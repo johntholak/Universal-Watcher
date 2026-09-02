@@ -17,7 +17,7 @@
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
 | Universal Watcher Core | 🟡 | Minimal watch/result contracts | Yes | Connect adapters only after Movies acceptance |
-| Universal Watcher Web App | 🟡 | V1 shell + in-memory lifecycle preview | Yes | Wire real adapters after Movies acceptance |
+| Universal Watcher Web App | 🟡 | V1 shell + in-memory lifecycle and results/evidence preview | Yes | Wire real adapters after Movies acceptance |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
 | Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key issued and awaiting Thursday production deployment; browser seat capture proven; 23 offline tests | Yes | Retry API after Thursday deployment, then run Odyssey acceptance; Mac browser regression remains useful |
 | Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9 | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
@@ -27,6 +27,20 @@
 | Event Producer Copilot | ⚪ | Planned, deliberately last | Placeholder | Do not lose; build after prior modules |
 | Car Search | ⚪ parking lot | Feasibility explored | Parking-lot note | Not active roadmap |
 | Restaurant PDF Menu Builder | 🚫 | Separate project | No | Keep separate |
+
+## Big-picture guardrail
+
+Universal Watcher work is intentionally split into two connected lanes:
+
+1. **Module verification:** Movies is the current live proof lane because its
+   AMC date and inventory behavior is the highest-risk unfinished area.
+2. **Platform foundation:** the shared contracts and web shell are being built
+   for Movies, Tickets, Family Deals, and future modules together.
+
+The platform work does not replace or narrow the module roadmap. Once Movies'
+API/Mac acceptance gate is complete, proven Family Deals, Ticket Watcher, and
+Seat Watcher engines will be connected through adapters, followed by theater
+discovery expansion and the later planned modules.
 
 ---
 
@@ -60,8 +74,11 @@ step is adapter mapping after the Movies API deployment and Mac acceptance
 regression.
 
 The shell preview now exercises draft lifecycle transitions (`active`,
-`paused`, and `completed`) through the same validation rules. These are local
-preview states only and do not start a watcher.
+`paused`, and `completed`) through the same validation rules. It also exposes
+an empty module-neutral results/evidence surface through `GET /api/results`.
+These are local preview states only and do not start a watcher or invent a
+match; an unavailable source remains distinct from `no_match` in the shared
+result contract.
 
 ---
 
@@ -240,9 +257,9 @@ One web application with initial module entry points and active-watch structure.
 Initial integrations should prioritize already-developed modules rather than inventing new ones.
 
 The first static shell foundation is now in `web/`. It is a dependency-free
-preview with module entry points, active-watch/activity surfaces, and a local
-draft flow. It does not start live watchers or alter the protected Movies
-engine.
+preview with module entry points, active-watch/activity/results-and-evidence
+surfaces, and a local draft flow. It does not start live watchers or alter the
+protected Movies engine.
 
 ### Milestone C — Module integration
 - Family Deals adapter

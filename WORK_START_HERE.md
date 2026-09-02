@@ -37,6 +37,12 @@ Preserve proven module engines. Prefer narrow fixes, tests, and adapters over re
 
 Do not work on another module yet.
 
+This priority is a verification lane, not a change to the product scope. The
+Universal Watcher core and web-shell work may continue when it is module-
+neutral and does not disturb the protected Movies engine. The end state still
+includes working Movies, Tickets, Family Deals, theater discovery, and later
+planned modules behind one control center.
+
 The current Movies implementation is the reconstructed AMC Seat Watcher V44.6 inside:
 
 `modules/seat-watcher/`
@@ -180,17 +186,21 @@ The live run should prove:
 
 The repository and private Git remote are now stable. A dependency-free
 Universal Watcher web-shell preview has also been started in `web/`; it is
-only a local draft/navigation surface and does not count Movies as verified.
-Keep the Movies API/Mac acceptance work as the next live verification step.
+only a local draft/navigation/results surface and does not count Movies as
+verified. Its Matches & evidence area stays empty until a module adapter
+publishes a normalized result with evidence.
+Keep the Movies API/Mac acceptance work as the next live verification step;
+module-neutral platform work can continue in parallel while that gate is
+pending. The next platform integration step is wiring proven module engines
+through adapters, after Movies is trustworthy.
 
-Only after Movies is trustworthy:
+After Movies is trustworthy:
 
 1. Freeze a master Git baseline.
 2. Configure one private Git remote.
 3. Use clone/pull/push as the cross-computer source of truth.
-4. Build Universal Watcher Web Shell V1.
-5. Integrate modules through adapters rather than rewriting proven engines.
-6. Continue roadmap:
+4. Integrate proven modules through adapters rather than rewriting engines.
+5. Continue roadmap:
    - Drop Watch
    - Automated Job Hunter
    - Event Producer Copilot last

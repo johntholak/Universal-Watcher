@@ -1,10 +1,12 @@
 import json
 import threading
 import unittest
+from datetime import datetime, timezone
 from http.client import HTTPConnection
 
-from server import DraftWatchStore, make_handler
+from server import DraftWatchStore, make_handler, serialize_result
 from http.server import ThreadingHTTPServer
+from core.contracts import Evidence, WatchResult
 
 
 class PreviewServerTests(unittest.TestCase):
@@ -78,6 +80,29 @@ class PreviewServerTests(unittest.TestCase):
 
         status, _ = self.request("PATCH", f"/api/watches/{watch_id}", {"status": "active"})
         self.assertEqual(status, 400)
+
+    def test_results_endpoint_is_empty_until_an_adapter_publishes_results(self):
+        status, results = self.request("GET", "/api/results")
+        self.assertEqual(status, 200)
+        self.assertEqual(results, [])
+
+    def test_result_serialization_preserves_evidence_and_truthful_outcome(self):
+        result = WatchResult(
+            result_id="result-1",
+            watch_id="watch-1",
+            module="movies",
+            title="The Odyssey · CityWalk",
+            outcome="unavailable",
+            verification="unverified",
+            coverage="partial",
+            evidence=(Evidence(source="AMC", kind="diagnostic", summary="Showtime discovery unavailable"),),
+            reason="The source could not be checked.",
+            observed_at=datetime(2026, 9, 2, tzinfo=timezone.utc),
+        )
+        serialized = serialize_result(result)
+        self.assertEqual(serialized["outcome"], "unavailable")
+        self.assertEqual(serialized["evidence"][0]["summary"], "Showtime discovery unavailable")
+        self.assertEqual(serialized["reason"], "The source could not be checked.")
 
 
 if __name__ == "__main__":

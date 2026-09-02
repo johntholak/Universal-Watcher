@@ -13,7 +13,7 @@ class WebShellTests(unittest.TestCase):
 
     def test_index_has_core_shell_surfaces(self):
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
-        for marker in ("Universal Watcher", "Active watches", "Recent activity", "Create a watch", "data-module=\"movies\"", "create-dialog"):
+        for marker in ("Universal Watcher", "Active watches", "Recent activity", "Matches &amp; evidence", "result-list", "Create a watch", "data-module=\"movies\"", "create-dialog"):
             self.assertIn(marker, html)
 
     def test_javascript_has_safe_draft_flow(self):
@@ -24,6 +24,8 @@ class WebShellTests(unittest.TestCase):
         self.assertIn("addDraft", javascript)
         self.assertIn("data-watch-action", javascript)
         self.assertIn('method: "PATCH"', javascript)
+        self.assertIn("/api/results", javascript)
+        self.assertIn("No verified matches yet", javascript)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,8 @@
   const watchList = document.querySelector("#watch-list");
   const activityList = document.querySelector("#activity-list");
   const watchCount = document.querySelector("#watch-count");
+  const resultList = document.querySelector("#result-list");
+  const resultCount = document.querySelector("#result-count");
   const pageTitle = document.querySelector("#page-title");
   const heroTitle = document.querySelector("#hero-title");
 
@@ -14,7 +16,7 @@
     tickets: "Tickets",
     "family-deals": "Family Deals",
   };
-  const state = { watches: [], activities: [] };
+  const state = { watches: [], activities: [], results: [] };
 
   function openDialog(module = "movies") {
     moduleInput.value = module;
@@ -62,6 +64,46 @@
       return;
     }
     activityList.innerHTML = state.activities.map((activity) => `<li class="activity-item"><div><strong>${escapeHtml(activity.message)}</strong><small>${escapeHtml(activity.detail)}</small></div></li>`).join("");
+  }
+
+  function renderResults() {
+    resultCount.textContent = String(state.results.length);
+    if (!state.results.length) {
+      resultList.className = "empty-state";
+      resultList.innerHTML = '<span class="empty-icon" aria-hidden="true">✓</span><h3>No verified matches yet</h3><p>Results and the evidence behind them will appear here as module adapters come online.</p>';
+      return;
+    }
+    resultList.className = "result-list";
+    resultList.innerHTML = state.results.map((result) => {
+      const outcome = ["match", "no_match", "unavailable", "error"].includes(result.outcome) ? result.outcome : "unavailable";
+      const evidence = Array.isArray(result.evidence) ? result.evidence : [];
+      const evidenceMarkup = evidence.length
+        ? evidence.map((item) => {
+            const summary = escapeHtml(item.summary || "Evidence captured");
+            const url = safeHttpUrl(item.url);
+            return `<span>${summary}${url ? ` · <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Source</a>` : ""}</span>`;
+          }).join("<br>")
+        : "No evidence attached";
+      const destination = safeHttpUrl(result.destination_url);
+      const moduleName = moduleLabels[result.module] || result.module || "Unknown module";
+      const coverage = result.coverage || "unknown";
+      const verification = result.verification || "unverified";
+      return `<article class="result-item"><div><strong>${escapeHtml(result.title || "Untitled result")}</strong><small>${escapeHtml(moduleName)} · ${escapeHtml(verification)} · ${escapeHtml(coverage)} coverage</small><div class="result-evidence">${evidenceMarkup}${result.reason ? `<br>${escapeHtml(result.reason)}` : ""}${destination ? ` · <a href="${escapeHtml(destination)}" target="_blank" rel="noreferrer">Open destination</a>` : ""}</div></div><div class="result-item-meta"><span class="result-status result-status-${outcome}">${outcomeLabel(outcome)}</span></div></article>`;
+    }).join("");
+  }
+
+  function outcomeLabel(outcome) {
+    return ({ match: "Match", no_match: "No match", unavailable: "Unavailable", error: "Error" })[outcome] || "Unavailable";
+  }
+
+  function safeHttpUrl(value) {
+    if (!value) return "";
+    try {
+      const url = new URL(value, window.location.href);
+      return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+    } catch (_error) {
+      return "";
+    }
   }
 
   function addDraft(watch, detail) {
@@ -137,6 +179,19 @@
     }
   }
 
+  async function hydrateResults() {
+    try {
+      const response = await fetch("/api/results", { cache: "no-store" });
+      if (!response.ok) return;
+      const results = await response.json();
+      if (!Array.isArray(results)) return;
+      state.results = results;
+      renderResults();
+    } catch (_error) {
+      // A static-only shell simply keeps the honest empty state.
+    }
+  }
+
   function selectView(view) {
     const label = moduleLabels[view] || "Overview";
     pageTitle.textContent = label;
@@ -179,5 +234,7 @@
 
   renderWatches();
   renderActivity();
+  renderResults();
   hydrateWatches();
+  hydrateResults();
 })();

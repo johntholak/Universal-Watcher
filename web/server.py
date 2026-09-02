@@ -1,6 +1,6 @@
 """Dependency-free local preview server for the Universal Watcher shell.
 
-This server is intentionally in-memory and draft-only. It demonstrates the
+This server is intentionally in-memory and preview-only. It demonstrates the
 web-to-core contract boundary without starting any live watcher or persisting
 account data.
 """
@@ -24,7 +24,7 @@ WEB_ROOT = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from core.contracts import WatchDefinition
+from core.contracts import Evidence, WatchDefinition, WatchResult
 
 
 SUPPORTED_MODULES = (
@@ -41,6 +41,7 @@ class DraftWatchStore:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._watches: list[WatchDefinition] = []
+        self._results: list[WatchResult] = []
 
     def add(self, watch: WatchDefinition) -> WatchDefinition:
         with self._lock:
@@ -61,6 +62,16 @@ class DraftWatchStore:
                 return updated
         return None
 
+    def add_result(self, result: WatchResult) -> WatchResult:
+        """Store a normalized result for a future adapter preview."""
+        with self._lock:
+            self._results.insert(0, result)
+        return result
+
+    def results(self) -> list[WatchResult]:
+        with self._lock:
+            return list(self._results)
+
 
 def serialize_watch(watch: WatchDefinition) -> dict[str, Any]:
     return {
@@ -70,6 +81,33 @@ def serialize_watch(watch: WatchDefinition) -> dict[str, Any]:
         "criteria": dict(watch.criteria),
         "status": watch.status,
         "created_at": watch.created_at.isoformat(),
+    }
+
+
+def serialize_evidence(evidence: Evidence) -> dict[str, Any]:
+    return {
+        "source": evidence.source,
+        "kind": evidence.kind,
+        "summary": evidence.summary,
+        "url": evidence.url,
+        "captured_at": evidence.captured_at.isoformat(),
+    }
+
+
+def serialize_result(result: WatchResult) -> dict[str, Any]:
+    """Expose the shared result contract without inventing live matches."""
+    return {
+        "result_id": result.result_id,
+        "watch_id": result.watch_id,
+        "module": result.module,
+        "title": result.title,
+        "outcome": result.outcome,
+        "verification": result.verification,
+        "coverage": result.coverage,
+        "evidence": [serialize_evidence(item) for item in result.evidence],
+        "destination_url": result.destination_url,
+        "reason": result.reason,
+        "observed_at": result.observed_at.isoformat(),
     }
 
 
@@ -128,6 +166,8 @@ def make_handler(store: DraftWatchStore):
                 self._send_json(list(SUPPORTED_MODULES))
             elif path == "/api/watches":
                 self._send_json([serialize_watch(watch) for watch in store.all()])
+            elif path == "/api/results":
+                self._send_json([serialize_result(result) for result in store.results()])
             else:
                 self._serve_static(path)
 
@@ -189,7 +229,7 @@ def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
     store = DraftWatchStore()
     server = ThreadingHTTPServer((host, port), make_handler(store))
     print(f"Universal Watcher shell preview: http://{host}:{server.server_port}/")
-    print("Drafts are held in memory only. Press Ctrl+C to stop.")
+    print("Drafts and preview results are held in memory only. Press Ctrl+C to stop.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -24,8 +24,10 @@ Verify the contract tests from the repository root:
 python -m unittest discover -s core -p "test_*.py" -v
 ```
 
-Do not connect the shell to these contracts until the Movies API deployment
-and Mac acceptance regression are complete.
+The shell preview reads these contracts at its in-memory boundary, including
+the empty results/evidence surface. This does not connect a live module or
+start monitoring; real adapters remain gated on the Movies API deployment
+and Mac acceptance regression.
 
 Likely future concerns:
 

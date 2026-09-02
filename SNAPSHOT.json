@@ -1,6 +1,6 @@
 {
   "snapshot": "Universal-Watcher-Master-Repo-v5",
-  "created_date": "2026-09-01",
+  "created_date": "2026-09-02",
   "family_deals": {
     "source_bundle": "HUNT-Codex-Handoff-v5.0.zip",
     "baseline": "V5.0 Fast Filters + Semantic Verifier",
@@ -12,21 +12,23 @@
     "imported": true
   },
   "seat_watcher": {
-    "baseline": "V44.4 reconstructed post-Codex",
+    "baseline": "V44.6 reconstructed post-Codex",
     "historical_target_commit": "7a19015",
     "exact_commit_recovered": false,
     "source": "User-uploaded V44 Depth/Layering baseline + saved August 28 Codex handoff",
     "imported": true,
-    "offline_tests": "13/13 passed",
+    "offline_tests": "23/23 passed",
     "live_regression_required": true,
-    "first_mac_live_feedback": "V44.2 fixed trackpad and proved current-day Odyssey IMAX 70MM discovery/seat checking. V44.4 follows AMC selectable dates to the last listed date, with a 35-day malfunction guard.",
-    "build": "V44.4 reconstructed",
+    "first_mac_live_feedback": "V44.2 fixed trackpad and proved current-day Odyssey IMAX 70MM discovery/seat checking. V44.6 follows AMC selectable dates to the last listed date, preserves truthful inventory failures, and can use the approved Showtime API when deployed.",
+    "build": "V44.6 reconstructed",
     "next_best": "Scan AMC selectable date range; 35-day safety ceiling only"
   },
   "restaurant_pdf_menu_builder_included": false,
   "verification": {
     "family_deals_tests": "13/13 passed in Master Repo V1",
     "ticket_watcher_tests": "12/12 passed in Master Repo V1",
+    "universal_watcher_core_tests": "5/5 passed",
+    "web_shell_tests": "9/9 passed",
     "repo_structure_check": "passed",
     "zip_integrity_check": "passed"
   }

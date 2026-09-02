@@ -32,11 +32,11 @@ Additional Movies support:
 
 The first dependency-free control-center preview is in `web/`:
 
-- `web/index.html` — module chooser, active-watch/activity surfaces, and draft dialog.
+- `web/index.html` — module chooser, active-watch/activity/results surfaces, and draft dialog.
 - `web/styles.css` — responsive shell styling and keyboard focus states.
 - `web/app.js` — local draft/navigation behavior only; no live watcher calls.
 - `web/test_web_shell.py` — focused static shell checks.
-- `web/server.py` — in-memory preview API backed by the shared watch contract.
+- `web/server.py` — in-memory preview API backed by the shared watch/result contracts.
 - `web/test_server.py` — static/API preview tests.
 
 ## Universal Watcher core contracts

@@ -23,7 +23,8 @@ This V1 bootstrap contains:
 - Ticket Watcher V1.11 source bundle, including the working Ticketmaster live-watcher path and StubHub diagnostics.
 - Seat Watcher V44 reconstructed post-Codex source, built from the user's uploaded Depth/Layering baseline plus the saved August 28 Codex handoff. This is a reconstruction, not a byte-for-byte recovery of Git commit `7a19015`.
 - Placeholder module directories for Theater Discovery, Drop Watch, Job Hunter, and Event Producer Copilot.
-- Architecture placeholders for the future Universal Watcher core and web app.
+- Initial shared watch/result contracts and a dependency-free Universal Watcher
+  web-shell preview for the future control center.
 
 ## Important naming rule
 
