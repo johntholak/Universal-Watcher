@@ -45,6 +45,12 @@ The first dependency-free control-center preview is in `web/`:
 - `core/test_contracts.py` — validation and truthful-outcome checks.
 - `core/__init__.py` — package exports for the contract types.
 
+## Universal Watcher module adapters
+
+- `adapters/family_deals.py` — translates Family Deals V5 job records into shared `WatchResult` and `Evidence` values without changing the engine.
+- `adapters/test_family_deals.py` — adapter mapping and truthful-unavailability tests.
+- `adapters/README.md` — adapter boundary and current integration limits.
+
 ## Separate project
 
 Restaurant PDF menu builder is not part of this repo.

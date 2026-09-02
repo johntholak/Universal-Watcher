@@ -4,7 +4,8 @@
   "family_deals": {
     "source_bundle": "HUNT-Codex-Handoff-v5.0.zip",
     "baseline": "V5.0 Fast Filters + Semantic Verifier",
-    "imported": true
+    "imported": true,
+    "adapter_mapping": "adapters/family_deals.py translates V5 job outcomes; live execution pending"
   },
   "ticket_watcher": {
     "source_bundle": "ticket-watcher-v1.11.zip",
@@ -29,6 +30,7 @@
     "ticket_watcher_tests": "12/12 passed in Master Repo V1",
     "universal_watcher_core_tests": "5/5 passed",
     "web_shell_tests": "9/9 passed",
+    "family_deals_adapter_tests": "6/6 passed",
     "repo_structure_check": "passed",
     "zip_integrity_check": "passed"
   }

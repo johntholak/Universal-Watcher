@@ -28,6 +28,10 @@ required = [
     "core/contracts.py",
     "core/test_contracts.py",
     "core/__init__.py",
+    "adapters/__init__.py",
+    "adapters/README.md",
+    "adapters/family_deals.py",
+    "adapters/test_family_deals.py",
 ]
 
 missing = [p for p in required if not (ROOT / p).exists()]

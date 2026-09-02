@@ -16,9 +16,9 @@
 
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
-| Universal Watcher Core | 🟡 | Minimal watch/result contracts | Yes | Connect adapters only after Movies acceptance |
+| Universal Watcher Core | 🟡 | Minimal watch/result contracts + Family Deals mapping | Yes | Keep live execution gated; add proven adapters after Movies acceptance |
 | Universal Watcher Web App | 🟡 | V1 shell + in-memory lifecycle and results/evidence preview | Yes | Wire real adapters after Movies acceptance |
-| Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
+| Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier; isolated result adapter mapping | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
 | Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key issued and awaiting Thursday production deployment; browser seat capture proven; 23 offline tests | Yes | Retry API after Thursday deployment, then run Odyssey acceptance; Mac browser regression remains useful |
 | Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9 | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
 | Theater Discovery | 🟠 | Separate-workstream decision made | Placeholder | Build non-AMC providers independently, then normalize into Seat Watcher |
@@ -42,6 +42,12 @@ API/Mac acceptance gate is complete, proven Family Deals, Ticket Watcher, and
 Seat Watcher engines will be connected through adapters, followed by theater
 discovery expansion and the later planned modules.
 
+While the Movies gate is waiting on AMC/API and Mac access, isolated adapter
+mapping is allowed when it only translates an existing module job record and
+does not start live monitoring or alter that module's engine. Family Deals is
+the first such mapping; its live benchmark and web execution remain separate
+acceptance steps.
+
 ---
 
 # 1. Universal Watcher Core
@@ -60,18 +66,19 @@ small `run_once` adapter protocol. No existing module is wired to it yet.
 
 ## Next
 
-After source-control consolidation:
+The initial extraction sequence is now:
 
-1. define a small module adapter contract
-2. define watch/result models
-3. define job/worker execution model
-4. define server-vs-local-helper boundary
-5. avoid premature rewrites
+1. [x] define a small module adapter contract
+2. [x] define watch/result models
+3. [ ] define job/worker execution model
+4. [ ] define server-vs-local-helper boundary
+5. [x] avoid premature rewrites
 
 The first contract step is complete. The web shell now exercises the watch
-definition boundary through a dependency-free in-memory preview API. The next
-step is adapter mapping after the Movies API deployment and Mac acceptance
-regression.
+definition boundary through a dependency-free in-memory preview API. A first
+isolated Family Deals result adapter mapping is also present, while live
+adapter execution remains gated on the Movies API deployment and Mac
+acceptance regression.
 
 The shell preview now exercises draft lifecycle transitions (`active`,
 `paused`, and `completed`) through the same validation rules. It also exposes
@@ -262,7 +269,7 @@ surfaces, and a local draft flow. It does not start live watchers or alter the
 protected Movies engine.
 
 ### Milestone C — Module integration
-- Family Deals adapter
+- Family Deals adapter (isolated result mapping started; live execution pending)
 - Seat Watcher adapter/local-helper strategy
 - Ticket Watcher adapter
 - Theater discovery expansion

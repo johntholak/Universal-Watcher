@@ -26,8 +26,9 @@ python -m unittest discover -s core -p "test_*.py" -v
 
 The shell preview reads these contracts at its in-memory boundary, including
 the empty results/evidence surface. This does not connect a live module or
-start monitoring; real adapters remain gated on the Movies API deployment
-and Mac acceptance regression.
+start monitoring; live adapter execution remains gated on the Movies API
+deployment and Mac acceptance regression. Isolated adapter mappings can be
+developed and tested against completed module job records in the meantime.
 
 Likely future concerns:
 

@@ -405,9 +405,25 @@ results state. The next step is real adapter wiring after the Movies API
 deployment and Mac acceptance regression. Do not change the protected Seat
 Watcher engine as part of shell work.
 
+## 11. Isolated module adapter checks
+
+The first adapter mapping is in `adapters/family_deals.py`. It translates
+completed Family Deals V5 job records into shared result/evidence values and
+keeps unresolved hours, capacity, or source coverage truthful. It does not
+start the Family Deals server or make live requests.
+
+Verify it from the repository root:
+
+```text
+python -m unittest discover -s adapters -p "test_*.py" -v
+```
+
+Live adapter execution remains gated until the Movies API deployment and Mac
+acceptance regression are complete.
+
 ---
 
-# 11. Switching computers safely
+# 12. Switching computers safely
 
 Once a private Git remote is configured, the operating pattern should be:
 
@@ -439,7 +455,7 @@ This is the intended cure for cross-computer / ChatGPT / Codex drift.
 
 ---
 
-# 12. What must never be treated as source of truth
+# 13. What must never be treated as source of truth
 
 Once Git is configured, do not treat these as authoritative development sources:
 

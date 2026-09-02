@@ -25,6 +25,8 @@ This V1 bootstrap contains:
 - Placeholder module directories for Theater Discovery, Drop Watch, Job Hunter, and Event Producer Copilot.
 - Initial shared watch/result contracts and a dependency-free Universal Watcher
   web-shell preview for the future control center.
+- An isolated Family Deals adapter that maps existing V5 job outcomes into the
+  shared result/evidence contract; live adapter execution remains gated.
 
 ## Important naming rule
 

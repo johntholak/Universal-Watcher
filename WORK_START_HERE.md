@@ -35,7 +35,9 @@ Preserve proven module engines. Prefer narrow fixes, tests, and adapters over re
 
 # CURRENT PRIORITY: MOVIES
 
-Do not work on another module yet.
+Do not alter another module's proven engine while Movies is pending. An
+isolated adapter or contract-mapping slice may be prepared when it only
+translates existing module output and does not start live monitoring.
 
 This priority is a verification lane, not a change to the product scope. The
 Universal Watcher core and web-shell work may continue when it is module-
