@@ -178,6 +178,11 @@ The live run should prove:
 
 # PRODUCT DIRECTION AFTER MOVIES IS VERIFIED
 
+The repository and private Git remote are now stable. A dependency-free
+Universal Watcher web-shell preview has also been started in `web/`; it is
+only a local draft/navigation surface and does not count Movies as verified.
+Keep the Movies API/Mac acceptance work as the next live verification step.
+
 Only after Movies is trustworthy:
 
 1. Freeze a master Git baseline.

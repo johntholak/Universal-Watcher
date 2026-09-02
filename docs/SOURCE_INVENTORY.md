@@ -28,6 +28,15 @@ Additional Movies support:
 - `modules/seat-watcher/live_amc_diagnostic.py` — repeatable headless diagnostic.
 - `modules/seat-watcher/.env.example` — ignored local key template.
 
+## Universal Watcher web shell
+
+The first dependency-free control-center preview is in `web/`:
+
+- `web/index.html` — module chooser, active-watch/activity surfaces, and draft dialog.
+- `web/styles.css` — responsive shell styling and keyboard focus states.
+- `web/app.js` — local draft/navigation behavior only; no live watcher calls.
+- `web/test_web_shell.py` — focused static shell checks.
+
 ## Separate project
 
 Restaurant PDF menu builder is not part of this repo.

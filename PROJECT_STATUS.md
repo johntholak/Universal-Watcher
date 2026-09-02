@@ -2,7 +2,7 @@
 
 **Status date:** September 2, 2026  
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Master Repo V1 → shared Git remote → import current Seat Watcher baseline → Universal Watcher web shell
+**Current milestone:** Universal Watcher Web Shell V1 static foundation; Movies API/Mac acceptance remains pending
 
 ## Status legend
 
@@ -17,7 +17,7 @@
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
 | Universal Watcher Core | 🟠 | Architecture defined | Placeholder | Establish shared contracts only after module baselines are safe |
-| Universal Watcher Web App | ⚪ | End-state defined | Placeholder | Build shell after repo/Seat import is complete |
+| Universal Watcher Web App | 🟡 | V1 static shell preview | Yes | Connect shared watch/result contracts after Movies acceptance |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
 | Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key issued and awaiting Thursday production deployment; browser seat capture proven; 23 offline tests | Yes | Retry API after Thursday deployment, then run Odyssey acceptance; Mac browser regression remains useful |
 | Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9 | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
@@ -215,16 +215,21 @@ No production-ready non-AMC implementation is claimed yet.
 ## Current sequence
 
 ### Milestone A — Source-control reliability
-- Master repo exists.
-- Configure private shared Git remote.
-- Import current Seat Watcher folder.
-- Establish baseline commits.
-- Confirm all run instructions.
+- [x] Master repo exists.
+- [x] Configure private shared Git remote.
+- [x] Import current Seat Watcher folder.
+- [x] Establish baseline commits.
+- [x] Confirm all run instructions.
 
 ### Milestone B — Universal Watcher Web Shell V1
 One web application with initial module entry points and active-watch structure.
 
 Initial integrations should prioritize already-developed modules rather than inventing new ones.
+
+The first static shell foundation is now in `web/`. It is a dependency-free
+preview with module entry points, active-watch/activity surfaces, and a local
+draft flow. It does not start live watchers or alter the protected Movies
+engine.
 
 ### Milestone C — Module integration
 - Family Deals adapter
@@ -255,10 +260,10 @@ Car Search Aggregator remains a strong possible Universal Watcher module but is 
 - [x] Create authoritative product/status/run documents
 - [x] Add reconstructed Seat Watcher post-Codex build (exact lost Git tree still unavailable)
 - [x] Initialize local Git repository and stage the V44.6 baseline
-- [ ] Configure shared private Git remote
-- [ ] Create baseline commit after reconstructed Seat Watcher live regression
+- [x] Configure shared private Git remote
+- [x] Create baseline commit after reconstructed Seat Watcher live regression
 - [ ] Verify all modules run from repo paths
-- [ ] Begin Universal Watcher web shell
+- [x] Begin Universal Watcher web shell
 
 
 ### Movies V44.4 Next Best behavior

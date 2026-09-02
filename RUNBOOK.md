@@ -41,7 +41,10 @@ modules/seat-watcher/
 
 It was reconstructed from the uploaded V44 Depth/Layering baseline using the saved August 28 Codex handoff. It is not a byte-for-byte recovery of lost commit `7a19015`.
 
-A local Git repository is now initialized and the V44.6 baseline is staged, but the recovery commit could not be created in the current environment because `.git` metadata writes were blocked. A shared Git remote is also not yet configured. Complete the local commit before treating multiple computers as simultaneous development machines.
+A local Git repository is initialized, the reconstructed V44.6 baseline is
+committed, and the shared GitHub remote is configured as `origin`. The current
+remote baseline is the `main` branch. Before changing files on another
+computer, pull first and confirm a clean status.
 
 ---
 
@@ -345,15 +348,31 @@ Not built yet.
 
 # 10. Universal Watcher web app
 
-Future path:
+The first dependency-free shell preview is in:
 
 ```text
 web/
 ```
 
-No production web shell exists yet.
+Run it from the repository root:
 
-Do not mistake the Family Deals local web UI for the final Universal Watcher web application.
+```text
+python -m http.server 8080 --directory web
+```
+
+Open `http://127.0.0.1:8080/`. This preview supports module navigation and
+clearly labeled local watch drafts only. It does not start Movies, Tickets, or
+Family Deals monitoring and must not be treated as a production web app.
+
+Verify the shell:
+
+```text
+python -m unittest discover -s web -p "test_*.py" -v
+```
+
+The next step is shared watch/result contracts and an adapter boundary after
+the Movies API deployment and Mac acceptance regression. Do not change the
+protected Seat Watcher engine as part of shell work.
 
 ---
 

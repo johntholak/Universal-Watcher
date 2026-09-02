@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Universal Watcher control center preview">
+  <title>Universal Watcher</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Universal Watcher navigation">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">UW</span>
+        <span>
+          <strong>Universal Watcher</strong>
+          <small>Control center</small>
+        </span>
+      </div>
+
+      <button class="button button-primary sidebar-create" type="button" data-open-create>
+        <span aria-hidden="true">+</span> New watch
+      </button>
+
+      <nav class="nav-list" aria-label="Views">
+        <button class="nav-item is-active" type="button" data-view="overview">Overview</button>
+        <button class="nav-item" type="button" data-view="movies">Movies</button>
+        <button class="nav-item" type="button" data-view="tickets">Tickets</button>
+        <button class="nav-item" type="button" data-view="family-deals">Family Deals</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span>Local shell preview</span>
+      </div>
+    </aside>
+
+    <main id="main-content" class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Personal internet agent</p>
+          <h1 id="page-title">Overview</h1>
+        </div>
+        <button class="button button-icon" type="button" data-open-create aria-label="Create a new watch">+</button>
+      </header>
+
+      <section class="hero" aria-labelledby="hero-title">
+        <div>
+          <p class="eyebrow">Discover · verify · monitor · act</p>
+          <h2 id="hero-title">Let Universal Watcher keep looking.</h2>
+          <p class="hero-copy">Create a watch once, then keep the useful results and evidence in one place.</p>
+        </div>
+        <button class="button button-primary" type="button" data-open-create>Create a watch</button>
+      </section>
+
+      <section class="dashboard-grid" aria-label="Watch summary">
+        <article class="panel">
+          <header class="panel-header">
+            <div>
+              <p class="eyebrow">Monitoring</p>
+              <h2>Active watches</h2>
+            </div>
+            <span class="count-badge" id="watch-count">0</span>
+          </header>
+          <div id="watch-list" class="empty-state">
+            <span class="empty-icon" aria-hidden="true">⌁</span>
+            <h3>No watches yet</h3>
+            <p>Your Movies, Tickets, and Family Deals watches will appear here.</p>
+            <button class="button button-secondary" type="button" data-open-create>Start your first watch</button>
+          </div>
+        </article>
+
+        <article class="panel">
+          <header class="panel-header">
+            <div>
+              <p class="eyebrow">Evidence trail</p>
+              <h2>Recent activity</h2>
+            </div>
+          </header>
+          <ol id="activity-list" class="activity-list">
+            <li class="activity-empty">Activity will appear when a watch runs.</li>
+          </ol>
+        </article>
+      </section>
+
+      <section class="modules" aria-labelledby="modules-title">
+        <header class="section-header">
+          <div>
+            <p class="eyebrow">Watch types</p>
+            <h2 id="modules-title">Choose a starting point</h2>
+          </div>
+          <p class="section-note">The shell is ready for module adapters.</p>
+        </header>
+        <div class="module-grid">
+          <button class="module-card" type="button" data-module="movies">
+            <span class="module-icon movies-icon" aria-hidden="true">▦</span>
+            <span class="module-card-copy"><strong>Movies</strong><small>Seat availability and showtimes</small></span>
+            <span class="module-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="module-card" type="button" data-module="tickets">
+            <span class="module-icon tickets-icon" aria-hidden="true">◆</span>
+            <span class="module-card-copy"><strong>Tickets</strong><small>Events, prices, and inventory</small></span>
+            <span class="module-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="module-card" type="button" data-module="family-deals">
+            <span class="module-icon family-icon" aria-hidden="true">✦</span>
+            <span class="module-card-copy"><strong>Family Deals</strong><small>Nearby offers that fit</small></span>
+            <span class="module-arrow" aria-hidden="true">→</span>
+          </button>
+          <div class="module-card module-card-disabled" aria-disabled="true">
+            <span class="module-icon planned-icon" aria-hidden="true">…</span>
+            <span class="module-card-copy"><strong>More watchers</strong><small>Coming after the foundation</small></span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="create-dialog" class="create-dialog" aria-labelledby="dialog-title">
+    <form id="create-form" method="dialog">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">New watch</p>
+          <h2 id="dialog-title">Start with a simple draft</h2>
+        </div>
+        <button class="dialog-close" type="button" data-close-dialog aria-label="Close">×</button>
+      </div>
+      <label for="watch-module">Watch type</label>
+      <select id="watch-module" name="module">
+        <option value="movies">Movies</option>
+        <option value="tickets">Tickets</option>
+        <option value="family-deals">Family Deals</option>
+      </select>
+      <label for="watch-name">What are you watching for?</label>
+      <input id="watch-name" name="name" type="text" placeholder="Example: The Odyssey at CityWalk" required>
+      <p class="form-note">This preview creates a local draft only. It does not start a live search.</p>
+      <div class="dialog-actions">
+        <button class="button button-secondary" type="button" data-close-dialog>Cancel</button>
+        <button class="button button-primary" type="submit">Create draft</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

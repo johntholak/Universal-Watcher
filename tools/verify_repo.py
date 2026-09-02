@@ -19,6 +19,10 @@ required = [
     "modules/seat-watcher/tests/test_amc_showtime_api.py",
     "modules/seat-watcher/run_v44.command",
     "modules/seat-watcher/requirements.txt",
+    "web/index.html",
+    "web/styles.css",
+    "web/app.js",
+    "web/test_web_shell.py",
 ]
 
 missing = [p for p in required if not (ROOT / p).exists()]
