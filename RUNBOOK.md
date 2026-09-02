@@ -379,8 +379,9 @@ python web/server.py
 ```
 
 Open `http://127.0.0.1:8080/`. This preview supports module navigation and
-clearly labeled local watch drafts only. It does not start Movies, Tickets, or
-Family Deals monitoring and must not be treated as a production web app.
+clearly labeled local watch drafts, including start/pause/resume/stop lifecycle
+controls. It does not start Movies, Tickets, or Family Deals monitoring and
+must not be treated as a production web app.
 
 For a static-only preview without the local draft API:
 
@@ -398,9 +399,9 @@ python -m unittest discover -s web -p "test_*.py" -v
 ```
 
 The shell now speaks to the shared watch contract through the in-memory
-preview API. The next step is real adapter wiring after the Movies API
-deployment and Mac acceptance regression. Do not change the protected Seat
-Watcher engine as part of shell work.
+preview API, including validated lifecycle transitions. The next step is real
+adapter wiring after the Movies API deployment and Mac acceptance regression.
+Do not change the protected Seat Watcher engine as part of shell work.
 
 ---
 

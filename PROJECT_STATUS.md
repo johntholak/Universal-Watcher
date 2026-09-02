@@ -17,7 +17,7 @@
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
 | Universal Watcher Core | 🟡 | Minimal watch/result contracts | Yes | Connect adapters only after Movies acceptance |
-| Universal Watcher Web App | 🟡 | V1 shell + in-memory contract preview | Yes | Wire real adapters after Movies acceptance |
+| Universal Watcher Web App | 🟡 | V1 shell + in-memory lifecycle preview | Yes | Wire real adapters after Movies acceptance |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
 | Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key issued and awaiting Thursday production deployment; browser seat capture proven; 23 offline tests | Yes | Retry API after Thursday deployment, then run Odyssey acceptance; Mac browser regression remains useful |
 | Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9 | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
@@ -58,6 +58,10 @@ The first contract step is complete. The web shell now exercises the watch
 definition boundary through a dependency-free in-memory preview API. The next
 step is adapter mapping after the Movies API deployment and Mac acceptance
 regression.
+
+The shell preview now exercises draft lifecycle transitions (`active`,
+`paused`, and `completed`) through the same validation rules. These are local
+preview states only and do not start a watcher.
 
 ---
 

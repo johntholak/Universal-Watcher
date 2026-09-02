@@ -16,7 +16,20 @@ class ContractTests(unittest.TestCase):
         )
         self.assertEqual(watch.status, "draft")
         self.assertEqual(watch.with_status("active").status, "active")
+        self.assertEqual(watch.transition_to("active").status, "active")
         self.assertEqual(watch.created_at, created)
+
+        with self.assertRaises(ValueError):
+            watch.transition_to("paused")
+
+    def test_watch_lifecycle_rejects_invalid_backwards_moves(self):
+        watch = WatchDefinition("watch-1", "movies", "The Odyssey").transition_to("active")
+        paused = watch.transition_to("paused")
+        self.assertEqual(paused.transition_to("active").status, "active")
+        with self.assertRaises(ValueError):
+            paused.transition_to("draft")
+        with self.assertRaises(ValueError):
+            watch.transition_to("draft")
 
     def test_watch_definition_rejects_invalid_values(self):
         with self.assertRaises(ValueError):

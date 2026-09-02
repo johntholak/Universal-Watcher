@@ -35,7 +35,25 @@
       return;
     }
     watchList.className = "watch-list";
-    watchList.innerHTML = state.watches.map((watch) => `<div class="watch-item"><div><strong>${escapeHtml(watch.query || watch.name)}</strong><small>${moduleLabels[watch.module]} · local draft</small></div><span class="watch-status">Draft</span></div>`).join("");
+    watchList.innerHTML = state.watches.map((watch) => {
+      const status = watch.status || "draft";
+      const controls = watchControls(watch);
+      return `<div class="watch-item"><div><strong>${escapeHtml(watch.query || watch.name)}</strong><small>${moduleLabels[watch.module]} · local preview</small></div><div class="watch-item-actions"><span class="watch-status watch-status-${status}">${statusLabel(status)}</span>${controls}</div></div>`;
+    }).join("");
+  }
+
+  function statusLabel(status) {
+    return ({ draft: "Draft", active: "Active", paused: "Paused", completed: "Stopped", error: "Error" })[status] || "Draft";
+  }
+
+  function watchControls(watch) {
+    const status = watch.status || "draft";
+    const id = escapeHtml(watch.watch_id || "");
+    if (!id) return "";
+    if (status === "draft") return `<button class="watch-action" type="button" data-watch-action="active" data-watch-id="${id}">Start</button>`;
+    if (status === "active") return `<button class="watch-action" type="button" data-watch-action="paused" data-watch-id="${id}">Pause</button><button class="watch-action" type="button" data-watch-action="completed" data-watch-id="${id}">Stop</button>`;
+    if (status === "paused") return `<button class="watch-action" type="button" data-watch-action="active" data-watch-id="${id}">Resume</button><button class="watch-action" type="button" data-watch-action="completed" data-watch-id="${id}">Stop</button>`;
+    return "";
   }
 
   function renderActivity() {
@@ -76,6 +94,36 @@
     }
   }
 
+  async function changeWatchStatus(watchId, status) {
+    const watch = state.watches.find((item) => item.watch_id === watchId);
+    if (!watch) return;
+    try {
+      const response = await fetch(`/api/watches/${encodeURIComponent(watchId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error("Preview API unavailable");
+      const updated = await response.json();
+      Object.assign(watch, updated);
+    } catch (_error) {
+      // Keep the static-only preview useful without claiming a live run.
+      const allowed = {
+        draft: ["active", "error"],
+        active: ["paused", "completed", "error"],
+        paused: ["active", "completed", "error"],
+      };
+      if (!(allowed[watch.status || "draft"] || []).includes(status)) return;
+      watch.status = status;
+    }
+    state.activities.unshift({
+      message: `${statusLabel(status)} ${moduleLabels[watch.module]} draft`,
+      detail: "Local preview · not monitoring yet",
+    });
+    renderWatches();
+    renderActivity();
+  }
+
   async function hydrateWatches() {
     try {
       const response = await fetch("/api/watches", { cache: "no-store" });
@@ -112,6 +160,9 @@
 
     const moduleCard = event.target.closest("button[data-module]");
     if (moduleCard) openDialog(moduleCard.dataset.module);
+
+    const actionButton = event.target.closest("[data-watch-action]");
+    if (actionButton) changeWatchStatus(actionButton.dataset.watchId, actionButton.dataset.watchAction);
   });
 
   form.addEventListener("submit", async (event) => {

@@ -22,6 +22,14 @@ RESULT_OUTCOMES = frozenset({"match", "no_match", "unavailable", "error"})
 VERIFICATION_STATUSES = frozenset({"unverified", "verified", "rejected"})
 COVERAGE_STATUSES = frozenset({"complete", "partial", "unavailable", "unknown"})
 
+WATCH_TRANSITIONS = {
+    "draft": frozenset({"active", "error"}),
+    "active": frozenset({"paused", "completed", "error"}),
+    "paused": frozenset({"active", "completed", "error"}),
+    "completed": frozenset(),
+    "error": frozenset(),
+}
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -58,6 +66,16 @@ class WatchDefinition:
     def with_status(self, status: WatchStatus) -> "WatchDefinition":
         if status not in WATCH_STATUSES:
             raise ValueError(f"unsupported watch status: {status}")
+        return replace(self, status=status)
+
+    def transition_to(self, status: WatchStatus) -> "WatchDefinition":
+        """Return a copy after enforcing the watch lifecycle."""
+        if status not in WATCH_STATUSES:
+            raise ValueError(f"unsupported watch status: {status}")
+        if status == self.status:
+            return self
+        if status not in WATCH_TRANSITIONS[self.status]:
+            raise ValueError(f"cannot transition watch from {self.status} to {status}")
         return replace(self, status=status)
 
 

@@ -9,6 +9,7 @@ API, or persist account data.
 - module chooser for Movies, Tickets, and Family Deals
 - create-watch dialog that creates a clearly labeled local draft
 - active-watch and recent-activity areas
+- local draft lifecycle controls: start, pause, resume, and stop
 - responsive layout with keyboard focus states
 - planned-module placeholder without claiming an integration exists
 
@@ -16,9 +17,9 @@ The shell uses plain HTML, CSS, and JavaScript so it can be opened without a
 framework or dependency install. Existing module engines remain unchanged.
 
 `server.py` adds a small in-memory preview API. It accepts draft watch
-definitions through the shared `core.contracts` types and serves the same
-static assets. No live watcher, authentication, persistence, or external API
-call is involved.
+definitions and lifecycle transitions through the shared `core.contracts`
+types and serves the same static assets. No live watcher, authentication,
+persistence, or external API call is involved.
 
 ## Run locally
 

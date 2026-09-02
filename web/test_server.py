@@ -61,6 +61,24 @@ class PreviewServerTests(unittest.TestCase):
         status, _ = self.request("POST", "/api/watches", {"module": "drop-watch", "query": "Anything"})
         self.assertEqual(status, 400)
 
+    def test_lifecycle_endpoint_uses_shared_transition_rules(self):
+        status, draft = self.request("POST", "/api/watches", {"module": "tickets", "query": "Example event"})
+        self.assertEqual(status, 201)
+        watch_id = draft["watch_id"]
+
+        status, active = self.request("PATCH", f"/api/watches/{watch_id}", {"status": "active"})
+        self.assertEqual(status, 200)
+        self.assertEqual(active["status"], "active")
+        status, paused = self.request("PATCH", f"/api/watches/{watch_id}", {"status": "paused"})
+        self.assertEqual(status, 200)
+        self.assertEqual(paused["status"], "paused")
+        status, stopped = self.request("PATCH", f"/api/watches/{watch_id}", {"status": "completed"})
+        self.assertEqual(status, 200)
+        self.assertEqual(stopped["status"], "completed")
+
+        status, _ = self.request("PATCH", f"/api/watches/{watch_id}", {"status": "active"})
+        self.assertEqual(status, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

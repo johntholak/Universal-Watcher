@@ -22,6 +22,8 @@ class WebShellTests(unittest.TestCase):
         self.assertIn("Browser-only preview", javascript)
         self.assertIn("escapeHtml", javascript)
         self.assertIn("addDraft", javascript)
+        self.assertIn("data-watch-action", javascript)
+        self.assertIn('method: "PATCH"', javascript)
 
 
 if __name__ == "__main__":

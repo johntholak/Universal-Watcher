@@ -51,6 +51,16 @@ class DraftWatchStore:
         with self._lock:
             return list(self._watches)
 
+    def transition(self, watch_id: str, status: str) -> WatchDefinition | None:
+        with self._lock:
+            for index, watch in enumerate(self._watches):
+                if watch.watch_id != watch_id:
+                    continue
+                updated = watch.transition_to(status)  # type: ignore[arg-type]
+                self._watches[index] = updated
+                return updated
+        return None
+
 
 def serialize_watch(watch: WatchDefinition) -> dict[str, Any]:
     return {
@@ -147,6 +157,27 @@ def make_handler(store: DraftWatchStore):
                 return
             store.add(watch)
             self._send_json(serialize_watch(watch), HTTPStatus.CREATED)
+
+        def do_PATCH(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
+            path = urlparse(self.path).path
+            prefix = "/api/watches/"
+            if not path.startswith(prefix) or not path[len(prefix):]:
+                self._send_error_json("Not found", HTTPStatus.NOT_FOUND)
+                return
+            payload = self._read_json()
+            status = payload.get("status") if payload else None
+            if status not in {"active", "paused", "completed", "error"}:
+                self._send_error_json("Unsupported watch status", HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                watch = store.transition(path[len(prefix):], status)
+            except (TypeError, ValueError) as exc:
+                self._send_error_json(str(exc), HTTPStatus.BAD_REQUEST)
+                return
+            if watch is None:
+                self._send_error_json("Watch not found", HTTPStatus.NOT_FOUND)
+                return
+            self._send_json(serialize_watch(watch))
 
         def log_message(self, _format: str, *_args: Any) -> None:
             return
