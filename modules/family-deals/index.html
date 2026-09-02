@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HUNT | Family Deals</title>
+  <style>
+    :root{
+      --ink:#17254a;
+      --muted:#6f7c9a;
+      --line:#dfe5f2;
+      --panel:#f8faff;
+      --white:#fff;
+      --purple:#5d5df5;
+      --blue:#4e67f4;
+      --green:#25c8a1;
+      --navy:#111d43;
+      --shadow:0 16px 50px rgba(34,46,88,.10);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:
+      radial-gradient(circle at 86% 12%,rgba(122,104,255,.25),transparent 27%),
+      radial-gradient(circle at 8% 88%,rgba(53,211,191,.23),transparent 28%),
+      #eef3fb;min-height:100vh}
+    button,input{font:inherit}
+    .app{max-width:1420px;margin:0 auto;padding:20px 24px 44px}
+    .topbar{height:72px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:20px}
+    .brand{display:flex;align-items:center;gap:12px}.brandmark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:800;background:linear-gradient(145deg,var(--purple),#7d61ef 52%,var(--green));box-shadow:0 10px 20px rgba(86,84,225,.25)}
+    .brandname{font-weight:900;letter-spacing:.22em;font-size:16px}.brandsub{font-size:12px;color:var(--muted);margin-top:4px}
+    .tabs{display:flex;gap:8px;background:rgba(255,255,255,.35);padding:5px;border-radius:999px}.tab{border:0;background:transparent;padding:11px 18px;border-radius:999px;color:#67718d;font-weight:700;font-size:13px}.tab.active{background:#fff;color:#4152e8;box-shadow:0 4px 16px rgba(70,82,150,.08)}.tag{font-size:9px;color:#929bb1;margin-left:6px}
+    .saved{justify-self:end;border:1px solid rgba(100,110,160,.15);background:rgba(255,255,255,.35);padding:10px 16px;border-radius:999px;font-weight:700;color:#42506d}
+    .layout{display:grid;grid-template-columns:340px 1fr;gap:22px;align-items:stretch}
+    .left,.main{background:rgba(249,251,255,.92);border:1px solid rgba(255,255,255,.88);box-shadow:var(--shadow);border-radius:28px;overflow:hidden}
+    .left{padding:28px 26px}.eyebrow{font-size:12px;letter-spacing:.14em;font-weight:900;color:#5b61ef;text-transform:uppercase}.left h1{font-size:28px;margin:14px 0 8px;font-weight:500;letter-spacing:-.04em}.sub{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:28px}
+    label{display:block;font-size:12px;font-weight:800;color:#40506e;margin:18px 0 8px}.field{height:42px;background:#fff;border:1px solid #dbe2ef;border-radius:11px;display:flex;align-items:center;padding:0 12px;gap:9px;box-shadow:0 1px 2px rgba(32,48,90,.03)}.field input{border:0;outline:0;width:100%;color:#31405e;background:transparent;font-size:13px}.icon{color:#7584a4}
+    .sliderline{display:flex;justify-content:space-between;align-items:center}.value{color:#4352eb;font-size:13px;font-weight:900}.range{width:100%;accent-color:#111827}.rangeLabels{display:flex;justify-content:space-between;color:#8b96ae;font-size:10px;margin-top:2px}
+    .counter{height:44px;border:1px solid #dbe2ef;border-radius:11px;display:grid;grid-template-columns:44px 1fr 44px;overflow:hidden;background:#fff}.counter button{border:0;background:#f2f5ff;color:#4d5ce9;font-size:19px}.counterMid{display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px}.counterMid b{font-size:16px}.mutedSmall{color:#8a95ad;font-size:11px}
+    .rule{margin:18px 0;border-top:1px solid #e3e8f2;padding-top:17px;display:flex;justify-content:space-between;align-items:center}.rule strong{font-size:12px}.rule small{display:block;color:#929bb1;font-size:10px;margin-top:5px}.switch{width:31px;height:18px;border-radius:999px;background:#121826;position:relative}.switch:after{content:"";position:absolute;width:12px;height:12px;background:white;border-radius:50%;right:3px;top:3px}.switch.off{background:#d8deea}.switch.off:after{right:16px}
+    .segmented{display:grid;grid-template-columns:1fr 1fr;gap:6px}.segBtn{border:1px solid #dbe2ef;background:#fff;color:#65718b;padding:9px 8px;border-radius:10px;font-size:10px;font-weight:800;cursor:pointer}.segBtn.active{border-color:#7681f2;background:#eef0ff;color:#4857e6;box-shadow:inset 0 0 0 1px rgba(86,100,239,.08)}
+    .chips{display:flex;gap:6px;flex-wrap:wrap}.chip{border:1px solid #dbe2ef;background:#fff;color:#77839c;padding:7px 9px;border-radius:999px;font-size:9px;font-weight:800;cursor:pointer}.chip.active{background:#17254a;color:#fff;border-color:#17254a}.filterHint{font-size:9px;color:#929bb1;line-height:1.4;margin-top:7px}.speedNote{margin:14px 0 4px;padding:10px 11px;border-radius:11px;background:#eefcf8;color:#467265;font-size:9px;line-height:1.45;border:1px solid #d7f3ea}.speedNote b{color:#188c70}
+    .huntBtn{width:100%;height:50px;border:0;border-radius:13px;color:#0e173c;font-weight:900;background:linear-gradient(100deg,#5864ef 0,#6372ed 45%,#28c5a8 100%);box-shadow:0 13px 28px rgba(70,87,219,.24);cursor:pointer}.huntBtn:disabled{opacity:.55;cursor:wait}.exact{text-align:center;color:#74809a;font-size:10px;margin-top:16px}.exact span{color:#1dbb8e;margin-right:7px}
+    .main{min-height:660px;background:rgba(247,249,254,.94)}
+    .hero{height:168px;position:relative;background:linear-gradient(90deg,#121d48 0%,#17234c 52%,rgba(15,27,62,.6) 100%);overflow:hidden;color:#fff;padding:30px 34px}.hero:after{content:"";position:absolute;inset:0 0 0 48%;background:linear-gradient(90deg,#18234c 0%,rgba(15,29,67,.15) 24%,rgba(15,29,67,.05)),url('assets/dinner-hero.png') center/cover no-repeat}.heroText{position:relative;z-index:2;max-width:430px}.beta{display:inline-block;border:1px solid rgba(86,220,180,.4);color:#6ee5bc;border-radius:999px;font-size:10px;font-weight:800;padding:4px 8px;margin-bottom:13px}.hero h2{font-size:24px;line-height:1.45;margin:0 0 8px;font-weight:500;letter-spacing:-.03em}.hero p{font-size:12px;color:#d6ddf1;margin:0;line-height:1.45}
+    .content{padding:27px 32px 30px}.resultsHead{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:18px}.resultsHead h3{margin:8px 0 4px;font-size:23px;font-weight:500;letter-spacing:-.03em}.resultsHead p{margin:0;color:#8490a8;font-size:12px}.statusPill{min-width:180px;padding:13px 15px;background:#fff;border:1px solid #dce3f0;border-radius:13px;font-size:11px;color:#34425f}.statusPill b{display:block;margin-bottom:3px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#a3aec2;margin-right:8px}.dot.live{background:#23c79f;box-shadow:0 0 0 4px rgba(35,199,159,.12)}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 18px}.stat{background:#fff;border:1px solid #e0e6f1;border-radius:13px;padding:13px 14px}.stat b{font-size:20px;display:block}.stat span{font-size:10px;color:#8a95ad;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+    .resultCard{background:#fff;border:1px solid #dfe5f0;border-radius:16px;padding:18px 20px;margin-bottom:10px}.resultTop{display:flex;justify-content:space-between;gap:20px}.restaurant{display:flex;gap:12px}.rank{color:#98a2b8;font-size:11px;font-weight:800;padding-top:3px;min-width:24px}.rname{font-size:13px;font-weight:900;color:#374764}.meta{font-size:11px;color:#8792aa;margin-top:6px;display:flex;gap:12px;flex-wrap:wrap}.badgeOk{color:#17ae84;font-weight:800}.dealState{font-size:12px;font-weight:800;color:#5b67e8;text-align:right}.dealState small{display:block;color:#9aa3b7;font-weight:500;margin-top:4px}.siteLink{display:inline-block;margin-top:9px;font-size:11px;color:#5162ee;text-decoration:none;font-weight:700}.siteLink:hover{text-decoration:underline}
+    .coverage{border:1px dashed #c9d3e6;border-radius:14px;padding:14px 16px;margin-top:16px;background:rgba(255,255,255,.45);display:flex;gap:12px;align-items:flex-start}.coverageIcon{font-size:22px;color:#5b63ee}.coverage b{font-size:11px}.coverage p{margin:5px 0 0;color:#8390a8;font-size:10px;line-height:1.45}
+    .empty{padding:48px 20px;text-align:center;color:#7d89a1}.empty b{display:block;color:#31405f;font-size:18px;margin-bottom:8px}.progress{height:7px;background:#e7ecf5;border-radius:999px;overflow:hidden;margin-top:12px}.progress > div{height:100%;width:0;background:linear-gradient(90deg,#5c64f0,#28c5a8);transition:width .25s ease}.error{background:#fff4f4;border:1px solid #ffd0d0;color:#8a3434;border-radius:13px;padding:15px;font-size:12px;line-height:1.5}.loadMore{display:block;margin:14px auto 0;padding:10px 16px;border-radius:11px;border:1px solid #dbe2f0;background:#fff;color:#4b58d9;font-weight:800;cursor:pointer}
+    .dealCard{background:#fff;border:1px solid #dfe5f0;border-radius:16px;padding:19px 20px;margin-bottom:10px}.dealGrid{display:grid;grid-template-columns:1fr auto;gap:18px}.dealPrice{font-size:22px;font-weight:900;color:#26365f;text-align:right}.dealPrice small{display:block;font-size:10px;color:#8a95ad;font-weight:600;margin-top:3px}.evidence{margin-top:10px;color:#66738f;font-size:11px;line-height:1.5;max-width:760px}.sourceBadge{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:5px 8px;border-radius:999px;background:#eefcf8;color:#159b78;font-size:10px;font-weight:800}.warningBox{border:1px solid #eadfb8;background:#fffaf0;border-radius:14px;padding:14px 16px;margin-top:14px;color:#6f6037;font-size:11px;line-height:1.55}.sectionTitle{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#6571ed;font-weight:900;margin:22px 0 10px}.tinyNote{color:#8a95ad;font-size:10px;line-height:1.5;margin-top:10px}.spinnerText{font-weight:800;color:#4252e6}.verificationFacts{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;color:#71809d;font-size:10px}.verificationFacts b{color:#34425f}
+    @media (max-width:900px){.topbar{grid-template-columns:1fr auto}.tabs{display:none}.layout{grid-template-columns:1fr}.left{max-width:none}.hero{height:auto;min-height:180px}.hero:after{opacity:.45;inset:0}.heroText{max-width:70%}.stats{grid-template-columns:1fr}.resultsHead{align-items:flex-start;flex-direction:column}.statusPill{width:100%}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><div class="brandmark">◎</div><div><div class="brandname">HUNT</div><div class="brandsub">Personal internet agent</div></div></div>
+    <nav class="tabs"><button class="tab active">Family deals</button><button class="tab">My watches <span class="tag">SOON</span></button><button class="tab">Job hunter <span class="tag">LATER</span></button></nav>
+    <div class="saved">♡&nbsp;&nbsp; Saved&nbsp; <span style="background:#fff;padding:2px 7px;border-radius:999px">0</span></div>
+  </header>
+
+  <div class="layout">
+    <aside class="left">
+      <div class="eyebrow">✣ New Hunt</div>
+      <h1>What should I find?</h1>
+      <div class="sub">Set the rules once. HUNT removes everything that does not fit.</div>
+
+      <label>Looking for</label>
+      <div class="field"><span class="icon">⌕</span><input id="lookingFor" value="Family meal deals for dinner" /></div>
+
+      <label>Near</label>
+      <div class="field"><span class="icon">⌖</span><input id="location" value="West Hills, CA" /></div>
+
+      <div class="sliderline"><label>Maximum total</label><span class="value" id="budgetOut">$50</span></div>
+      <input class="range" id="budget" type="range" min="20" max="100" value="50" step="5" />
+      <div class="rangeLabels"><span>$20</span><span>$100</span></div>
+
+      <div class="sliderline"><label>Distance</label><span class="value" id="distanceOut">7 miles</span></div>
+      <input class="range" id="distance" type="range" min="1" max="30" value="7" step="1" />
+
+      <label>People to feed</label>
+      <div class="counter"><button id="minus">−</button><div class="counterMid"><span>♙</span><b id="peopleOut">4</b><span class="mutedSmall">people</span></div><button id="plus">+</button></div>
+
+      <label>Restaurant type</label>
+      <div class="segmented" id="typeFilter">
+        <button type="button" class="segBtn" data-type="any">Any</button>
+        <button type="button" class="segBtn" data-type="indie_local">Independent + local</button>
+        <button type="button" class="segBtn" data-type="independent">Independent only</button>
+        <button type="button" class="segBtn" data-type="chains">Chains only</button>
+      </div>
+      <div class="filterHint">Unknown businesses stay included in “Independent + local” so HUNT does not hide a possible local restaurant just because classification evidence is incomplete.</div>
+
+      <label>Cuisine</label>
+      <div class="chips" id="cuisineFilter">
+        <button type="button" class="chip" data-cuisine="any">Any</button>
+        <button type="button" class="chip" data-cuisine="italian">Pizza / Italian</button>
+        <button type="button" class="chip" data-cuisine="mexican">Mexican / Latin</button>
+        <button type="button" class="chip" data-cuisine="asian">Asian</button>
+        <button type="button" class="chip" data-cuisine="american">American</button>
+        <button type="button" class="chip" data-cuisine="bbq">BBQ</button>
+        <button type="button" class="chip" data-cuisine="mediterranean">Mediterranean</button>
+        <button type="button" class="chip" data-cuisine="indian">Indian</button>
+        <button type="button" class="chip" data-cuisine="seafood">Seafood</button>
+        <button type="button" class="chip" data-cuisine="other">Other / unknown</button>
+      </div>
+
+      <div class="rule"><div><strong>Open tonight only</strong><small>Hide anything unavailable for dinner</small></div><div id="openSwitch" class="switch"></div></div>
+
+      <div class="speedNote"><b>Faster HUNT:</b> type and cuisine filters are applied before website checks. Recent radius scans and official-source evidence are cached so repeat hunts can skip work already completed.</div>
+      <button id="huntBtn" class="huntBtn">◎&nbsp;&nbsp; Hunt for matches</button>
+      <div class="exact"><span>✓</span> Exact filters, not just keywords</div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <div class="heroText">
+          <div class="beta">SOURCE-BACKED BETA</div>
+          <h2>Dinner without the scavenger<br/>hunt.</h2>
+          <p>HUNT discovers the full restaurant set in your radius, then checks official web sources for family meals that fit your budget.</p>
+        </div>
+      </section>
+      <section class="content" id="results"></section>
+    </main>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = {
+  people: Number(localStorage.getItem('hunt.people') || 4),
+  openOnly: (localStorage.getItem('hunt.openOnly') ?? 'true') === 'true',
+  restaurantType: localStorage.getItem('hunt.restaurantType') || 'any',
+  cuisines: (()=>{try{return JSON.parse(localStorage.getItem('hunt.cuisines')||'[]')}catch{return []}})(),
+  allRestaurants: [],
+  restaurants: [],
+  visible: 15,
+  locationLabel: '',
+  radius: 7,
+  phase: 'idle',
+  jobId: '',
+  verification: null
+};
+
+function saveInputs(){
+  ['lookingFor','location','budget','distance'].forEach(id=>localStorage.setItem('hunt.'+id,$(id).value));
+  localStorage.setItem('hunt.people',state.people);
+  localStorage.setItem('hunt.openOnly',state.openOnly);
+  localStorage.setItem('hunt.restaurantType',state.restaurantType);
+  localStorage.setItem('hunt.cuisines',JSON.stringify(state.cuisines));
+}
+function restoreInputs(){
+  ['lookingFor','location','budget','distance'].forEach(id=>{const v=localStorage.getItem('hunt.'+id); if(v!==null) $(id).value=v});
+  $('peopleOut').textContent=state.people;
+  renderControls();
+  renderFilterControls();
+}
+function renderControls(){
+  $('budgetOut').textContent='$'+$('budget').value;
+  $('distanceOut').textContent=$('distance').value+' mile'+($('distance').value==='1'?'':'s');
+  $('openSwitch').className='switch'+(state.openOnly?'':' off');
+}
+['budget','distance'].forEach(id=>$(id).addEventListener('input',()=>{renderControls();saveInputs()}));
+['lookingFor','location'].forEach(id=>$(id).addEventListener('change',saveInputs));
+$('minus').onclick=()=>{state.people=Math.max(1,state.people-1);$('peopleOut').textContent=state.people;saveInputs()};
+$('plus').onclick=()=>{state.people=Math.min(20,state.people+1);$('peopleOut').textContent=state.people;saveInputs()};
+$('openSwitch').onclick=()=>{state.openOnly=!state.openOnly;renderControls();saveInputs()};
+
+function renderFilterControls(){
+  document.querySelectorAll('[data-type]').forEach(b=>b.classList.toggle('active',b.dataset.type===state.restaurantType));
+  const anyCuisine=state.cuisines.length===0;
+  document.querySelectorAll('[data-cuisine]').forEach(b=>{
+    const c=b.dataset.cuisine;
+    b.classList.toggle('active',c==='any'?anyCuisine:state.cuisines.includes(c));
+  });
+}
+document.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{state.restaurantType=b.dataset.type;renderFilterControls();saveInputs()});
+document.querySelectorAll('[data-cuisine]').forEach(b=>b.onclick=()=>{
+  const c=b.dataset.cuisine;
+  if(c==='any') state.cuisines=[];
+  else state.cuisines=state.cuisines.includes(c)?state.cuisines.filter(x=>x!==c):[...state.cuisines,c];
+  renderFilterControls();saveInputs();
+});
+
+function miles(lat1,lon1,lat2,lon2){
+  const R=3958.7613, d2r=Math.PI/180;
+  const dLat=(lat2-lat1)*d2r,dLon=(lon2-lon1)*d2r;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*d2r)*Math.cos(lat2*d2r)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function esc(s=''){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function normalizeUrl(u=''){if(!u)return ''; if(/^https?:\/\//i.test(u))return u; return 'https://'+u}
+
+async function geocode(q){
+  const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q='+encodeURIComponent(q);
+  const r=await fetch(url,{headers:{'Accept':'application/json','Accept-Language':'en-US,en;q=0.9'}});
+  if(!r.ok) throw new Error('Location lookup returned '+r.status+'.');
+  const data=await r.json();
+  if(!data.length) throw new Error('I could not find that location. Try a city plus state or ZIP code.');
+  return {lat:Number(data[0].lat),lon:Number(data[0].lon),display:data[0].display_name};
+}
+
+const overpassEndpoints=[
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter'
+];
+
+async function overpassAllRestaurants(lat,lon,radiusMeters){
+  const q=`[out:json][timeout:70];(nwr["amenity"="restaurant"](around:${radiusMeters},${lat},${lon});nwr["amenity"="fast_food"](around:${radiusMeters},${lat},${lon});nwr["amenity"="food_court"](around:${radiusMeters},${lat},${lon}););out center tags;`;
+  let last;
+  for(const endpoint of overpassEndpoints){
+    try{
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),78000);
+      const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:'data='+encodeURIComponent(q),signal:controller.signal});
+      clearTimeout(timer);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const data=await r.json();
+      if(!Array.isArray(data.elements)) throw new Error('Unexpected response');
+      return data.elements;
+    }catch(e){last=e;}
+  }
+  throw new Error('Restaurant source did not respond after trying three servers. '+(last?.message||''));
+}
+
+function extractRestaurants(elements,origin,radiusMi){
+  const prelim=[];
+  for(const e of elements){
+    const t=e.tags||{};
+    const lat=Number(e.lat ?? e.center?.lat), lon=Number(e.lon ?? e.center?.lon);
+    if(!Number.isFinite(lat)||!Number.isFinite(lon)) continue;
+    const d=miles(origin.lat,origin.lon,lat,lon);
+    if(d>radiusMi+0.03) continue;
+    const name=(t.name||t.brand||'Unnamed restaurant').trim();
+    const website=normalizeUrl(t.website||t['contact:website']||t['brand:website']||'');
+    prelim.push({
+      osmKey:e.type+':'+e.id,name,lat,lon,distance:d,
+      cuisine:(t.cuisine||'').replaceAll(';',', '),
+      brand:t.brand||'',operator:t.operator||'',
+      website,phone:t.phone||t['contact:phone']||'',
+      opening:t.opening_hours||'',
+      wikidata:t.wikidata||'',
+      brandWikidata:t['brand:wikidata']||'',
+      operatorWikidata:t['operator:wikidata']||'',
+      type:t.amenity||'restaurant',
+      address:[t['addr:housenumber'],t['addr:street'],t['addr:city'],t['addr:state']].filter(Boolean).join(' ')
+    });
+  }
+  prelim.sort((a,b)=>a.distance-b.distance);
+  const kept=[];
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  for(const r of prelim){
+    const key=norm(r.name);
+    const dupe=kept.find(k=>key && norm(k.name)===key && miles(r.lat,r.lon,k.lat,k.lon)<0.06);
+    if(!dupe) kept.push(r);
+    else if(!dupe.website && r.website) dupe.website=r.website;
+  }
+  return classifyRestaurantTypes(kept);
+}
+
+const KNOWN_CHAINS=new Set([
+  'mcdonald s','taco bell','burger king','wendy s','subway','domino s','pizza hut','papa john s','little caesars','kfc','popeyes','chick fil a','chipotle','panda express','starbucks','dunkin','ihop','denny s','applebee s','chili s','olive garden','red lobster','buffalo wild wings','wingstop','jersey mike s','firehouse subs','panera bread','raising cane s','in n out burger','carl s jr','jack in the box','del taco','el pollo loco','the habit burger grill','shake shack','the cheesecake factory','california pizza kitchen','bj s restaurant brewhouse','chuck e cheese','five guys','sonic drive in','arby s','dairy queen','wingstop'
+]);
+function normName(s=''){return String(s).toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim()}
+function classifyRestaurantTypes(restaurants){
+  const counts=new Map();
+  for(const r of restaurants){
+    const key=normName(r.brand||r.name);
+    if(key) counts.set(key,(counts.get(key)||0)+1);
+  }
+  return restaurants.map(r=>{
+    const key=normName(r.brand||r.name), count=counts.get(key)||1;
+    let restaurantClass='unknown', classReason='Not enough evidence to classify confidently';
+    if(KNOWN_CHAINS.has(key)||KNOWN_CHAINS.has(normName(r.name))){restaurantClass='chain';classReason='Known multi-location chain';}
+    else if(count>=6){restaurantClass='chain';classReason=`${count} locations with this brand/name appear in the search area`; }
+    else if(count>=2){restaurantClass='local_group';classReason=`${count} nearby locations with this brand/name`; }
+    else if(!r.brand&&!r.brandWikidata&&!r.operatorWikidata){restaurantClass='independent';classReason='Single local listing with no structured chain/brand identifier';}
+    return {...r,restaurantClass,classReason};
+  });
+}
+const CUISINE_RULES={
+  italian:['italian','pizza','pasta'],
+  mexican:['mexican','tex mex','tex-mex','taco','burrito','latin american','latin_american','peruvian','salvadoran','colombian','argentinian','brazilian'],
+  asian:['chinese','japanese','sushi','thai','vietnamese','korean','ramen','asian','filipino','indonesian','teriyaki','poke'],
+  american:['american','burger','hamburger','hot dog','hot_dog','diner','breakfast','sandwich'],
+  bbq:['bbq','barbecue','barbeque','smokehouse'],
+  mediterranean:['mediterranean','greek','lebanese','turkish','persian','iranian','arab','middle eastern','middle_eastern','shawarma','falafel','armenian','israeli'],
+  indian:['indian','pakistani','nepalese','bangladeshi'],
+  seafood:['seafood','fish','lobster','crab']
+};
+function cuisineGroups(r){
+  const text=normName((r.cuisine||'')+' '+(r.name||''));
+  const groups=[];
+  for(const [group,terms] of Object.entries(CUISINE_RULES)){if(terms.some(t=>text.includes(normName(t)))) groups.push(group);}
+  if(!groups.length) groups.push('other');
+  return groups;
+}
+function applyRestaurantFilters(restaurants){
+  return restaurants.filter(r=>{
+    const typeOk=state.restaurantType==='any' ||
+      (state.restaurantType==='indie_local' && r.restaurantClass!=='chain') ||
+      (state.restaurantType==='independent' && r.restaurantClass==='independent') ||
+      (state.restaurantType==='chains' && r.restaurantClass==='chain');
+    if(!typeOk) return false;
+    if(!state.cuisines.length) return true;
+    return cuisineGroups(r).some(c=>state.cuisines.includes(c));
+  });
+}
+function restaurantTypeLabel(){return ({any:'Any restaurant type',indie_local:'Independent + local',independent:'Independent only',chains:'Chains only'})[state.restaurantType]||'Any restaurant type'}
+function cuisineLabel(){return state.cuisines.length?state.cuisines.map(c=>({italian:'Pizza/Italian',mexican:'Mexican/Latin',asian:'Asian',american:'American',bbq:'BBQ',mediterranean:'Mediterranean',indian:'Indian',seafood:'Seafood',other:'Other/unknown'})[c]||c).join(' + '):'Any cuisine'}
+
+function getDiscoveryCache(location,radius){
+  try{
+    const d=JSON.parse(localStorage.getItem('hunt.discoveryCache')||'null');
+    if(!d||Date.now()-d.savedAt>30*60*1000) return null;
+    if(normName(d.location)!==normName(location)||Number(d.radius)!==Number(radius)) return null;
+    return d.restaurants||null;
+  }catch{return null}
+}
+function setDiscoveryCache(location,radius,restaurants){
+  try{localStorage.setItem('hunt.discoveryCache',JSON.stringify({savedAt:Date.now(),location,radius,restaurants}))}catch{}
+}
+
+function renderIdle(){
+  $('results').innerHTML=`
+    <div class="resultsHead"><div><div class="eyebrow">⌘ Full-radius hunt</div><h3>Discover everything first. Verify second.</h3><p>HUNT scans the complete restaurant source inside your radius, then checks official web sources for qualifying family-meal prices.</p></div><div class="statusPill"><span class="dot"></span><b>Ready to hunt</b><span>No top-N restaurant cap</span></div></div>
+    <div class="empty"><b>Ready when you are.</b>One click now runs restaurant discovery and the new official-source deal verification stage.</div>
+    <div class="coverage"><div class="coverageIcon">♜</div><div><b>Evidence rule</b><p>HUNT will not invent a price or treat a restaurant as checked when its official source cannot be read. Unresolved and blocked sources remain visible in the coverage totals.</p></div></div>`;
+}
+function renderProgress(title,detail,pct){
+  $('results').innerHTML=`<div class="resultsHead"><div><div class="eyebrow">⌘ HUNT in progress</div><h3>${esc(title)}</h3><p>${esc(detail)}</p><div class="progress"><div style="width:${pct}%"></div></div></div><div class="statusPill"><span class="dot live"></span><b>Scanning live sources</b><span>Do not close this tab</span></div></div>
+  <div class="empty"><b>Searching the whole radius.</b>No restaurant count limit is being applied.</div>`;
+}
+function renderError(err){
+  $('results').innerHTML=`<div class="resultsHead"><div><div class="eyebrow">⌘ HUNT interrupted</div><h3>HUNT could not finish this search</h3><p>No partial list is being presented as complete.</p></div></div><div class="error"><b>What happened:</b> ${esc(err.message||String(err))}<br><br>Try the hunt again in a moment.</div>`;
+}
+function renderDiscoveryComplete(cached=false){
+  const rs=state.restaurants, all=state.allRestaurants;
+  const withSites=rs.filter(r=>r.website).length;
+  $('results').innerHTML=`
+    <div class="resultsHead"><div><div class="eyebrow">⌘ Radius scan complete</div><h3>${all.length} discovered · ${rs.length} survive your filters</h3><p>${esc(restaurantTypeLabel())} · ${esc(cuisineLabel())}. HUNT will verify only these ${rs.length} restaurants${cached?' using a recent cached radius scan':''}.</p></div><div class="statusPill"><span class="dot live"></span><b>Discovery complete</b><span>${cached?'Radius scan reused':'Fresh radius scan'} · starting verifier</span></div></div>
+    <div class="stats"><div class="stat"><b>${all.length}</b><span>restaurants discovered</span></div><div class="stat"><b>${rs.length}</b><span>after filters</span></div><div class="stat"><b>${withSites}</b><span>sites already known</span></div></div>
+    <div class="coverage"><div class="coverageIcon">⚡</div><div><b>Speed strategy</b><p>HUNT is not throwing away radius coverage. It discovers the whole area first, then removes restaurants that fail your restaurant-type or cuisine filters before the expensive website pass. Recent source evidence is cached for reuse.</p></div></div>`;
+}
+
+function renderVerificationProgress(job){
+  const rs=state.restaurants;
+  const resolving=job.status==='queued'||job.status==='resolving';
+  const doneSources=Number(job.sources_checked||0), totalSources=Number(job.sources_total||0);
+  const pct=resolving
+    ? Math.min(38, 8 + 30*((Number(job.processed||0))/Math.max(1,Number(job.total||rs.length))))
+    : 40 + 58*(doneSources/Math.max(1,totalSources));
+  $('results').innerHTML=`
+    <div class="resultsHead"><div><div class="eyebrow">⌘ Official-source verification</div><h3>${resolving?'Resolving restaurant sources':'Checking menus and deal pages'}</h3><p>${esc(job.message||'Working through the full restaurant set')}</p><div class="progress"><div style="width:${Math.min(98,pct)}%"></div></div><div class="verificationFacts"><span><b>${state.allRestaurants.length}</b> discovered</span><span><b>${rs.length}</b> after filters</span><span><b>${Number(job.resolved||0)}</b> official sources resolved</span><span><b>${doneSources}</b> sources checked</span><span><b>${Number(job.cached_sources||0)}</b> reused from cache</span><span><b>${Number(job.candidate_deals||0)}</b> strict meal candidates retained</span></div></div><div class="statusPill"><span class="dot live"></span><b>Verifier running</b><span>${resolving?'Resolving sources':`${doneSources} / ${totalSources||'…'} sites`}</span></div></div>
+    <div class="empty"><b>${resolving?'Finding official sources.':'Reading official restaurant pages.'}</b>HUNT records blocked and unresolved sources instead of pretending they were checked.</div>
+    <div class="coverage"><div class="coverageIcon">⚡</div><div><b>Faster verifier</b><p>V5 resolves structured source IDs in parallel, checks up to 24 independent sources at once, stops crawling a restaurant once a qualifying meal is proven, and reuses fresh source evidence from previous hunts.</p></div></div>`;
+}
+function dealCard(m,i,needsHours=false,incomplete=false){
+  const feeds=m.capacity_label?`Feeds/serves ${m.capacity_label}`:(m.capacity?`Feeds/serves up to ${m.capacity}`:`Serving size not proven`);
+  const hours=needsHours?'Hours need confirmation':(state.openOnly?'Open for dinner from listed hours':'Hours filter off');
+  const priceLabel=m.price_mode==='per_person'&&m.listed_price?`$${Number(m.price).toFixed(2)}<small>calculated minimum total · $${Number(m.listed_price).toFixed(2)}/person</small>`:`$${Number(m.price).toFixed(2)}<small>${incomplete?'item price found · not a verified fit':'verified package total'}</small>`;
+  const badge=incomplete?'Price is tied to a meal, but party size is not proven':'✓ Item price + serving size verified';
+  return `<div class="dealCard"><div class="dealGrid"><div><div class="restaurant"><div class="rank">${String(i+1).padStart(2,'0')}</div><div><div class="rname">${esc(m.name)}</div><div class="meta"><span>⌖ ${Number(m.distance||0).toFixed(2)} mi</span>${m.restaurantClass?`<span>${esc(({chain:'Chain',local_group:'Local group',independent:'Independent',unknown:'Unknown type'})[m.restaurantClass]||m.restaurantClass)}</span>`:''}${m.cuisine?`<span>${esc(m.cuisine)}</span>`:''}<span>${esc(feeds)}</span><span>${esc(hours)}</span></div></div></div><div class="evidence">${esc(m.evidence||'Official source contained a qualifying family-meal item.')}</div><a class="siteLink" href="${esc(m.source_url||m.website)}" target="_blank" rel="noopener">Open evidence source ↗</a><div class="sourceBadge">${esc(badge)}</div></div><div class="dealPrice">${priceLabel}</div></div></div>`;
+}
+function renderVerifiedResults(job){
+  state.verification=job;
+  const matches=job.matches||[];
+  const needsHours=job.needs_hours||[];
+  const needsCapacity=job.needs_capacity||[];
+  const rejected=Object.values(job.rejection_counts||{}).reduce((a,b)=>a+Number(b||0),0);
+  const fully=matches.length;
+  const statusText=fully===1?'1 verified deal fits every checked rule':`${fully} verified deals fit every checked rule`;
+  $('results').innerHTML=`
+    <div class="resultsHead"><div><div class="eyebrow">⌘ HUNT complete</div><h3>${statusText}</h3><p>Budget: $${$('budget').value} · ${state.people} people · ${state.radius} miles · ${esc(restaurantTypeLabel())} · ${esc(cuisineLabel())}${state.openOnly?' · dinner-hours filter on':''}</p></div><div class="statusPill"><span class="dot live"></span><b>Verification complete</b><span>${Number(job.sources_checked||0)} sources · ${Number(job.cached_sources||0)} cached · ${Number(job.elapsed_seconds||0).toFixed(1)}s</span></div></div>
+    <div class="stats"><div class="stat"><b>${state.allRestaurants.length}</b><span>discovered in radius</span></div><div class="stat"><b>${state.restaurants.length}</b><span>after filters</span></div><div class="stat"><b>${fully}</b><span>fully verified matches</span></div></div>
+    ${matches.length?`<div class="sectionTitle">Strictly verified matches</div>${matches.map((m,i)=>dealCard(m,i,false,false)).join('')}`:`<div class="empty"><b>No fully verified match yet.</b>That does not mean there are no family deals. It means V4.1 could not prove the meal price, family-size serving range, budget, and active hours together from readable evidence.</div>`}
+    ${state.openOnly&&needsHours.length?`<div class="sectionTitle">Meal + party size verified · hours still need confirmation</div>${needsHours.slice(0,12).map((m,i)=>dealCard(m,i,true,false)).join('')}<div class="tinyNote">${needsHours.length>12?`${needsHours.length-12} more are hidden here.`:''}</div>`:''}
+    ${needsCapacity.length?`<div class="sectionTitle">Promising, but not counted as matches</div>${needsCapacity.slice(0,12).map((m,i)=>dealCard(m,i,false,true)).join('')}<div class="tinyNote">HUNT found an item-bound price, but would not claim it covers ${state.people} people within the family-size 4-10 serving rule without explicit serving evidence.${needsCapacity.length>12?` ${needsCapacity.length-12} more are hidden here.`:''}</div>`:''}
+    <div class="coverage"><div class="coverageIcon">♜</div><div><b>Verification coverage</b><p>${state.allRestaurants.length} restaurants discovered in the full radius · ${state.restaurants.length} survived restaurant-type/cuisine filters · ${Number(job.resolved||0)} official sources resolved · ${Number(job.sources_checked||0)} unique official web sources checked · ${Number(job.cached_sources||0)} reused from the 6-hour evidence cache · ${Number(job.blocked||0)} blocked/unreadable · ${Number(job.unresolved||0)} filtered restaurants still lack a resolvable official source · ${rejected} misleading/irrelevant price candidates rejected.</p></div></div>
+    <div class="warningBox"><b>Strict evidence rule:</b> V4.1 will not count delivery charges, coupons, discounts, side dishes, approximate/starting prices, unavailable promos, per-person prices without a provable group size, or a dollar amount that is merely near family-related text. Fewer results are intentional when the evidence cannot prove the exact fit.</div>`;
+}
+async function startVerification(){
+  const payload={
+    restaurants:state.restaurants,
+    budget:Number($('budget').value),
+    people:state.people,
+    openOnly:state.openOnly
+  };
+  const r=await fetch('/api/verify/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const data=await r.json();
+  if(!r.ok) throw new Error(data.error||'Could not start deal verification.');
+  state.jobId=data.job_id;
+  while(true){
+    await new Promise(res=>setTimeout(res,900));
+    const sr=await fetch('/api/verify/status?id='+encodeURIComponent(state.jobId),{cache:'no-store'});
+    const job=await sr.json();
+    if(!sr.ok) throw new Error(job.error||'Could not read verifier status.');
+    if(job.status==='done'){renderVerifiedResults(job);return;}
+    if(job.status==='error') throw new Error(job.message||'Deal verifier stopped.');
+    renderVerificationProgress(job);
+  }
+}
+
+async function runHunt(){
+  saveInputs();
+  const btn=$('huntBtn');btn.disabled=true;btn.textContent='HUNT is working…';
+  try{
+    state.radius=Number($('distance').value);
+    state.visible=15;
+    const locationQuery=$('location').value.trim();
+    const cachedDiscovery=getDiscoveryCache(locationQuery,state.radius);
+    let usedDiscoveryCache=false;
+    if(cachedDiscovery&&cachedDiscovery.length){
+      renderProgress('Reusing your recent radius scan',`Skipping restaurant enumeration for the same ${state.radius}-mile area`,28);
+      state.allRestaurants=classifyRestaurantTypes(cachedDiscovery);
+      usedDiscoveryCache=true;
+      await new Promise(r=>setTimeout(r,120));
+    }else{
+      renderProgress('Locating your search center','Resolving '+locationQuery,10);
+      const origin=await geocode(locationQuery);
+      state.locationLabel=origin.display;
+      renderProgress('Enumerating restaurants','Requesting every restaurant record returned inside '+state.radius+' miles',27);
+      const raw=await overpassAllRestaurants(origin.lat,origin.lon,Math.ceil(state.radius*1609.344));
+      renderProgress('Checking the full result set','Distance-checking and deduplicating '+raw.length+' returned map objects',36);
+      await new Promise(r=>setTimeout(r,120));
+      state.allRestaurants=extractRestaurants(raw,origin,state.radius);
+      setDiscoveryCache(locationQuery,state.radius,state.allRestaurants);
+    }
+    state.restaurants=applyRestaurantFilters(state.allRestaurants);
+    renderDiscoveryComplete(usedDiscoveryCache);
+    if(!state.restaurants.length){
+      $('results').innerHTML+=`<div class="empty"><b>No restaurants survived these filters.</b>The full radius was still scanned. Change restaurant type or cuisine and try again.</div>`;
+      return;
+    }
+    await startVerification();
+  }catch(err){renderError(err)}
+  finally{btn.disabled=false;btn.innerHTML='◎&nbsp;&nbsp; Hunt for matches'}
+}
+
+$('huntBtn').onclick=runHunt;
+restoreInputs();renderIdle();
+</script>
+</body>
+</html>

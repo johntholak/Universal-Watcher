@@ -1,0 +1,103 @@
+{
+  "movie": "Spider-Man: Brand New Day",
+  "format": "ANY",
+  "earliest_time": "1:00pm",
+  "latest_time": "7:15pm",
+  "seats_required": 4,
+  "minimum_row": 5,
+  "search_radius_miles": 10.0,
+  "check_interval": 30,
+  "sound_alert": true,
+  "alert_beeps": 5,
+  "open_browser_on_match": true,
+  "search_center_name": "Woodland Hills, CA",
+  "location_query": "Woodland Hills, CA",
+  "movie_options": [],
+  "date_mode": "NEXT BEST",
+  "date_start": "2026-08-27",
+  "date_end": "2026-09-02",
+  "next_best_days": 7,
+  "search_lat": 34.1577,
+  "search_lon": -118.6056,
+  "showtime_refresh_cycles": 5,
+  "enabled_theaters": [
+    "AMC Topanga 12",
+    "AMC Fallbrook 7",
+    "AMC Northridge 10",
+    "AMC Porter Ranch 9"
+  ],
+  "theaters": [
+    {
+      "name": "AMC Topanga 12",
+      "slug": "amc-topanga-12",
+      "lat": 34.1577,
+      "lon": -118.6056
+    },
+    {
+      "name": "AMC Fallbrook 7",
+      "slug": "amc-fallbrook-7",
+      "lat": 34.2007,
+      "lon": -118.6237
+    },
+    {
+      "name": "AMC Northridge 10",
+      "slug": "amc-northridge-10",
+      "lat": 34.2383,
+      "lon": -118.5364
+    },
+    {
+      "name": "AMC Porter Ranch 9",
+      "slug": "amc-porter-ranch-9",
+      "lat": 34.2827,
+      "lon": -118.5502
+    },
+    {
+      "name": "AMC Universal CityWalk 19",
+      "slug": "universal-cinema-an-amc-theatre",
+      "lat": 34.1381,
+      "lon": -118.3529
+    },
+    {
+      "name": "AMC Santa Monica 7",
+      "slug": "amc-santa-monica-7",
+      "lat": 34.0259,
+      "lon": -118.4896
+    },
+    {
+      "name": "AMC Burbank Town Center 8",
+      "slug": "amc-burbank-town-center-8",
+      "lat": 34.1845,
+      "lon": -118.3135
+    },
+    {
+      "name": "AMC Burbank 16",
+      "slug": "amc-burbank-16",
+      "lat": 34.1867,
+      "lon": -118.3128
+    },
+    {
+      "name": "AMC Santa Anita 16",
+      "slug": "amc-santa-anita-16",
+      "lat": 34.1417,
+      "lon": -118.0467
+    },
+    {
+      "name": "AMC Montebello 10",
+      "slug": "amc-montebello-10",
+      "lat": 34.0334,
+      "lon": -118.1248
+    },
+    {
+      "name": "AMC Marina Pacifica 12",
+      "slug": "amc-marina-pacifica-12",
+      "lat": 33.7758,
+      "lon": -118.1154
+    },
+    {
+      "name": "AMC Victoria Gardens 12",
+      "slug": "amc-victoria-gardens-12",
+      "lat": 34.1097,
+      "lon": -117.5365
+    }
+  ]
+}
