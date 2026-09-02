@@ -254,8 +254,9 @@ Car Search Aggregator remains a strong possible Universal Watcher module but is 
 - [x] Import Ticket Watcher V1.11 bundle
 - [x] Create authoritative product/status/run documents
 - [x] Add reconstructed Seat Watcher post-Codex build (exact lost Git tree still unavailable)
+- [x] Initialize local Git repository and stage the V44.6 baseline
 - [ ] Configure shared private Git remote
-- [ ] Baseline commit after reconstructed Seat Watcher live regression
+- [ ] Create baseline commit after reconstructed Seat Watcher live regression
 - [ ] Verify all modules run from repo paths
 - [ ] Begin Universal Watcher web shell
 

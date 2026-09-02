@@ -41,7 +41,7 @@ modules/seat-watcher/
 
 It was reconstructed from the uploaded V44 Depth/Layering baseline using the saved August 28 Codex handoff. It is not a byte-for-byte recovery of lost commit `7a19015`.
 
-A shared Git remote is not yet configured in this bootstrap snapshot. That should be completed before treating multiple computers as simultaneous development machines.
+A local Git repository is now initialized and the V44.6 baseline is staged, but the recovery commit could not be created in the current environment because `.git` metadata writes were blocked. A shared Git remote is also not yet configured. Complete the local commit before treating multiple computers as simultaneous development machines.
 
 ---
 
