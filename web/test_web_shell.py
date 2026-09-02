@@ -18,7 +18,8 @@ class WebShellTests(unittest.TestCase):
 
     def test_javascript_has_safe_draft_flow(self):
         javascript = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
-        self.assertIn("Local shell preview", javascript)
+        self.assertIn("Local preview API", javascript)
+        self.assertIn("Browser-only preview", javascript)
         self.assertIn("escapeHtml", javascript)
         self.assertIn("addDraft", javascript)
 

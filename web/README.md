@@ -15,15 +15,29 @@ API, or persist account data.
 The shell uses plain HTML, CSS, and JavaScript so it can be opened without a
 framework or dependency install. Existing module engines remain unchanged.
 
+`server.py` adds a small in-memory preview API. It accepts draft watch
+definitions through the shared `core.contracts` types and serves the same
+static assets. No live watcher, authentication, persistence, or external API
+call is involved.
+
 ## Run locally
 
-From the repository root:
+Preferred preview with the local contract boundary, from the repository root:
+
+```text
+python web/server.py
+```
+
+Open `http://127.0.0.1:8080/` in a browser. Stop the preview with `Ctrl+C`.
+
+The static-only fallback remains available when an API is not needed:
 
 ```text
 python -m http.server 8080 --directory web
 ```
 
-Open `http://127.0.0.1:8080/` in a browser. Stop the preview with `Ctrl+C`.
+In that mode drafts stay in the browser session and are still labeled as
+non-monitoring previews.
 
 ## Verify
 

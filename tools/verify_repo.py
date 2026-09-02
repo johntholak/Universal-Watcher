@@ -23,6 +23,8 @@ required = [
     "web/styles.css",
     "web/app.js",
     "web/test_web_shell.py",
+    "web/server.py",
+    "web/test_server.py",
     "core/contracts.py",
     "core/test_contracts.py",
     "core/__init__.py",

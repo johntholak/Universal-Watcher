@@ -35,7 +35,7 @@
       return;
     }
     watchList.className = "watch-list";
-    watchList.innerHTML = state.watches.map((watch) => `<div class="watch-item"><div><strong>${escapeHtml(watch.name)}</strong><small>${moduleLabels[watch.module]} · local draft</small></div><span class="watch-status">Draft</span></div>`).join("");
+    watchList.innerHTML = state.watches.map((watch) => `<div class="watch-item"><div><strong>${escapeHtml(watch.query || watch.name)}</strong><small>${moduleLabels[watch.module]} · local draft</small></div><span class="watch-status">Draft</span></div>`).join("");
   }
 
   function renderActivity() {
@@ -46,14 +46,47 @@
     activityList.innerHTML = state.activities.map((activity) => `<li class="activity-item"><div><strong>${escapeHtml(activity.message)}</strong><small>${escapeHtml(activity.detail)}</small></div></li>`).join("");
   }
 
-  function addDraft(name, module) {
-    state.watches.unshift({ name, module });
+  function addDraft(watch, detail) {
+    state.watches.unshift(watch);
     state.activities.unshift({
-      message: `Created ${moduleLabels[module]} draft`,
-      detail: "Local shell preview · not monitoring yet",
+      message: `Created ${moduleLabels[watch.module]} draft`,
+      detail,
     });
     renderWatches();
     renderActivity();
+  }
+
+  async function createDraft(name, module) {
+    const payload = { module, query: name, criteria: {} };
+    try {
+      const response = await fetch("/api/watches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error("Preview API unavailable");
+      addDraft(await response.json(), "Local preview API · not monitoring yet");
+    } catch (_error) {
+      addDraft({
+        watch_id: `browser-draft-${Date.now()}`,
+        module,
+        query: name,
+        status: "draft",
+      }, "Browser-only preview · not monitoring yet");
+    }
+  }
+
+  async function hydrateWatches() {
+    try {
+      const response = await fetch("/api/watches", { cache: "no-store" });
+      if (!response.ok) return;
+      const watches = await response.json();
+      if (!Array.isArray(watches)) return;
+      state.watches = watches;
+      renderWatches();
+    } catch (_error) {
+      // Opening the shell through a static file server is supported; drafts stay local.
+    }
   }
 
   function selectView(view) {
@@ -81,11 +114,11 @@
     if (moduleCard) openDialog(moduleCard.dataset.module);
   });
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const name = nameInput.value.trim();
     if (!name) return;
-    addDraft(name, moduleInput.value);
+    await createDraft(name, moduleInput.value);
     closeDialog();
   });
 
@@ -95,4 +128,5 @@
 
   renderWatches();
   renderActivity();
+  hydrateWatches();
 })();
