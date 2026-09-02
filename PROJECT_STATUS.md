@@ -2,7 +2,7 @@
 
 **Status date:** September 2, 2026  
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Universal Watcher Web Shell V1 static foundation; Movies API/Mac acceptance remains pending
+**Current milestone:** Universal Watcher Web Shell V1 + minimal shared contracts; Movies API/Mac acceptance remains pending
 
 ## Status legend
 
@@ -16,7 +16,7 @@
 
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
-| Universal Watcher Core | 🟠 | Architecture defined | Placeholder | Establish shared contracts only after module baselines are safe |
+| Universal Watcher Core | 🟡 | Minimal watch/result contracts | Yes | Connect adapters only after Movies acceptance |
 | Universal Watcher Web App | 🟡 | V1 static shell preview | Yes | Connect shared watch/result contracts after Movies acceptance |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
 | Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key issued and awaiting Thursday production deployment; browser seat capture proven; 23 offline tests | Yes | Retry API after Thursday deployment, then run Odyssey acceptance; Mac browser regression remains useful |
@@ -40,6 +40,10 @@ The conceptual common engine is:
 
 This has not yet been extracted into a shared production package. That is intentional. The real modules should inform the shared interface before a large refactor.
 
+The first narrow contract preview now lives in `core/contracts.py`. It defines
+module-neutral watch definitions, evidence, truthful result outcomes, and a
+small `run_once` adapter protocol. No existing module is wired to it yet.
+
 ## Next
 
 After source-control consolidation:
@@ -49,6 +53,9 @@ After source-control consolidation:
 3. define job/worker execution model
 4. define server-vs-local-helper boundary
 5. avoid premature rewrites
+
+The first contract step is complete. The next step is adapter mapping after
+the Movies API deployment and Mac acceptance regression.
 
 ---
 

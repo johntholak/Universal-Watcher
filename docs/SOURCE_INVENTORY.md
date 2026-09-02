@@ -37,6 +37,12 @@ The first dependency-free control-center preview is in `web/`:
 - `web/app.js` — local draft/navigation behavior only; no live watcher calls.
 - `web/test_web_shell.py` — focused static shell checks.
 
+## Universal Watcher core contracts
+
+- `core/contracts.py` — minimal watch, evidence, result, and adapter types.
+- `core/test_contracts.py` — validation and truthful-outcome checks.
+- `core/__init__.py` — package exports for the contract types.
+
 ## Separate project
 
 Restaurant PDF menu builder is not part of this repo.

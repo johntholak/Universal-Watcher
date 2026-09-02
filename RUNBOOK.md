@@ -46,6 +46,24 @@ committed, and the shared GitHub remote is configured as `origin`. The current
 remote baseline is the `main` branch. Before changing files on another
 computer, pull first and confirm a clean status.
 
+## Shared contract preview
+
+The first small control-plane contract layer is in:
+
+```text
+core/contracts.py
+```
+
+Verify it from the repository root:
+
+```text
+python -m unittest discover -s core -p "test_*.py" -v
+```
+
+These contracts are not connected to live modules yet. Keep the existing
+Movies, Tickets, and Family Deals engines behind adapters until the Movies API
+deployment and Mac acceptance regression are complete.
+
 ---
 
 # 3. Family Deals

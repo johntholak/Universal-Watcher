@@ -23,6 +23,9 @@ required = [
     "web/styles.css",
     "web/app.js",
     "web/test_web_shell.py",
+    "core/contracts.py",
+    "core/test_contracts.py",
+    "core/__init__.py",
 ]
 
 missing = [p for p in required if not (ROOT / p).exists()]
