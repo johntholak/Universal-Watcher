@@ -2,6 +2,99 @@
 
 This file answers one question: **How do I safely pick this project up on any computer?**
 
+## New machine: start here
+
+The authoritative repository is https://github.com/johntholak/Universal-Watcher
+(branch `main`). Install Git and Python **3.14 with Tk support** first. Authenticate
+with GitHub using your own account; access to the repository is required.
+
+```sh
+git clone https://github.com/johntholak/Universal-Watcher.git
+cd Universal-Watcher
+python manage.py setup --browsers
+```
+
+On Windows, use `py -3.14` in place of `python` if needed. On macOS/Linux use
+`python3.14`. No virtual-environment activation is required. Setup creates a
+repository-local `.venv`, installs the pinned dependency set and Chromium,
+and creates missing module `.env` files without overwriting existing ones.
+Use `python manage.py setup` to omit Chromium for the web preview, Family
+Deals, offline tests, and ticket demo. Live Movies/Tickets require Chromium.
+
+Configure only the modules you need:
+
+| File | Setting | Required for |
+|---|---|---|
+| `modules/seat-watcher/.env` | `AMC_VENDOR_KEY` | Optional approved AMC catalog access; blank uses browser discovery |
+| `modules/ticket-watcher/.env` | `TICKETMASTER_API_KEY` | Live Ticketmaster event discovery; not needed for demo |
+
+Retrieve keys from your password manager or securely from your existing
+machine. Git deliberately does not transfer them. There is no root `.env`:
+the existing engines read their module-local files. Environment variables
+take precedence. Blank templates contain no usable credentials.
+
+Then verify and launch:
+
+```sh
+python manage.py test
+python manage.py run
+```
+
+Open http://127.0.0.1:8080. This is the **web preview**, with in-memory drafts;
+it does not start live watchers and its state does not follow you to another
+machine. Stop a running server with Ctrl+C.
+
+| Command | Application |
+|---|---|
+| `python manage.py run` | Web preview on port 8080 |
+| `python manage.py run family-deals` | Family Deals, port 8765 (up to 8774 if busy) |
+| `python manage.py run movies` | Movies desktop interface; requires a graphical session and Tk |
+| `python manage.py run tickets-demo` | One offline ticket demo cycle |
+| `python manage.py run tickets` | Existing live Ticketmaster watcher |
+
+Commands resolve paths relative to `manage.py`; launchers do not depend on a
+particular username, drive, or clone-folder name. Existing module launchers
+remain available, but may use their own separate module virtual environments.
+Use the root commands above for the shared environment.
+
+Windows/Python 3.14.7 setup and offline tests are verified. The same Python
+launcher supports macOS/Linux, but fresh installation and live GUI/browser
+acceptance on those systems remain unverified. On Linux, install your
+distribution's Python Tk and Playwright system libraries if missing; a desktop
+session is required for Movies. Do not copy `.venv` between machines.
+
+## Each work session and switching machines
+
+Before starting, run `git status`, then `git pull --ff-only` on a clean working
+tree. If you have local work, commit it or deliberately stash it before pulling;
+never discard it to force a pull. Rerun setup when dependency files change.
+Read `AGENTS.md`, `PRODUCT_VISION.md`, `PROJECT_STATUS.md`, and `RUNBOOK.md`.
+
+Before leaving:
+
+```sh
+python manage.py test
+git status
+git diff
+# Update PROJECT_STATUS.md with the result and one NEXT TASK.
+git add <reviewed-files>
+git diff --cached
+git commit -m "Describe the completed checkpoint"
+git push origin main
+git status -sb
+```
+
+Stage explicit reviewed files, especially when settings or diagnostics changed.
+If a push is rejected, fetch and reconcile the other machine's commits; never
+force-push over them. A successful push is the handoff, not closing the app.
+On another machine, clone once; thereafter pull in that same clone.
+
+The repository preserves source, docs, and committed configuration. Local
+credentials, browser sessions, logs, caches, virtual environments, and preview
+drafts are not synchronized. Family Deals caches under `~/.hunt_cache`;
+it can rebuild that cache. Review changes to tracked Movies `settings.json`
+and Tickets `watch.json` before committing personal preferences.
+
 ## 1. Every work session
 
 Before coding:
@@ -16,7 +109,7 @@ Read RUNBOOK.md
 If a shared Git remote has been configured:
 
 ```bash
-git pull
+git pull --ff-only
 git status
 ```
 
@@ -104,7 +197,20 @@ cd modules/family-deals
 python3 -m unittest discover -s tests -v
 ```
 
-Expected V5 handoff baseline: 13 passing tests.
+Expected V5 handoff baseline: 13 passing tests. The current repository adds
+six hours-evidence regression tests, for 19 passing Family Deals tests.
+
+Next live benchmark on the Mac:
+
+- West Hills, CA
+- 7 miles
+- $50 maximum total
+- 4 people
+- Open tonight enabled
+- Run Any restaurant type / Any cuisine, then Independent + local / Any
+  cuisine, then repeat one identical search to measure cache benefit
+
+Save the coverage counts, elapsed times, and evidence for every claimed match.
 
 ## Windows
 
@@ -138,7 +244,7 @@ For the **first run of the reconstructed build**, double-click:
 setup_and_run_v44.command
 ```
 
-That creates the local `.venv`, installs dependencies and Playwright Chromium, runs the nine offline tests, and launches the app.
+That creates the local `.venv`, installs dependencies and Playwright Chromium, runs the current offline tests, and launches the app.
 
 After setup, normal launches can use:
 
@@ -199,7 +305,7 @@ V44.6 includes an optional Showtime API discovery adapter while preserving brows
 
 The `.env` file is ignored by Git. Never place the real key in documentation, screenshots, Activity logs, or commits.
 
-Current key state on September 2: AMC's success page confirms the key was generated and ready to use, but also says new keys are deployed to production once per week on Thursday. The API currently returns error 12005 (`Unauthorized VendorKey`) until that deployment. The app reports the condition once and disables API attempts for the remainder of that run. Restart and retry after Thursday's deployment; do not request or expose the key in chat or logs.
+Current key state on September 2: AMC's success page confirms the key was generated and ready to use, but also says new keys are deployed to production once per week on Thursday. The September 2 API check returned error 12005 (`Unauthorized VendorKey`) until that deployment. The app reports the condition once and disables API attempts for the remainder of that run. Restart and retry after Thursday's deployment; do not request or expose the key in chat or logs.
 
 Windows headless diagnostic (also accepts `--headed` for comparison):
 
@@ -216,14 +322,14 @@ The exact source tree for post-Codex commit `7a19015` was not recoverable.
 The module in this repository is a careful reconstruction from the user's
 uploaded V44 baseline plus the saved Codex handoff.
 
-Before making it the permanent Git baseline:
+Remaining live acceptance checklist (the reconstructed baseline is already committed):
 
-1. Run the nine offline tests.
+1. Run the current offline tests (23 Movies tests as of September 4).
 2. Launch it on the Mac.
 3. Repeat a controlled AMC live test.
 4. Verify date selection, format classification, CityWalk routing, theater cleanup, seat matching, and browser handoff.
 5. Update `PROJECT_STATUS.md` with the live result.
-6. Then make the master Git baseline commit.
+6. Commit the acceptance evidence and updated status without secrets.
 
 ---
 
@@ -243,7 +349,7 @@ From the module directory:
 
 ```bat
 python -m venv .venv
-.venv\Scriptsctivate
+.venv\Scripts\activate
 copy .env.example .env
 ```
 
@@ -312,7 +418,7 @@ python -m unittest discover -s tests -v
 
 ## Mac
 
-The recovered bundle is Windows-oriented. Do not invent a Mac launcher. Port/setup should be done intentionally, preserving the working Ticketmaster logic.
+The root `manage.py` provides a platform-neutral entry point without changing the Ticketmaster logic. Live browser acceptance on a fresh Mac is still required.
 
 ---
 
@@ -407,10 +513,15 @@ Watcher engine as part of shell work.
 
 ## 11. Isolated module adapter checks
 
-The first adapter mapping is in `adapters/family_deals.py`. It translates
+The Family Deals mapping is in `adapters/family_deals.py`. It translates
 completed Family Deals V5 job records into shared result/evidence values and
 keeps unresolved hours, capacity, or source coverage truthful. It does not
 start the Family Deals server or make live requests.
+
+The Ticket Watcher mapping is in `adapters/tickets.py`. It translates existing
+Ticket Watcher `Match` records and keeps unknown fees, inventory, adjacency,
+and incomplete source coverage visible. It does not start Ticketmaster or
+change the working browser watcher.
 
 Verify it from the repository root:
 
@@ -425,14 +536,14 @@ acceptance regression are complete.
 
 # 12. Switching computers safely
 
-Once a private Git remote is configured, the operating pattern should be:
+The configured GitHub origin uses the workflow above. In brief:
 
 ## Before switching away
 
 ```bash
 git status
 # run tests
-git add -A
+git add <reviewed-files>
 git commit -m "Describe the completed checkpoint"
 git push
 ```
@@ -440,7 +551,7 @@ git push
 ## On the other computer
 
 ```bash
-git pull
+git pull --ff-only
 git status
 ```
 

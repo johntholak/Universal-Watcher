@@ -19,3 +19,14 @@ Verify it from the repository root:
 ```text
 python -m unittest discover -s adapters -p "test_*.py" -v
 ```
+
+## Tickets
+
+`tickets.py` normalizes existing Ticket Watcher `Match` records. A fully
+specified offer can be marked verified; event-level prices, unknown fees, and
+unconfirmed adjacency remain an unverified match with the source limitation
+shown as the reason. In-progress, failed, and incomplete-source runs stay
+separate from a truthful `no_match` result.
+
+The adapter accepts an injected job provider. It does not start the
+Ticketmaster watcher, contact Ticketmaster, or alter the working browser path.

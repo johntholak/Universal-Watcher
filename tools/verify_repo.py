@@ -4,6 +4,10 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 required = [
+    "manage.py",
+    "requirements.txt",
+    "constraints.txt",
+    "modules/ticket-watcher/.env.example",
     "AGENTS.md",
     "PRODUCT_VISION.md",
     "PROJECT_STATUS.md",
@@ -32,6 +36,8 @@ required = [
     "adapters/README.md",
     "adapters/family_deals.py",
     "adapters/test_family_deals.py",
+    "adapters/tickets.py",
+    "adapters/test_tickets.py",
 ]
 
 missing = [p for p in required if not (ROOT / p).exists()]

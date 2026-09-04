@@ -49,6 +49,8 @@ The first dependency-free control-center preview is in `web/`:
 
 - `adapters/family_deals.py` — translates Family Deals V5 job records into shared `WatchResult` and `Evidence` values without changing the engine.
 - `adapters/test_family_deals.py` — adapter mapping and truthful-unavailability tests.
+- `adapters/tickets.py` — translates existing Ticket Watcher `Match` records into shared `WatchResult` and `Evidence` values without changing the engine.
+- `adapters/test_tickets.py` — Ticket Watcher adapter mapping and evidence-state tests.
 - `adapters/README.md` — adapter boundary and current integration limits.
 
 ## Separate project

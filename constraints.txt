@@ -1,0 +1,9 @@
+# Resolved with Python 3.14.7 on Windows; portable package versions.
+# Revalidate on macOS/Linux before claiming those platforms are tested.
+customtkinter==6.0.0
+playwright==1.62.0
+darkdetect==0.8.0
+packaging==26.3
+greenlet==3.5.5
+pyee==13.0.1
+typing_extensions==4.16.0

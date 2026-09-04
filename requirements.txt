@@ -1,0 +1,4 @@
+# Shared environment; preserve the existing Movies dependency baseline.
+-c constraints.txt
+-r modules/seat-watcher/requirements.txt
+-r modules/ticket-watcher/requirements.txt

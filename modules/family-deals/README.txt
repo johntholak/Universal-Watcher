@@ -76,4 +76,4 @@ TESTS
 Run:
 python3 -m unittest discover -s tests -v
 
-Current suite: 13 tests.
+Current suite: 19 tests, including conservative dinner-hours parsing.

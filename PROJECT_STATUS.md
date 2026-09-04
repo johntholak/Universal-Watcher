@@ -1,8 +1,34 @@
 # PROJECT_STATUS.md — Universal Watcher
 
-**Status date:** September 2, 2026  
+**Status date:** September 4, 2026
 **Overall stage:** Foundation / consolidation  
 **Current milestone:** Universal Watcher Web Shell V1 + minimal shared contracts; Movies API/Mac acceptance remains pending
+
+## September 4 portability checkpoint
+
+- GitHub source of truth: `https://github.com/johntholak/Universal-Watcher`, `main`.
+- Preserved the existing uncommitted Family Deals hours fix and Ticket adapter.
+- Added root setup/test/run entry points, shared dependency manifest with pinned
+  transitive constraints, blank module environment templates, and line-ending rules.
+- Reconciled the four authoritative docs with current code and documented the
+  clone/setup/configure/test/run/pull/push workflow and local-state limitations.
+- Windows Python 3.14.7 clean-environment installation and Chromium setup passed.
+- Root launcher served HTTP 200 from another working directory; blank Chromium
+  launch and Tk initialization passed. Tracked/proposed files and local Git
+  history passed checks for known local credentials, common token/private-key
+  patterns, and user-specific absolute paths; no detected secrets were committed.
+- All 80 offline tests passed: core 5, web 9, adapters 12, Family Deals 19,
+  Tickets 12, Movies 23. These do not establish live provider acceptance.
+- AMC production activation has not been rechecked in this session. The
+  September 2 key/deployment notes below are historical observations.
+- macOS/Linux fresh setup and live GUI/browser acceptance remain unverified.
+- Credentials remain ignored on the original machine and must be configured
+  securely on a new machine; Git does not synchronize runtime state.
+
+**NEXT TASK:** On the Mac, bootstrap this GitHub checkout, configure the approved
+AMC key securely, and run the documented Movies NEXT BEST acceptance case;
+record current API authorization, date coverage, and seat-inventory outcomes
+without exposing credentials before enabling live web adapter execution.
 
 ## Status legend
 
@@ -16,11 +42,11 @@
 
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
-| Universal Watcher Core | 🟡 | Minimal watch/result contracts + Family Deals mapping | Yes | Keep live execution gated; add proven adapters after Movies acceptance |
+| Universal Watcher Core | 🟡 | Minimal watch/result contracts + Family Deals and Ticket mappings | Yes | Keep live execution gated; add execution boundary after Movies acceptance |
 | Universal Watcher Web App | 🟡 | V1 shell + in-memory lifecycle and results/evidence preview | Yes | Wire real adapters after Movies acceptance |
-| Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier; isolated result adapter mapping | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
-| Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key issued and awaiting Thursday production deployment; browser seat capture proven; 23 offline tests | Yes | Retry API after Thursday deployment, then run Odyssey acceptance; Mac browser regression remains useful |
-| Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9 | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
+| Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier; V5.0.1 conservative hours parsing; isolated result adapter mapping | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
+| Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key issued; production authorization recheck pending; browser seat capture proven; 23 offline tests | Yes | Retry API after Thursday deployment, then run Odyssey acceptance; Mac browser regression remains useful |
+| Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9; isolated result adapter mapping | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
 | Theater Discovery | 🟠 | Separate-workstream decision made | Placeholder | Build non-AMC providers independently, then normalize into Seat Watcher |
 | Drop Watch | ⚪ | Planned | Placeholder | Start only after Universal shell/integration foundation |
 | Automated Job Hunter | ⚪ | Planned | Placeholder | After Drop Watch |
@@ -44,9 +70,9 @@ discovery expansion and the later planned modules.
 
 While the Movies gate is waiting on AMC/API and Mac access, isolated adapter
 mapping is allowed when it only translates an existing module job record and
-does not start live monitoring or alter that module's engine. Family Deals is
-the first such mapping; its live benchmark and web execution remain separate
-acceptance steps.
+does not start live monitoring or alter that module's engine. Family Deals and
+Ticket Watcher now have these mappings; their live benchmarks and web
+execution remain separate acceptance steps.
 
 ---
 
@@ -62,7 +88,8 @@ This has not yet been extracted into a shared production package. That is intent
 
 The first narrow contract preview now lives in `core/contracts.py`. It defines
 module-neutral watch definitions, evidence, truthful result outcomes, and a
-small `run_once` adapter protocol. No existing module is wired to it yet.
+small `run_once` adapter protocol. Family Deals and Ticket Watcher now have
+offline mappings into it; no live module is wired to it yet.
 
 ## Next
 
@@ -75,9 +102,9 @@ The initial extraction sequence is now:
 5. [x] avoid premature rewrites
 
 The first contract step is complete. The web shell now exercises the watch
-definition boundary through a dependency-free in-memory preview API. A first
-isolated Family Deals result adapter mapping is also present, while live
-adapter execution remains gated on the Movies API deployment and Mac
+definition boundary through a dependency-free in-memory preview API. Family
+Deals and Ticket Watcher both have isolated result adapter mappings, while
+live adapter execution remains gated on the Movies API deployment and Mac
 acceptance regression.
 
 The shell preview now exercises draft lifecycle transitions (`active`,
@@ -112,7 +139,11 @@ The internal source still uses the legacy `HUNT` name. Preserve it until an inte
 - Event/birthday-package rejection exists.
 - Caching and concurrency optimizations exist.
 - 13 automated strict-parser tests were passing at the V5 handoff.
-- **Master Repo V1 verification:** all 13 Family Deals tests were rerun successfully after import.
+- The current suite has 19 tests, including conservative dinner-hours parsing.
+- **Master Repo V1 verification:** all 19 Family Deals tests pass in the current repository.
+- **Universal Watcher adapter verification:** Family Deals and Ticket Watcher
+  mappings pass their offline contract tests; this does not claim that either
+  live module meets the final product specification.
 
 ## Major unresolved areas
 
@@ -121,21 +152,32 @@ The internal source still uses the legacy `HUNT` name. Preserve it until an inte
 - Official-source resolution coverage is incomplete.
 - A prior broad run left roughly 372 of 697 restaurants without a resolvable official source.
 - Every live claimed match still needs skeptical evidence review.
+- The Universal Watcher adapter is plumbing only; it does not make the V5
+  engine live or imply that Family Deals already meets the final product
+  specification.
 
 ## Hard rule
 
 Never restore an arbitrary top-N restaurant limit to make broad searches feel faster.
 
+## Exact next Family Deals step
+
+On the Mac, run the documented West Hills / 7-mile / $50 / 4-person / open
+tonight benchmark for Any restaurants, Independent + local, and one repeated
+search. Capture the coverage and elapsed-time numbers, then inspect every
+claimed match against its evidence source. Do not make another parser or speed
+change until that live evidence identifies the next failure or bottleneck.
+
 ---
 
 # 3. Seat Watcher
 
-## Authoritative known state
+## Historical source provenance
 
 The post-Codex working state is documented as:
 
 - branch: `main`
-- latest known commit: `7a19015` — `Clean duplicate and incomplete theater results`
+- lost original-source commit: `7a19015` — `Clean duplicate and incomplete theater results`
 - baseline before Mac migration: `3a19039` — `Recovery point before macOS migration`
 
 The exact post-Codex Git tree at `7a19015` was not recoverable. Master Repo V2 therefore contains a **reconstructed post-Codex V44 build** made from the user's uploaded Depth/Layering baseline plus the saved August 28 Codex handoff. It is not represented as a byte-for-byte recovery of that commit.
@@ -256,7 +298,7 @@ No production-ready non-AMC implementation is claimed yet.
 - [x] Configure private shared Git remote.
 - [x] Import current Seat Watcher folder.
 - [x] Establish baseline commits.
-- [x] Confirm all run instructions.
+- [x] Document root setup/run workflow; fresh Mac/Linux acceptance remains pending.
 
 ### Milestone B — Universal Watcher Web Shell V1
 One web application with initial module entry points and active-watch structure.
@@ -270,8 +312,8 @@ protected Movies engine.
 
 ### Milestone C — Module integration
 - Family Deals adapter (isolated result mapping started; live execution pending)
+- Ticket Watcher adapter (isolated result mapping started; live execution pending)
 - Seat Watcher adapter/local-helper strategy
-- Ticket Watcher adapter
 - Theater discovery expansion
 
 ### Milestone D — Drop Watch

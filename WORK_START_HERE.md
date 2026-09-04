@@ -157,8 +157,9 @@ Live-test the V44.5 Movies iteration to verify that it:
 8. produce a clear live diagnostic log for the same Odyssey acceptance case
 
 Do not redesign the UI.
-Do not start Tickets, Family Deals, Drops, Jobs, or Event Copilot work yet.
-Do not perform broad architecture cleanup.
+Do not alter another module's proven engine as part of Movies verification.
+Module-neutral platform work and isolated adapter mappings may continue while
+the Movies gate is pending. Do not perform broad architecture cleanup.
 
 ---
 

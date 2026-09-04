@@ -31,7 +31,7 @@ MAX_BYTES = 1_500_000
 MAX_PAGES_PER_SOURCE = 3
 MAX_WORKERS = 24
 RESOLVE_WORKERS = 20
-PARSER_VERSION = "5.0-fast-semantic"
+PARSER_VERSION = "5.0.1-hours"
 SOURCE_CACHE_TTL = 6 * 60 * 60
 WIKIDATA_CACHE_TTL = 7 * 24 * 60 * 60
 CACHE_DIR = Path.home() / ".hunt_cache"
@@ -650,7 +650,10 @@ def crawl_official_source(url: str, budget: float, people: int) -> dict[str, Any
     }
 
 
-DAY_INDEX = {"Mo": 0, "Tu": 1, "We": 2, "Th": 3, "Fr": 4, "Sa": 5, "Su": 6}
+DAY_INDEX = {
+    "Mo": 0, "Tu": 1, "We": 2, "Th": 3, "Fr": 4, "Sa": 5, "Su": 6,
+    "Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6,
+}
 
 
 def expand_days(spec: str) -> set[int]:
@@ -670,38 +673,107 @@ def expand_days(spec: str) -> set[int]:
     return out
 
 
+def _parse_clock(value: str) -> int | None:
+    """Parse a conservative 12-hour or 24-hour clock value."""
+    value = value.strip().lower().replace(" ", "")
+    match = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?(am|pm)?", value)
+    if not match:
+        # OSM also permits compact values such as 1130 or 2200.
+        compact = re.fullmatch(r"(\d{3,4})", value)
+        if compact:
+            digits = compact.group(1).zfill(4)
+            hour, minute = int(digits[:2]), int(digits[2:])
+            return hour * 60 + minute if hour <= 23 and minute <= 59 else None
+        return None
+
+    hour = int(match.group(1))
+    minute = int(match.group(2) or 0)
+    meridiem = match.group(3)
+    if minute > 59:
+        return None
+    if meridiem:
+        if hour < 1 or hour > 12:
+            return None
+        if meridiem == "am":
+            hour = 0 if hour == 12 else hour
+        else:
+            hour = 12 if hour == 12 else hour + 12
+    elif hour > 24 or (hour == 24 and minute != 0):
+        return None
+    return hour * 60 + minute
+
+
+def _parse_opening_span(value: str) -> tuple[int, int] | None:
+    value = value.strip().replace("–", "-").replace("—", "-")
+    match = re.fullmatch(r"(.+?)\s*-\s*(.+)", value)
+    if not match:
+        return None
+    start = _parse_clock(match.group(1))
+    end = _parse_clock(match.group(2))
+    if start is None or end is None:
+        return None
+    return start, end
+
+
 def parse_simple_opening_hours(spec: str, at: datetime | None = None) -> bool | None:
-    spec = clean_space(spec)
+    """Return dinner availability as true, false, or unknown.
+
+    This is intentionally a small, conservative reader for common OSM and
+    official-source strings. A day not mentioned by the source is unknown,
+    not closed. Unsupported syntax also remains unknown rather than being
+    treated as proof that dinner is unavailable.
+    """
+    spec = clean_space(spec).replace("–", "-").replace("—", "-")
     if not spec:
         return None
-    if spec == "24/7":
+    if spec.casefold() == "24/7":
         return True
+
     at = at or datetime.now()
     # Dinner availability means 6:30 PM today, not whether the place is open at the moment the morning search runs.
     target_min = 18 * 60 + 30
     weekday = at.weekday()
-    understood = False
+    day_names = "|".join(sorted(DAY_INDEX, key=len, reverse=True))
+    day_pattern = rf"((?:{day_names})(?:-(?:{day_names}))?(?:,(?:{day_names})(?:-(?:{day_names}))?)*)"
+    current_day_covered = False
+    current_day_unknown = False
+
     for chunk in [c.strip() for c in spec.split(";") if c.strip()]:
-        m = re.match(r"^((?:Mo|Tu|We|Th|Fr|Sa|Su)(?:-(?:Mo|Tu|We|Th|Fr|Sa|Su))?(?:,(?:Mo|Tu|We|Th|Fr|Sa|Su)(?:-(?:Mo|Tu|We|Th|Fr|Sa|Su))?)*)\s+(.+)$", chunk)
-        if not m:
+        match = re.match(rf"^{day_pattern}\s*(?::|\s)\s*(.+)$", chunk, flags=re.I)
+        if not match:
             continue
-        days = expand_days(m.group(1))
+        day_spec, hours_spec = match.group(1), match.group(2).strip()
+        # Normalize full day names back to the canonical keys used by expand_days.
+        canonical_days = []
+        for token in re.split(r"[-,]", day_spec):
+            token = token[:1].upper() + token[1:].lower()
+            canonical_days.append(token)
+        canonical_spec = day_spec
+        for original, canonical in zip(re.split(r"[-,]", day_spec), canonical_days):
+            canonical_spec = re.sub(rf"(?<![A-Za-z]){re.escape(original)}(?![A-Za-z])", canonical, canonical_spec)
+        days = expand_days(canonical_spec)
         if weekday not in days:
-            understood = True
             continue
-        for span in m.group(2).split(","):
-            tm = re.match(r"(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})", span.strip())
-            if not tm:
-                continue
-            understood = True
-            start = int(tm.group(1)) * 60 + int(tm.group(2))
-            end = int(tm.group(3)) * 60 + int(tm.group(4))
+
+        current_day_covered = True
+        if hours_spec.casefold() in {"off", "closed", "none"}:
+            return False
+
+        spans = [_parse_opening_span(span) for span in re.split(r"\s*,\s*", hours_spec)]
+        valid_spans = [span for span in spans if span is not None]
+        if not valid_spans:
+            current_day_unknown = True
+            continue
+        for start, end in valid_spans:
             if end < start:  # crosses midnight
                 if target_min >= start or target_min <= end:
                     return True
             elif start <= target_min <= end:
                 return True
-    return False if understood else None
+
+    if current_day_covered and not current_day_unknown:
+        return False
+    return None
 
 
 def set_job(job_id: str, **updates: Any) -> None:

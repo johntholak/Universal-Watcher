@@ -50,8 +50,8 @@ A change is not considered complete if the code changed but the status/runbook b
 
 Once a remote repository is configured:
 
-1. Pull before beginning work.
-2. Check `git status`.
+1. Check `git status`; preserve any existing local work.
+2. On a clean tree, run `git pull --ff-only` before beginning work.
 3. Create a recovery commit before risky changes.
 4. Make narrow changes.
 5. Run relevant tests.
@@ -110,7 +110,7 @@ High-risk areas include:
 - headless-to-visible browser handoff
 - Tk worker-thread/event-queue boundaries
 
-The current working source must be imported from the user's current local Seat Watcher folder. Do not substitute an older Library ZIP as the current baseline.
+The current authoritative source is the committed reconstructed V44.6 tree in `modules/seat-watcher`. The lost original commit is historical provenance, not a recoverable baseline. Do not replace this source with an old ZIP or another machine's folder.
 
 ### Family Deals
 
@@ -144,3 +144,12 @@ Before finishing a substantial Codex session:
 - commit/push when a remote is configured
 
 The goal is that a different computer or a fresh AI session can recover the full state by reading this repository.
+
+## Portable setup contract
+
+Use `python manage.py setup --browsers`, `python manage.py test`, and
+`python manage.py run` from the root. See README for Python command variants.
+Keep dependency constraints and module manifests consistent. Never commit local
+`.env` files, credentials, virtual environments, or machine-specific absolute paths.
+Preserve pre-existing user changes. Keep exactly one global NEXT TASK in
+PROJECT_STATUS.md; module roadmaps are context, not competing session priorities.

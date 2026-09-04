@@ -169,13 +169,15 @@ Seat Watcher is the clearest example: the valuable AMC engine survives. Its curr
 
 ## Current product milestone
 
-The immediate milestone is **Universal Watcher Foundation / Master Repo V1**:
+The repository and GitHub baseline now exist. The current implementation has
+minimal shared contracts, a dependency-free web preview with in-memory draft
+lifecycle/results endpoints, and isolated Family Deals/Tickets result mappings.
+The existing modules remain independent engines. Accounts, persistent shared
+watches, scheduled workers, notifications, and cross-device runtime state are
+future work, not features delivered by repository portability.
 
-- establish one authoritative repository
-- preserve current module baselines
-- make status and run instructions recoverable on any computer
-- configure a shared Git remote
-- import the current Seat Watcher post-Codex source
-- then begin the first Universal Watcher web shell
+The current milestone is reliable cross-machine development and preservation
+of those engines. Live integration remains gated on Movies API/Mac acceptance;
+see PROJECT_STATUS.md for the single next task and current evidence.
 
 The restaurant PDF menu builder is explicitly outside this product.

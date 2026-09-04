@@ -1,0 +1,4 @@
+# Keep new entry points portable without renormalizing imported baselines.
+/manage.py text eol=lf
+/requirements.txt text eol=lf
+/constraints.txt text eol=lf
