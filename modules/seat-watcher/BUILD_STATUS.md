@@ -78,3 +78,30 @@ Live verification remains required using the exact Odyssey / IMAX 70MM / Univers
 - This was a catalog-only Windows check. It stopped on the first rejection;
   no dated-showtime request, seat check, or browser fallback ran.
 - No engine code changed. Mac acceptance and live web integration remain pending.
+
+## V44.7 September 4 reliability pass (current)
+
+This section supersedes the earlier authorization and capture-only claims.
+
+- The same catalog key now succeeds; 32/32 independently browser-observed
+  showtimes matched the API in seven theater/date cases across three LA theaters.
+- Find theaters now uses the complete approved catalog (523 records in the live
+  sample), retaining official identities/URLs and full-radius filtering. Maps
+  remain a clearly unverified fallback. Pagination fails closed if incomplete.
+- Live map comparison found the fallback decoder spanning unnamed gap objects
+  into a real seat and dropping seat types. D1–D4 at Burbank included two
+  wheelchair spaces and a companion position, invalidating that ordinary match.
+- Structured per-object decoding now precedes the preserved encoding/fallback
+  paths. A separate map verifier requires complete agreement; unnamed layout
+  placeholders are not physical seats. Ordinary-seat groups exclude wheelchair
+  and companion positions. Accessibility-specific matching is not implemented.
+- All browser discovery failures feed the unavailable counter. Seat HTTP 403/429
+  disables further requests in that run; diagnostic routes omit query tokens.
+- Existing adjacency/ranking, Tk boundaries, scrolling, Activity, date progression,
+  format/movie/time filters and handoff code were not rewritten.
+- 47 Movies offline tests pass; root suite 104. Final decoder/map-gap fixes need
+  live Mac validation: repeated Windows probes encountered an AMC 429, and the
+  user reports no administrator access. No further Windows browser testing.
+- See `docs/AMC_RELIABILITY_REVIEW.md` at the repository root for the evidence
+  set, chronology, provider decision and acceptance thresholds. No overall >90%
+  accuracy or final live seating success is claimed.

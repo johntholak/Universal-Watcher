@@ -1,4 +1,5 @@
 """Fast behavior-contract tests; no network or browser calls."""
+import json
 import unittest
 from datetime import date
 from unittest.mock import patch
@@ -14,6 +15,7 @@ from seat_watcher_v44 import (
     load_amc_vendor_key,
     movie_similarity,
     normalize_amc_api_showtimes,
+    normalize_amc_api_theaters,
     next_best_should_stop,
     parse_date_value,
     resolve_date_option_value,
@@ -27,6 +29,48 @@ from seat_watcher_v44 import (
 
 
 class HelperContractTests(unittest.TestCase):
+    def test_escaped_payload_cannot_attach_gap_availability_to_next_seat(self):
+        watcher = object.__new__(WatcherEngine)
+        records = [
+            {"available": False, "column": 1, "row": 1, "type": "Gap", "shouldDisplay": False},
+            {"available": True, "column": 2, "row": 1, "name": "A12",
+             "type": "Traditional", "seatTier": "Regular", "shouldDisplay": True},
+        ]
+        embedded = json.dumps(records).replace('"', '\\"')
+        parsed = watcher.parse_seats_from_bytes(f'<script>payload="{embedded}"</script>'.encode())
+        self.assertEqual(len(parsed), 1)
+        self.assertTrue(parsed[0]["available"])
+        self.assertEqual(parsed[0]["column"], 2)
+        self.assertEqual(parsed[0]["type"], "Traditional")
+
+    def test_escaped_seat_name_alias_preserves_accessible_type(self):
+        watcher = object.__new__(WatcherEngine)
+        embedded = json.dumps({"available": True, "column": 11, "row": 5,
+                               "seatName": "D3", "type": "Wheelchair"}).replace('"', '\\"')
+        parsed = watcher.parse_seats_from_bytes(f'<script>{embedded}</script>'.encode('utf-16'))
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["name"], "D3")
+        self.assertEqual(parsed[0]["type"], "Wheelchair")
+
+    def test_catalog_preserves_official_theatre_identity_and_full_radius(self):
+        records = [{
+            "id": i, "name": f"AMC Test {i}", "slug": f"official-route-{i}",
+            "websiteUrl": f"https://www.amctheatres.com/movie-theatres/test/official-route-{i}",
+            "location": {"latitude": 34.0, "longitude": -118.0}, "isClosed": False,
+        } for i in range(40)]
+        records.append(dict(records[0], id=100, isClosed=True))
+        records.append(dict(records[0], id=101, location={"latitude": 35, "longitude": -118}))
+        result = normalize_amc_api_theaters(records, 34.0, -118.0, 5)
+        self.assertEqual(len(result), 40)
+        self.assertEqual(result[0]["slug"], "official-route-0")
+        self.assertEqual(result[0]["amc_theatre_id"], 0)
+        self.assertEqual(result[0]["theater_url"], records[0]["websiteUrl"])
+
+    def test_catalog_missing_coordinates_cannot_claim_full_coverage(self):
+        from amc_showtime_api import AmcApiError
+        with self.assertRaises(AmcApiError):
+            normalize_amc_api_theaters([{"id": 1}], 34, -118, 10)
+
     def test_time_parsing(self):
         self.assertEqual(time_to_minutes("12:00am"), 0)
         self.assertEqual(time_to_minutes("1:15pm"), 795)

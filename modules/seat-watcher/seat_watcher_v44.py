@@ -35,7 +35,7 @@ from amc_showtime_api import (
 
 
 APP_NAME = "Universal Watcher | Movies"
-APP_VERSION = "V44.6 RECONSTRUCTED"
+APP_VERSION = "V44.7 RECONSTRUCTED"
 
 # ============================================================
 # PORTABLE APP PATHS
@@ -394,6 +394,50 @@ def summarize_inventory_results(results):
         else:
             unavailable += 1
     return matches, captured_without_match, unavailable, errors
+
+
+def verify_seats_against_rendered_map(seats, controls):
+    """Require a complete, agreeing visible map before any positive/negative claim.
+
+    Keep the proven payload decoder and grouping untouched. The displayed map
+    supplies the seat-type labels lost by the legacy escaped-JSON fallback.
+    Accessible spaces/companions are not ordinary seats; accessibility-specific
+    matching needs an explicit future preference, not an automatic assumption.
+    """
+    if not controls:
+        raise ValueError("Seat map not available to verify captured inventory")
+    by_name = {}
+    visible_names = {str(c.get("name") or "").strip().upper() for c in controls}
+    for seat in seats:
+        name = str(seat.get("name", "")).strip().upper()
+        if not name or name not in visible_names:
+            continue  # Layout gaps are not physical seats and may share blank names.
+        if name in by_name and any(by_name[name].get(key) != seat.get(key)
+                                   for key in ("available", "row", "column")):
+            raise ValueError("Conflicting captured seat snapshots")
+        by_name[name] = seat
+    verified, seen = [], set()
+    for control in controls:
+        name = str(control.get("name") or "").strip().upper()
+        label = str(control.get("label") or "").strip()
+        disabled = control.get("disabled")
+        if not name or not label or name in seen or type(disabled) is not bool:
+            raise ValueError("Incomplete rendered seat identity/state")
+        seen.add(name)
+        seat = by_name.get(name)
+        if seat is None or seat.get("available") is not (not disabled):
+            raise ValueError("Captured inventory disagrees with the displayed seat map")
+        copy = dict(seat)
+        copy["display_label"] = label
+        if "wheelchair" in label.lower() or "companion" in label.lower():
+            copy["available"] = False
+        verified.append(copy)
+    return verified
+
+
+def diagnostic_url(url):
+    """Log provider routes, never queue/session/query tokens."""
+    return urlparse(str(url))._replace(query="", fragment="").geturl()
 
 
 def dated_request_was_blocked(responses, search_date):
@@ -932,7 +976,9 @@ def clean_theater_list(theaters):
         copy["name"] = name
         copy["lat"] = lat
         copy["lon"] = lon
-        copy["slug"] = slugify_theater_name(name)
+        copy["slug"] = str(copy.get("slug") or slugify_theater_name(name)).strip()
+        if slugify_theater_name(name) == "universal-cinema-an-amc-theatre":
+            copy["slug"] = "universal-cinema-an-amc-theatre"
 
         existing_url = str(copy.get("theater_url", "") or "").strip()
         if copy["slug"] == "universal-cinema-an-amc-theatre":
@@ -1220,6 +1266,39 @@ def nominatim_fallback_amc_theaters(
     return results
 
 
+def normalize_amc_api_theaters(records, center_lat, center_lon, radius_miles):
+    """Use AMC identities/coordinates without guessing names or market routes."""
+    theaters = []
+    for record in records:
+        if record.get("isClosed") is True:
+            continue
+        try:
+            location = record["location"]
+            lat, lon = float(location["latitude"]), float(location["longitude"])
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                raise ValueError("invalid coordinates")
+            distance = haversine_miles(center_lat, center_lon, lat, lon)
+            if distance > float(radius_miles):
+                continue
+            slug = str(record["slug"]).strip()
+            name = str(record.get("name") or record.get("longName") or "").strip()
+            url = str(record["websiteUrl"]).rstrip("/")
+            parsed = urlparse(url)
+            if (not name or not slug or parsed.scheme != "https"
+                    or parsed.hostname != "www.amctheatres.com"
+                    or not parsed.path.startswith("/movie-theatres/")
+                    or parsed.path.rsplit("/", 1)[-1] != slug):
+                raise ValueError("invalid AMC identity/route")
+            theaters.append({
+                "name": name, "slug": slug, "amc_theatre_id": int(record["id"]),
+                "lat": lat, "lon": lon, "distance": distance,
+                "theater_url": url, "discovery_source": "AMC Theatre API",
+            })
+        except (KeyError, ValueError, TypeError) as exc:
+            raise AmcApiError("AMC theater catalog could not establish full-radius coverage") from exc
+    return sorted(clean_theater_list(theaters), key=lambda item: item["distance"])
+
+
 async def discover_amc_theaters_for_location(
     location_query,
     radius_miles,
@@ -1247,6 +1326,21 @@ async def discover_amc_theaters_for_location(
     say(
         f"Finding AMC theaters within {float(radius_miles):.1f} miles..."
     )
+
+    vendor_key = load_amc_vendor_key()
+    if vendor_key:
+        try:
+            records = await asyncio.to_thread(AmcShowtimeClient(vendor_key).list_theatres)
+            discovered = normalize_amc_api_theaters(
+                records, center_lat, center_lon, radius_miles
+            )
+            say(f"AMC catalog: {len(discovered)} open theaters within the selected radius "
+                f"({len(records)} catalog records checked; no top-N cap).")
+            return {"theaters": discovered, "lat": center_lat, "lon": center_lon,
+                    "display_name": display_name, "location_query": location_query}
+        except AmcApiError as exc:
+            say(f"AMC theater catalog unavailable: {exc}. Using map candidates; "
+                "their completeness and current AMC identity are not verified.")
 
     raw_candidates = []
 
@@ -1379,7 +1473,8 @@ async def discover_amc_theaters_for_location(
         )
 
     say(
-        f"Confirmed {len(discovered)} AMC theaters within the selected radius."
+        f"Found {len(discovered)} map-listed AMC candidates within the selected radius; "
+        "map coverage and current AMC identity are not verified."
     )
 
     for theater in discovered:
@@ -1636,6 +1731,7 @@ class WatcherEngine:
         vendor_key = load_amc_vendor_key()
         self.amc_api_client = AmcShowtimeClient(vendor_key) if vendor_key else None
         self.amc_theatre_ids = {}
+        self.seat_access_block = None
 
     def get_search_dates(self):
         mode = str(
@@ -2144,6 +2240,22 @@ class WatcherEngine:
                     '"'
                 )
 
+                # AMC embeds escaped seat objects in its streamed HTML. Decode
+                # each whole flat object before the legacy text fallback: the
+                # latter can cross an unnamed aisle/gap into the following seat
+                # and loses type/visibility metadata. Keep all encoding and
+                # fallback paths; the rendered-map guard rejects partial reads.
+                seats = []
+                for fragment in re.finditer(
+                    r'\{[^{}]*"available"\s*:\s*(?:true|false)[^{}]*\}', cleaned, re.I
+                ):
+                    try:
+                        self.walk_json(json.loads(fragment.group()), seats)
+                    except (ValueError, TypeError):
+                        continue
+                if seats:
+                    return seats
+
                 pattern = re.compile(
                     r'"available"\s*:\s*'
                     r'(true|false).*?'
@@ -2492,10 +2604,16 @@ class WatcherEngine:
             if self.stop_event.is_set():
                 return None
 
+            if self.seat_access_block:
+                self.emit(f"  Seat inventory unavailable: {self.seat_access_block}")
+                return dict(showtime, inventory_status="unavailable", reason=self.seat_access_block)
+
             context = None
             page = None
 
             all_seats = []
+            response_tasks = set()
+            response_handler = None
 
             try:
                 context = await browser.new_context(
@@ -2509,7 +2627,6 @@ class WatcherEngine:
                     f"{showtime['format']}"
                 )
 
-                response_tasks = set()
                 response_diagnostics = []
 
                 async def capture_response(response):
@@ -2519,6 +2636,17 @@ class WatcherEngine:
                     if not self.promising_response(
                         response
                     ):
+                        return
+
+                    if response.status >= 400:
+                        if response.status in (403, 429):
+                            self.seat_access_block = (
+                                f"AMC returned HTTP {response.status}; further seat requests "
+                                "are disabled for this run. Retry later after access is available."
+                            )
+                        response_diagnostics.append(
+                            (diagnostic_url(response.url), 0, 0, f"HTTP {response.status}")
+                        )
                         return
 
                     try:
@@ -2537,12 +2665,12 @@ class WatcherEngine:
                             )
 
                         response_diagnostics.append(
-                            (response.url, len(raw), len(seats), "")
+                            (diagnostic_url(response.url), len(raw), len(seats), "")
                         )
 
                     except Exception as exc:
                         response_diagnostics.append(
-                            (response.url, 0, 0, f"{type(exc).__name__}: {exc}")
+                            (diagnostic_url(response.url), 0, 0, f"{type(exc).__name__}: body capture failed")
                         )
 
                 def handle_response(response):
@@ -2550,6 +2678,7 @@ class WatcherEngine:
                     response_tasks.add(task)
                     task.add_done_callback(response_tasks.discard)
 
+                response_handler = handle_response
                 page.on(
                     "response",
                     handle_response
@@ -2571,6 +2700,8 @@ class WatcherEngine:
 
                 capture_deadline = time.monotonic() + SEAT_CAPTURE_WAIT_SECONDS
                 while not all_seats and time.monotonic() < capture_deadline:
+                    if self.stop_event.is_set() or self.seat_access_block:
+                        break
                     if response_tasks:
                         await asyncio.wait(
                             list(response_tasks), timeout=0.5,
@@ -2582,7 +2713,7 @@ class WatcherEngine:
                 if response_tasks:
                     await asyncio.wait(list(response_tasks), timeout=SEAT_RESPONSE_TIMEOUT)
 
-                if not all_seats:
+                if not all_seats or self.seat_access_block:
                     self.emit(
                         f"  Seat inventory unavailable for {showtime['theater']} "
                         f"at {showtime['time']} (capture failed after "
@@ -2610,6 +2741,20 @@ class WatcherEngine:
                                 f"{byte_count} bytes; {seat_count} seats parsed"
                             )
 
+                seat_map = page.get_by_role("grid", name="Seat Selection Map", exact=True)
+                await seat_map.wait_for(state="visible", timeout=5000)
+                controls = await seat_map.get_by_role("checkbox").evaluate_all(
+                    """els => els.map(el => ({
+                        name: el.getAttribute('name'),
+                        label: el.getAttribute('aria-label'),
+                        disabled: el.disabled === true || el.getAttribute('aria-disabled') === 'true'
+                    }))"""
+                )
+                all_seats = verify_seats_against_rendered_map(all_seats, controls)
+                inventory_count = len(all_seats)
+                self.emit(f"    Verified {inventory_count} seats against the displayed map; "
+                          "wheelchair/companion positions excluded from ordinary-seat groups.")
+
                 group = self.find_consecutive_seats(
                     all_seats
                 )
@@ -2621,6 +2766,7 @@ class WatcherEngine:
                     )
                     return {
                         "inventory_status": "captured_no_match",
+                        "inventory_seat_count": inventory_count,
                         "theater": showtime["theater"],
                         "date": showtime.get("date", ""),
                         "time": showtime["time"],
@@ -2656,6 +2802,7 @@ class WatcherEngine:
 
                 return {
                     "inventory_status": "match",
+                    "inventory_seat_count": inventory_count,
                     "theater": showtime["theater"],
                     "date": showtime.get(
                         "date",
@@ -2687,6 +2834,12 @@ class WatcherEngine:
                 }
 
             finally:
+                if page and response_handler:
+                    page.remove_listener("response", response_handler)
+                for task in response_tasks:
+                    task.cancel()
+                if response_tasks:
+                    await asyncio.gather(*response_tasks, return_exceptions=True)
                 try:
                     if page:
                         await page.close()
@@ -2698,6 +2851,12 @@ class WatcherEngine:
                         await context.close()
                 except Exception:
                     pass
+
+    def discovery_unavailable(self, theater, search_date, reason):
+        self.discovery_failures.append((theater.get("name", "unknown theater"), search_date, reason))
+        self.emit(f"  SHOWTIME DISCOVERY UNAVAILABLE: {theater.get('name', 'unknown theater')} "
+                  f"| {search_date} | {reason}")
+        return []
 
     async def discover_theater(
         self,
@@ -2742,9 +2901,9 @@ class WatcherEngine:
                     return results
                 except AmcUnauthorizedVendorKey:
                     self.emit(
-                        "  AMC issued the vendor key, but it is awaiting AMC's weekly "
-                        "Thursday production deployment. API discovery is disabled for "
-                        "this run; falling back to the website."
+                        "  AMC rejected the configured vendor key (HTTP 403 / 12005). "
+                        "The reason is not established; confirm catalog access with AMC. "
+                        "API discovery is disabled for this run; falling back to the website."
                     )
                     self.amc_api_client = None
                 except (AmcApiError, ValueError, KeyError) as exc:
@@ -2776,11 +2935,15 @@ class WatcherEngine:
 
                 # AMC no longer reliably honors ?date=YYYY-MM-DD.
                 # Load the theater page, then drive its real date selector.
-                await page.goto(
+                navigation = await page.goto(
                     theater_url,
                     wait_until="domcontentloaded",
                     timeout=DISCOVERY_TIMEOUT
                 )
+                if navigation is not None and navigation.status >= 400:
+                    return self.discovery_unavailable(
+                        theater, search_date, f"Theater page returned HTTP {navigation.status}"
+                    )
 
                 selector = page.locator('select[name="date"]')
                 await selector.wait_for(
@@ -2832,7 +2995,7 @@ class WatcherEngine:
                     self.emit(
                         f"  AMC date option not available for {search_date}.{latest_text}"
                     )
-                    return []
+                    return self.discovery_unavailable(theater, search_date, "Requested date not selectable")
 
                 results_box = page.locator("#showtime-results")
 
@@ -2906,7 +3069,7 @@ class WatcherEngine:
                         self.emit(
                             f"  AMC did not accept date selection for {search_date}."
                         )
-                        return []
+                        return self.discovery_unavailable(theater, search_date, "Date selection not accepted")
 
                     # Same visible times can repeat on consecutive dates, so text
                     # alone is not enough. Showtime href/IDs are part of the
@@ -2939,13 +3102,13 @@ class WatcherEngine:
                         )
                         self.emit(
                             "    Date control diagnostic: "
-                            f"desired={desired_value!r}; page={page.url}; options="
+                            f"desired={desired_value!r}; page={diagnostic_url(page.url)}; options="
                             + repr(option_records[:5])
                         )
                         if discovery_responses:
                             for status_code, response_url in discovery_responses[-8:]:
                                 self.emit(
-                                    f"    Date response: {status_code} {response_url}"
+                                    f"    Date response: {status_code} {diagnostic_url(response_url)}"
                                 )
                         else:
                             self.emit("    Date response: no relevant AMC request observed.")
@@ -2953,14 +3116,7 @@ class WatcherEngine:
                             discovery_responses, search_date
                         )
                         if blocked:
-                            self.discovery_failures.append(
-                                (theater.get("name", "unknown theater"), search_date, "HTTP 403")
-                            )
-                            self.emit(
-                                f"  SHOWTIME DISCOVERY UNAVAILABLE for {search_date}: "
-                                "AMC rejected its dated-results request with HTTP 403."
-                            )
-                            return []
+                            return self.discovery_unavailable(theater, search_date, "Dated request HTTP 403")
                         try:
                             dated_url = page.url
                             await page.goto(
@@ -2973,7 +3129,7 @@ class WatcherEngine:
                                 f"  AMC dated-page reload failed for {search_date}: "
                                 f"{type(exc).__name__}: {exc}"
                             )
-                            return []
+                            return self.discovery_unavailable(theater, search_date, "Dated reload failed")
 
                         reload_deadline = time.monotonic() + min(
                             15.0, DISCOVERY_TIMEOUT / 1000
@@ -3017,7 +3173,7 @@ class WatcherEngine:
                                 f"  AMC dated-page reload did not produce verified "
                                 f"results for {search_date}."
                             )
-                            return []
+                            return self.discovery_unavailable(theater, search_date, "Dated reload not verified")
 
                 else:
                     # The requested option can be selected before AMC finishes
@@ -3042,7 +3198,7 @@ class WatcherEngine:
                         self.emit(
                             f"  AMC results did not settle for selected date {search_date}."
                         )
-                        return []
+                        return self.discovery_unavailable(theater, search_date, "Selected-date results did not settle")
 
                 await page.wait_for_timeout(DISCOVERY_WAIT_MS)
 
@@ -3057,7 +3213,7 @@ class WatcherEngine:
                     f"  Showtime discovery error at {theater.get('name', 'unknown theater')} "
                     f"for {search_date}: {type(exc).__name__}: {exc}"
                 )
-                return []
+                return self.discovery_unavailable(theater, search_date, f"Discovery error: {type(exc).__name__}")
 
             finally:
                 try:
@@ -3099,9 +3255,12 @@ class WatcherEngine:
 
         all_showtimes = []
 
-        for result in results:
+        checks = [(theater, search_date) for theater in theaters for search_date in self.search_dates]
+        for (theater, search_date), result in zip(checks, results):
             if isinstance(result, list):
                 all_showtimes.extend(result)
+            else:
+                self.discovery_unavailable(theater, search_date, "Discovery task failed")
 
         unique = {}
 

@@ -2,7 +2,36 @@
 
 **Status date:** September 4, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Universal Watcher Web Shell V1 + minimal shared contracts; Movies API/Mac acceptance remains pending
+**Current milestone:** Universal Watcher Web Shell V1 + minimal shared contracts; Movies catalog works, final seating/Mac acceptance remains pending
+
+## September 4 AMC reliability pass — V44.7
+
+- The existing catalog key began succeeding later in the session; this supersedes
+  the earlier 14:15 UTC rejection below. No credential or permission changes.
+- Official catalog: 523 records across three pages; seven open AMC locations
+  within ten miles of CityWalk. Find theaters now prefers these official IDs,
+  coordinates and URLs, with a labeled map fallback; no arbitrary result cap.
+- API discovery matched **32/32 browser-observed showtimes** across three LA
+  theaters, seven theater/date combinations, and dates through September 20.
+  This limited sample is not proof of nationwide or end-to-end >90% reliability.
+- Live seat comparison exposed a real fallback-decoder bug: unnamed layout gaps
+  could supply the next seat's availability/coordinates, and seat types were lost.
+  A reported Burbank D1–D4 group included wheelchair spaces/companion positions.
+- V44.7 adds whole-object decoding ahead of the existing fallbacks and requires
+  agreement with the displayed seat map. Ordinary-seat matches exclude accessible
+  spaces/companions. Unknown/partial/conflicting inventory remains unavailable.
+  Grouping/ranking, Mac scrolling, Activity, UI and watch filters remain intact.
+- API pagination/schema failures and browser date failures no longer silently
+  succeed with incomplete/empty results. Authorization messages do not guess an
+  activation date. Seat HTTP 403/429 disables further requests for that run;
+  diagnostic URLs omit query tokens.
+- Live testing stopped after an AMC HTTP 429 and the user's report of no Windows
+  administrator rights. No further browser launches on this machine. The final
+  decoder/map-gap corrections are **offline-verified only**, not live-accepted.
+- Tests: **104 passed**, including **47 Movies tests**. No other module engine,
+  machine permissions, credentials, or tracked personal settings changed.
+- Full evidence, provider alternatives and >90% acceptance definitions:
+  [AMC reliability review](docs/AMC_RELIABILITY_REVIEW.md).
 
 ## September 4 portability checkpoint
 
@@ -36,12 +65,13 @@
 - Credentials remain ignored on the original machine and must be configured
   securely on a new machine; Git does not synchronize runtime state.
 
-**NEXT TASK:** Resolve the configured AMC catalog key's continuing authorization
-rejection with AMC, then run the documented Movies NEXT BEST acceptance case
-on the Mac when available. Record API authorization, date coverage, and
-seat-inventory outcomes without exposing credentials before enabling live web
-adapter execution. Mac acceptance remains pending; no further module feature
-work is part of this stopping checkpoint.
+**NEXT TASK:** On the Mac, after AMC access/rate limits permit, run one small
+V44.7 catalog-plus-seat comparison using the original Odyssey / IMAX 70MM /
+CityWalk case and Burbank's ordinary-seat case. Verify the final structured
+decoder and full-map agreement before expanding to the documented >90%
+acceptance set and NEXT BEST/scrolling/Activity/handoff regression. Do not
+launch more browsers or require admin access on this Windows machine. Keep
+live web adapters gated until that acceptance passes.
 
 ## Status legend
 
@@ -58,7 +88,7 @@ work is part of this stopping checkpoint.
 | Universal Watcher Core | 🟡 | Minimal watch/result contracts + Family Deals and Ticket mappings | Yes | Keep live execution gated; add execution boundary after Movies acceptance |
 | Universal Watcher Web App | 🟡 | V1 shell + in-memory lifecycle and results/evidence preview | Yes | Wire real adapters after Movies acceptance |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier; V5.0.1 conservative hours parsing; isolated result adapter mapping | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
-| Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key still rejected Sept. 4 (403/12005); browser seat capture proven Sept. 2; 23 offline tests | Yes | Confirm catalog authorization with AMC, then run Odyssey acceptance on Mac |
+| Seat Watcher | 🟡 reconstructed / live regression in progress | V44.7; catalog authorized; 32/32 sampled showtimes; final seat fixes offline-only; 47 Movies tests | Yes | Mac seat-map comparison, then broader reliability/NEXT BEST acceptance |
 | Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9; isolated result adapter mapping | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
 | Theater Discovery | 🟠 | Separate-workstream decision made | Placeholder | Build non-AMC providers independently, then normalize into Seat Watcher |
 | Drop Watch | ⚪ | Planned | Placeholder | Start only after Universal shell/integration foundation |
@@ -117,7 +147,7 @@ The initial extraction sequence is now:
 The first contract step is complete. The web shell now exercises the watch
 definition boundary through a dependency-free in-memory preview API. Family
 Deals and Ticket Watcher both have isolated result adapter mappings, while
-live adapter execution remains gated on the Movies API deployment and Mac
+live adapter execution remains gated on Movies seat reliability and Mac
 acceptance regression.
 
 The shell preview now exercises draft lifecycle transitions (`active`,

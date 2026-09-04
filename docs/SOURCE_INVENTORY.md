@@ -16,11 +16,12 @@ Imported into: `modules/ticket-watcher/`
 
 The user supplied `Seat_Watcher_V44_DEPTH_LAYERING`, which matches the pre-macOS-migration baseline described by the Codex handoff. The exact later Git source at `7a19015` was not recoverable. A reconstructed post-Codex V44 module is now included, implementing the documented macOS/date/format/Next Best/CityWalk/theater-cleanup changes while preserving the sensitive V44 seat parsing engine. It must receive a fresh controlled live regression before becoming the permanent baseline.
 
-The current reconstructed Movies implementation is V44.6. It adds truthful
-inventory states and an optional approved AMC Showtime API adapter while
-preserving the sensitive V44 seat parsing engine. It must receive the
-post-Thursday API/Mac acceptance regression before becoming the permanent
-baseline.
+The current reconstructed Movies implementation is V44.7. Approved AMC catalog
+access now works and supplies official theater identities and dated showtimes.
+V44.7 adds a narrow structured seat-decoding correction and a complete displayed-
+map verification guard; the existing fallback encodings and grouping/ranking
+remain. Final live seating/Mac acceptance is still required. See
+`docs/AMC_RELIABILITY_REVIEW.md`; the >90% end-to-end target is not yet proven.
 
 Additional Movies support:
 

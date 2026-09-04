@@ -167,7 +167,7 @@ High-risk areas include:
 - headless-to-visible browser handoff
 - Tk worker-thread/event-queue boundaries
 
-The current authoritative source is the committed reconstructed V44.6 tree in `modules/seat-watcher`. The lost original commit is historical provenance, not a recoverable baseline. Do not replace this source with an old ZIP or another machine's folder.
+The current authoritative source is the reconstructed V44.7 tree in `modules/seat-watcher`. Its final seat-verification corrections await live Mac acceptance. The lost original commit is historical provenance, not a recoverable baseline. Do not replace this source with an old ZIP or another machine's folder.
 
 ### Family Deals
 

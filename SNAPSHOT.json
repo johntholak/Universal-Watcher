@@ -13,15 +13,16 @@
     "imported": true
   },
   "seat_watcher": {
-    "baseline": "V44.6 reconstructed post-Codex",
+    "baseline": "V44.7 reconstructed post-Codex",
     "historical_target_commit": "7a19015",
     "exact_commit_recovered": false,
     "source": "User-uploaded V44 Depth/Layering baseline + saved August 28 Codex handoff",
     "imported": true,
-    "offline_tests": "23/23 passed",
+    "offline_tests": "47/47 passed",
     "live_regression_required": true,
-    "first_mac_live_feedback": "V44.2 fixed trackpad and proved current-day Odyssey IMAX 70MM discovery/seat checking. V44.6 follows AMC selectable dates to the last listed date, preserves truthful inventory failures, and can use the approved Showtime API when deployed.",
-    "build": "V44.6 reconstructed",
+    "first_mac_live_feedback": "V44.2 fixed trackpad and proved current-day discovery/capture. Later map comparison exposed a seat fallback-decoder defect; do not equate historical capture with seat accuracy.",
+    "build": "V44.7 reconstructed",
+    "latest_verification": "Sept 4: catalog authorized; 32/32 sampled showtimes matched; final structured seat decoder/map verification awaits Mac live acceptance. Windows browser testing stopped; no overall >90% claim.",
     "next_best": "Scan AMC selectable date range; 35-day safety ceiling only"
   },
   "restaurant_pdf_menu_builder_included": false,

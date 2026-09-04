@@ -165,8 +165,8 @@ python -m unittest discover -s core -p "test_*.py" -v
 ```
 
 These contracts are not connected to live modules yet. Keep the existing
-Movies, Tickets, and Family Deals engines behind adapters until the Movies API
-deployment and Mac acceptance regression are complete.
+Movies, Tickets, and Family Deals engines behind adapters until Movies seating
+reliability and Mac acceptance regression are complete. Catalog access now works.
 
 ---
 
@@ -302,7 +302,7 @@ setup_and_run_v44.bat
 
 The newest Mac-era fixes still need a fresh Windows regression.
 
-## V44.6 live-regression and approved API note
+## V44.7 live-regression and approved API note
 
 A Sept. 1 live test of V44.2 showed one valid current-day Odyssey IMAX 70MM showtime, and later acceptance evidence showed skipped future showtimes plus repeated inventory-capture failures. V44.5 waits for the requested AMC date's results to stabilize before extracting them, tracks asynchronous seat-response parsing to completion, accepts AMC's documented `seatName` seat identifier, and keeps capture failures separate from valid captured-inventory negatives. NEXT BEST still follows AMC's selectable calendar to its final listed date, with a 35-day malfunction guard only.
 
@@ -316,26 +316,62 @@ V44.6 includes an optional Showtime API discovery adapter while preserving brows
 
 The `.env` file is ignored by Git. Never place the real key in documentation, screenshots, Activity logs, or commits.
 
-Current key state, rechecked September 4 at 14:15 UTC: AMC still returned HTTP
-403 / error 12005 (`Unauthorized VendorKey`) for theatre catalog discovery.
-The probe used the existing `AmcShowtimeClient` and key loader, stopped at the
-first rejection, and made no dated-showtime or seating requests. The earlier
-success-page statement about Thursday deployments does not prove activation;
-the continuing rejection needs confirmation from AMC. Do not replace the key
-or assume a deployment delay explains it. Never expose the key in chat or logs.
+Current key state: the existing key **began working later on September 4**,
+after the earlier 14:15 UTC rejection. A complete catalog returned 523 records;
+32/32 independently observed showtimes matched in the limited comparison set.
+V44.7 Find theaters uses official IDs/coordinates/URLs before the map fallback.
+Never expose the key in chat or logs. Catalog success is not seating API approval.
 
-During normal app runs this response is reported once, API attempts are
+During normal app runs an authorization rejection is reported once, API attempts are
 disabled for the remainder of that run, and the browser fallback remains
-available. After AMC confirms access, restart before retrying. A successful
-catalog request would still not establish seating API permission, reliable
-future-date coverage, or Mac GUI/browser acceptance.
+available. Do not infer an activation date from that rejection. Mac GUI/browser
+acceptance and broader reliability remain unverified.
 
-Windows headless diagnostic (also accepts `--headed` for comparison):
+V44.7 corrects a live-observed escaped-payload issue: unnamed gaps could be read
+as part of the next seat, losing availability/position/type information. A small
+structured decoding stage precedes the old fallbacks. Before either match or
+no-match, the complete displayed seat map must agree with captured inventory.
+Layout gaps are excluded; wheelchair and companion positions are not ordinary
+seat groups. Accessibility-specific matching remains unimplemented. Missing or
+disagreeing evidence is `unavailable`, not a no-seat conclusion.
 
-```bat
-cd modules\seat-watcher
-python live_amc_diagnostic.py --start 2026-09-02 --days 3 --check-seats
+AMC HTTP 403/429 disables additional seat checks in that engine run. Stop and
+wait for permitted access; do not repeatedly restart or bypass the response.
+Candidate URL logs omit query tokens. The final corrected reader needs a fresh
+live pass; earlier payload-capture counts do not establish seat correctness.
+
+**Current Windows machine:** the user has no administrator rights and requested
+that browser launches stop. An AMC 429 was separately observed. Finish offline
+here; perform the remaining live tests on the Mac. No elevation, policy changes,
+browser installation, or security bypass is needed as part of this checkpoint.
+
+Repeatable diagnostic from the repository root, using the shared environment.
+On the Mac, after access is available, begin with one date; do not launch several
+diagnostic batches concurrently. The default movie is Odyssey, IMAX 70MM,
+four ordinary seats, numeric minimum row 5 and an all-day time window:
+
+```sh
+.venv/bin/python modules/seat-watcher/live_amc_diagnostic.py --days 1 --check-seats
 ```
+
+For a separate Burbank format/ordinary-seat comparison after that succeeds:
+
+```sh
+.venv/bin/python modules/seat-watcher/live_amc_diagnostic.py --days 1 --theatre-slug amc-burbank-16 --format ANY --check-seats
+```
+
+`--start YYYY-MM-DD`, `--movie`, `--format` and repeated `--theatre-slug` are
+supported. Explicit slugs require approved catalog access. `--days` rejects
+values outside 1–35 instead of silently truncating them. The diagnostic prints
+each result and separate discovery/capture totals; totals are not accuracy.
+It does not alert, hold seats, or open a match window. `--headed` requests a
+visible test browser only when appropriate on the Mac. Windows equivalent,
+if later authorized on a suitable machine: `.venv\Scripts\python.exe`.
+
+Record the selected theater/date/time/format and expected IDs from AMC's normal
+page before comparing; inspect every returned group and count unavailable
+checks as unsuccessful. See [the reliability review](docs/AMC_RELIABILITY_REVIEW.md)
+for the reference sample, known remaining checks and >90% acceptance definition.
 
 Sept. 2 live result: current-day CityWalk discovery returned four Odyssey IMAX 70MM showtimes, and inventory was captured for all four. AMC returned HTTP 403 for its dated React-results request on Sept. 3 and Sept. 4 in both headless and visible Chromium. The engine reports those checks as showtime discovery unavailable. Do not treat them as empty schedules and do not bypass the access response.
 
@@ -347,7 +383,7 @@ uploaded V44 baseline plus the saved Codex handoff.
 
 Remaining live acceptance checklist (the reconstructed baseline is already committed):
 
-1. Run the current offline tests (23 Movies tests as of September 4).
+1. Run `python manage.py test` (104 tests including 47 Movies tests at this checkpoint).
 2. Launch it on the Mac.
 3. Repeat a controlled AMC live test.
 4. Verify date selection, format classification, CityWalk routing, theater cleanup, seat matching, and browser handoff.
@@ -530,8 +566,8 @@ python -m unittest discover -s web -p "test_*.py" -v
 
 The shell now speaks to the shared watch/result contracts through the in-memory
 preview API, including validated lifecycle transitions and an honest empty
-results state. The next step is real adapter wiring after the Movies API
-deployment and Mac acceptance regression. Do not change the protected Seat
+results state. The next step is real adapter wiring after Movies seat reliability
+and Mac acceptance regression. Do not change the protected Seat
 Watcher engine as part of shell work.
 
 ## 11. Isolated module adapter checks
@@ -552,7 +588,7 @@ Verify it from the repository root:
 python -m unittest discover -s adapters -p "test_*.py" -v
 ```
 
-Live adapter execution remains gated until the Movies API deployment and Mac
+Live adapter execution remains gated until Movies seat reliability and Mac
 acceptance regression are complete.
 
 ---

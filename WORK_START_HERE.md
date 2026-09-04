@@ -45,7 +45,7 @@ neutral and does not disturb the protected Movies engine. The end state still
 includes working Movies, Tickets, Family Deals, theater discovery, and later
 planned modules behind one control center.
 
-The current Movies implementation is the reconstructed AMC Seat Watcher V44.6 inside:
+The current Movies implementation is the reconstructed AMC Seat Watcher V44.7 inside:
 
 `modules/seat-watcher/`
 
@@ -97,15 +97,26 @@ This must NOT be treated as equivalent to:
 
 # CURRENT MOVIES LIVE-VERIFICATION TARGET
 
-V44.6 contains the V44.5 truthfulness/capture fixes plus an optional approved AMC Showtime API discovery adapter. Windows live testing proves browser seat capture is restored for the Sept. 2 CityWalk showtimes. The website's future-date request returns HTTP 403 in that environment, so reliable discovery should use an approved AMC catalog key. Without a key, the browser path remains active and reports blocked dates truthfully.
+V44.7 supersedes the earlier capture-only assessment. The existing AMC catalog
+key began succeeding later on September 4, after the 14:15 UTC rejection.
+Official discovery matched 32/32 independently observed showtimes across three
+LA theaters and sampled dates through September 20. Find theaters now uses
+the complete official catalog with accurate IDs/URLs and radius filtering;
+map results are an explicitly unverified fallback.
 
-An AMC vendor key has been issued and placed in the ignored local `.env`.
-A September 4, 14:15 UTC catalog-only Windows recheck still returned HTTP 403 /
-error 12005 (`Unauthorized VendorKey`). The previously announced Thursday
-deployment schedule does not establish activation or explain this continuing
-rejection. Confirm catalog authorization with AMC; do not replace, expose, or
-bypass the key. No showtime/seat requests ran in that probe. Mac acceptance
-remains pending; follow the single NEXT TASK in `PROJECT_STATUS.md`.
+Seat-map comparison exposed a fallback-decoder bug: unnamed layout gaps could
+supply the following seat's availability/coordinates and seat types were lost.
+A reported ordinary four-seat group included wheelchair spaces/companions.
+The new structured decoding step and displayed-map cross-check are tested
+offline; grouping/ranking and UI behavior are preserved. No missing or
+disagreeing inventory may be reported as a valid no-match.
+
+Final live seat verification is pending. AMC rate-limited repeated Windows
+seat checks, and the user reports no administrator rights on this machine:
+do not launch more browsers here or request permission/security workarounds.
+Use the Mac for the remaining bounded acceptance when access is available.
+See `docs/AMC_RELIABILITY_REVIEW.md` and the single NEXT TASK in
+`PROJECT_STATUS.md`. The broader >90% target has not been established.
 
 ## 1. Future-date/showtime discovery was unreliable
 
@@ -151,14 +162,14 @@ V44.5 tracks asynchronous response parsing through a bounded capture window, acc
 
 # NEXT TASK
 
-Live-test the V44.5 Movies iteration to verify that it:
+Follow the global NEXT TASK and live-test V44.7 on the Mac to verify that it:
 
 1. make AMC future date/showtime discovery reliable
 2. restore reliable seat-inventory capture
 3. distinguish inventory-unavailable from no-matching-seats
 4. preserve working Mac scrolling and Activity logging
 5. preserve movie/theater/format/time/seat filters
-6. preserve the sensitive AMC seat parsing/grouping logic
+6. validate the structured decoder/map guard while preserving grouping/ranking
 7. add focused offline regression coverage
 8. produce a clear live diagnostic log for the same Odyssey acceptance case
 
