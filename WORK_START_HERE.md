@@ -99,7 +99,13 @@ This must NOT be treated as equivalent to:
 
 V44.6 contains the V44.5 truthfulness/capture fixes plus an optional approved AMC Showtime API discovery adapter. Windows live testing proves browser seat capture is restored for the Sept. 2 CityWalk showtimes. The website's future-date request returns HTTP 403 in that environment, so reliable discovery should use an approved AMC catalog key. Without a key, the browser path remains active and reports blocked dates truthfully.
 
-An AMC vendor key has now been issued and placed in the ignored local `.env`. The success page says new keys are deployed to production once per week on Thursday; the current error 12005 (`Unauthorized VendorKey`) is therefore expected until that deployment. Do not replace or expose the key. Restart and retry the API-backed diagnostic after Thursday.
+An AMC vendor key has been issued and placed in the ignored local `.env`.
+A September 4, 14:15 UTC catalog-only Windows recheck still returned HTTP 403 /
+error 12005 (`Unauthorized VendorKey`). The previously announced Thursday
+deployment schedule does not establish activation or explain this continuing
+rejection. Confirm catalog authorization with AMC; do not replace, expose, or
+bypass the key. No showtime/seat requests ran in that probe. Mac acceptance
+remains pending; follow the single NEXT TASK in `PROJECT_STATUS.md`.
 
 ## 1. Future-date/showtime discovery was unreliable
 

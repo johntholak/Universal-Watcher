@@ -26,16 +26,22 @@
   patterns, and user-specific absolute paths; no detected secrets were committed.
 - All 80 offline tests passed: core 5, web 9, adapters 12, Family Deals 19,
   Tickets 12, Movies 23. These do not establish live provider acceptance.
-- AMC production activation has not been rechecked in this session. The
-  September 2 key/deployment notes below are historical observations.
+- September 4, 14:15 UTC (07:15 PDT): a catalog-only Windows probe using the
+  existing AMC client and configured key still received HTTP 403 / error 12005
+  (`Unauthorized VendorKey`) on theatre discovery. No dated showtime requests,
+  seat requests, or browser fallback ran. Authorization remains unconfirmed;
+  the announced Thursday deployment schedule is not proof of activation or
+  an explanation for the continuing rejection. Credentials were not displayed.
 - macOS/Linux fresh setup and live GUI/browser acceptance remain unverified.
 - Credentials remain ignored on the original machine and must be configured
   securely on a new machine; Git does not synchronize runtime state.
 
-**NEXT TASK:** On the Mac, bootstrap this GitHub checkout, configure the approved
-AMC key securely, and run the documented Movies NEXT BEST acceptance case;
-record current API authorization, date coverage, and seat-inventory outcomes
-without exposing credentials before enabling live web adapter execution.
+**NEXT TASK:** Resolve the configured AMC catalog key's continuing authorization
+rejection with AMC, then run the documented Movies NEXT BEST acceptance case
+on the Mac when available. Record API authorization, date coverage, and
+seat-inventory outcomes without exposing credentials before enabling live web
+adapter execution. Mac acceptance remains pending; no further module feature
+work is part of this stopping checkpoint.
 
 ## Status legend
 
@@ -52,7 +58,7 @@ without exposing credentials before enabling live web adapter execution.
 | Universal Watcher Core | 🟡 | Minimal watch/result contracts + Family Deals and Ticket mappings | Yes | Keep live execution gated; add execution boundary after Movies acceptance |
 | Universal Watcher Web App | 🟡 | V1 shell + in-memory lifecycle and results/evidence preview | Yes | Wire real adapters after Movies acceptance |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier; V5.0.1 conservative hours parsing; isolated result adapter mapping | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
-| Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key issued; production authorization recheck pending; browser seat capture proven; 23 offline tests | Yes | Retry API after Thursday deployment, then run Odyssey acceptance; Mac browser regression remains useful |
+| Seat Watcher | 🟡 reconstructed / live regression in progress | V44.6; AMC key still rejected Sept. 4 (403/12005); browser seat capture proven Sept. 2; 23 offline tests | Yes | Confirm catalog authorization with AMC, then run Odyssey acceptance on Mac |
 | Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9; isolated result adapter mapping | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
 | Theater Discovery | 🟠 | Separate-workstream decision made | Placeholder | Build non-AMC providers independently, then normalize into Seat Watcher |
 | Drop Watch | ⚪ | Planned | Placeholder | Start only after Universal shell/integration foundation |
@@ -226,7 +232,7 @@ Also proven or covered:
 - The same live diagnostic proved the remaining future-date cause: AMC returns HTTP 403 for its dated React results request (including in visible Chromium), leaving the current-day DOM unchanged. V44.5 now reports this as `SHOWTIME DISCOVERY UNAVAILABLE` and cannot convert it into a zero-showtime/no-seat conclusion.
 - V44.5 passes 18 offline regression tests. Run it on the Mac to determine whether AMC permits that environment's dated request; pursue approved Showtime API access as the reliable provider path if it does not.
 - V44.6 adds an optional approved AMC Showtime API discovery adapter. It resolves theatre IDs by slug, follows all result pages, applies the existing movie/format/time filters, and passes showtime IDs to the unchanged browser seat engine. It activates only when `AMC_VENDOR_KEY` is configured; otherwise the existing browser discovery path remains active.
-- An AMC vendor key was issued and stored only in the ignored module-local `.env` file. AMC's success page says new keys are deployed to production once per week on Thursday; until that deployment, the API returns error 12005, `Unauthorized VendorKey`. V44.6 recognizes that state, reports it once, disables API retries for the remainder of the run, and uses the website fallback. Retry after Thursday's deployment.
+- An AMC vendor key was issued and stored only in the ignored module-local `.env` file. The September 2 success-page observation described Thursday production deployments, but the September 4 catalog probe still returned HTTP 403 / error 12005, `Unauthorized VendorKey`. The reason for continuing rejection is not established. V44.6 recognizes that state, reports it once, disables API retries for the remainder of a normal run, and uses the website fallback. Confirm authorization with AMC; do not assume the key is active or bypass the rejection.
 - Verify theater cleanup visually.
 - Run a controlled live Next Best exhaustion test.
 - Stress Specific Date and Date Range after the date-control changes.

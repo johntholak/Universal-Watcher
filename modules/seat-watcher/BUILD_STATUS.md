@@ -67,3 +67,14 @@ Live verification remains required using the exact Odyssey / IMAX 70MM / Univers
 - Activates only when an approved `AMC_VENDOR_KEY` is present in the environment or ignored local `.env` file.
 - No new third-party dependency and no bundled credential.
 - AMC has issued a vendor key, stored only in the ignored local `.env`. The success page says new keys are deployed to production once per week on Thursday; until then AMC returns error 12005 (`Unauthorized VendorKey`). The app reports this pending-deployment state once and stops repeated API attempts during that run.
+
+## September 4 catalog authorization recheck
+
+- At 14:15 UTC (07:15 PDT), the existing client still received HTTP 403 / error
+  12005 (`Unauthorized VendorKey`) when resolving the CityWalk theatre through
+  the catalog. The key was loaded locally and was not displayed.
+- The announced deployment schedule does not prove activation; the continuing
+  rejection's cause remains unknown and needs AMC confirmation.
+- This was a catalog-only Windows check. It stopped on the first rejection;
+  no dated-showtime request, seat check, or browser fallback ran.
+- No engine code changed. Mac acceptance and live web integration remain pending.

@@ -316,7 +316,19 @@ V44.6 includes an optional Showtime API discovery adapter while preserving brows
 
 The `.env` file is ignored by Git. Never place the real key in documentation, screenshots, Activity logs, or commits.
 
-Current key state on September 2: AMC's success page confirms the key was generated and ready to use, but also says new keys are deployed to production once per week on Thursday. The September 2 API check returned error 12005 (`Unauthorized VendorKey`) until that deployment. The app reports the condition once and disables API attempts for the remainder of that run. Restart and retry after Thursday's deployment; do not request or expose the key in chat or logs.
+Current key state, rechecked September 4 at 14:15 UTC: AMC still returned HTTP
+403 / error 12005 (`Unauthorized VendorKey`) for theatre catalog discovery.
+The probe used the existing `AmcShowtimeClient` and key loader, stopped at the
+first rejection, and made no dated-showtime or seating requests. The earlier
+success-page statement about Thursday deployments does not prove activation;
+the continuing rejection needs confirmation from AMC. Do not replace the key
+or assume a deployment delay explains it. Never expose the key in chat or logs.
+
+During normal app runs this response is reported once, API attempts are
+disabled for the remainder of that run, and the browser fallback remains
+available. After AMC confirms access, restart before retrying. A successful
+catalog request would still not establish seating API permission, reliable
+future-date coverage, or Mac GUI/browser acceptance.
 
 Windows headless diagnostic (also accepts `--headed` for comparison):
 
