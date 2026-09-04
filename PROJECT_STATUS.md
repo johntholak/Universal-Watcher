@@ -6,6 +6,13 @@
 
 ## September 4 portability checkpoint
 
+- Consolidated the September 2 agent guidance into `AGENTS.md`, preserving
+  protected module behavior and the current Movies acceptance priority.
+  `RUNBOOK.md` now identifies the New Machine Start up reference and includes
+  the session-start prompt. Documentation-only reconciliation; no module code,
+  runtime configuration, or user data changed. Reviewed document consistency
+  and whitespace; the 80-test result below remains the prior code checkpoint.
+
 - GitHub source of truth: `https://github.com/johntholak/Universal-Watcher`, `main`.
 - Preserved the existing uncommitted Family Deals hours fix and Ticket adapter.
 - Added root setup/test/run entry points, shared dependency manifest with pinned

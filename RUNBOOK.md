@@ -4,6 +4,17 @@ This file answers one question: **How do I safely pick this project up on any co
 
 ## New machine: start here
 
+This is the repository's **New Machine Start up** reference. After setup, open
+the repository folder in your coding agent and give it this instruction:
+
+> Read AGENTS.md, PRODUCT_VISION.md, PROJECT_STATUS.md, and RUNBOOK.md in that
+> order. Inspect the current repository state and relevant module status.
+> Tell me the current milestone and next task, then help me continue.
+
+Agent rules live in [AGENTS.md](AGENTS.md); current priorities live in
+[PROJECT_STATUS.md](PROJECT_STATUS.md). These committed documents travel with
+the repository, so a previous chat or a separate startup task is not required.
+
 The authoritative repository is https://github.com/johntholak/Universal-Watcher
 (branch `main`). Install Git and Python **3.14 with Tk support** first. Authenticate
 with GitHub using your own account; access to the repository is required.
