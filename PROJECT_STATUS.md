@@ -25,7 +25,7 @@ The end-to-end search/watch execution behavior is locked in `docs/JOB_SEARCH_WAT
 
 The conceptual V1 domain/data model required to implement these behaviors is locked in `docs/JOB_DATA_MODEL_V1.md`. The existing Python scaffold remains intentionally minimal and should be evolved incrementally only after migration to the dedicated repository and baseline test execution.
 
-The V1 validation/calibration plan is locked in `docs/JOB_VALIDATION_V1.md`. Aggressive narrowing is not trusted until a held-out human-reviewed validation set reaches the worthwhile-job recall target and major miss classes are understood.
+The V1 user interface and interaction hierarchy are locked in `docs/JOB_UI_V1.md`. The default experience is a polished resume-first search screen with minimal practical controls, transparent broad-search progress, ranked recommendation-style job cards, auditable score reasoning, inspectable filtered-out jobs, and one-click saved watches.
 
 ## Locked V1 direction
 
@@ -62,10 +62,14 @@ The V1 validation/calibration plan is locked in `docs/JOB_VALIDATION_V1.md`. Agg
 - Searches can become watches for newly posted or materially changed qualifying roles.
 - Provider postings and user-facing LogicalJobs are separate concepts so duplicates can merge without losing provenance.
 - Resume facts, user preferences, scoring evidence, source observations, and user feedback are separate data domains rather than one mutable profile blob.
-- Validation separates source misses from ranking misses; scoring changes cannot be used to hide source-coverage failures.
-- Any missed `Definitely Apply` or `Probably Apply` job gets root-cause review and, where appropriate, a regression test.
+- The main UI should expose only high-value controls: resume, freshness, compensation, distance/work arrangement, employment type, and match style.
+- Advanced controls remain collapsed by default.
+- Search progress should visibly communicate broad retrieval, deduplication, filtering, deep review, ranking, and source coverage.
+- Results should look like recommendations, not copied job-board rows.
+- Career Fit, Practical Fit, Confidence, gaps, and unknowns remain visually distinct.
+- Filtered-out jobs remain inspectable with the exact reason preserved.
 
-See `docs/JOB_RESUME_SEARCH_V1.md` for the locked search experience, `docs/JOB_RESUME_PROFILE_V1.md` for resume intelligence, `docs/JOB_SCORING_V1.md` for scoring, `docs/JOB_SOURCE_COVERAGE_V1.md` for source discovery/coverage, `docs/JOB_SEARCH_WATCH_V1.md` for execution/watches, `docs/JOB_DATA_MODEL_V1.md` for the conceptual V1 domain model, and `docs/JOB_VALIDATION_V1.md` for calibration/acceptance.
+See `docs/JOB_RESUME_SEARCH_V1.md` for the locked search experience, `docs/JOB_RESUME_PROFILE_V1.md` for resume intelligence, `docs/JOB_SCORING_V1.md` for scoring, `docs/JOB_SOURCE_COVERAGE_V1.md` for source discovery/coverage, `docs/JOB_SEARCH_WATCH_V1.md` for execution/watches, `docs/JOB_DATA_MODEL_V1.md` for the conceptual V1 domain model, and `docs/JOB_UI_V1.md` for the V1 interface specification.
 
 ## V1 scoring baseline
 
@@ -123,7 +127,7 @@ LinkedIn/Indeed are not V1 dependencies.
 - `docs/JOB_SOURCE_COVERAGE_V1.md`
 - `docs/JOB_SEARCH_WATCH_V1.md`
 - `docs/JOB_DATA_MODEL_V1.md`
-- `docs/JOB_VALIDATION_V1.md`
+- `docs/JOB_UI_V1.md`
 
 ## Verification
 
@@ -143,8 +147,9 @@ Current official source checks confirm that Greenhouse exposes public unauthenti
 8. Normalize Greenhouse postings into the shared provider-posting/logical-job model.
 9. Implement SearchRun/coverage reporting and the locked search execution pipeline.
 10. Verify hard filters, deduplication, provenance, resume evidence matching, source-coverage reporting, and explainable scoring against fixtures.
-11. Build the human-labeled development/calibration/held-out validation sets defined in `docs/JOB_VALIDATION_V1.md` and measure worthwhile-job recall before enabling aggressive hiding.
+11. Build a human-labeled validation set and measure worthwhile-job recall before enabling aggressive hiding.
 12. Implement watches only after one-shot search behavior is reliable, then add Lever and Ashby after Greenhouse is stable.
+13. Build the V1 UI according to `docs/JOB_UI_V1.md` after the resume/search/scoring contracts are stable enough to feed the interface.
 
 ## Product quality target
 
@@ -152,6 +157,6 @@ The key validation metric is recall of worthwhile opportunities:
 
 > Of the jobs the user considers genuinely worth applying to, how many did Job Hunter successfully surface?
 
-Provisional V1 target: surface at least 95% of jobs labeled `Definitely Apply` or `Probably Apply` in the held-out human-reviewed validation set before relying on aggressive automatic narrowing.
+Provisional V1 target: surface at least 95% of jobs labeled `Definitely Apply` or `Probably Apply` in the human-reviewed validation set before relying on aggressive automatic narrowing.
 
 False negatives on worthwhile jobs are considered more serious than showing an occasional extra `Worth a Look` result.
