@@ -40,10 +40,13 @@ class PreviewServerTests(unittest.TestCase):
         status, body = self.request("GET", "/")
         self.assertEqual(status, 200)
         self.assertIn(b"Universal Watcher", body if isinstance(body, bytes) else b"")
+        for marker in (b'data-view="tickets"', b'data-module="tickets"',
+                       b'value="tickets"', b'More watchers'):
+            self.assertNotIn(marker, body)
 
         status, modules = self.request("GET", "/api/modules")
         self.assertEqual(status, 200)
-        self.assertEqual([module["id"] for module in modules], ["movies", "tickets", "family-deals"])
+        self.assertEqual([module["id"] for module in modules], ["movies", "family-deals"])
 
     def test_valid_draft_uses_shared_watch_contract(self):
         status, draft = self.request("POST", "/api/watches", {"module": "movies", "query": "The Odyssey"})
@@ -63,8 +66,14 @@ class PreviewServerTests(unittest.TestCase):
         status, _ = self.request("POST", "/api/watches", {"module": "drop-watch", "query": "Anything"})
         self.assertEqual(status, 400)
 
+    def test_shelved_and_future_modules_cannot_create_web_drafts(self):
+        for module in ("tickets", "drops", "drop-watch", "jobs"):
+            with self.subTest(module=module):
+                status, _ = self.request("POST", "/api/watches", {"module": module, "query": "Example"})
+                self.assertEqual(status, 400)
+
     def test_lifecycle_endpoint_uses_shared_transition_rules(self):
-        status, draft = self.request("POST", "/api/watches", {"module": "tickets", "query": "Example event"})
+        status, draft = self.request("POST", "/api/watches", {"module": "family-deals", "query": "Family dinner"})
         self.assertEqual(status, 201)
         watch_id = draft["watch_id"]
 

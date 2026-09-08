@@ -1,5 +1,11 @@
 # Family Deals Module Status
 
+**Recovery state (September 8, 2026): active product module.** V5.0.1 engine
+is preserved; full-radius coverage and all existing filters remain required.
+The shared web search/results UI is not built yet. Use
+`docs/FAMILY_DEALS_UX_BASELINE.md` and the shared visual baseline from the root.
+The live benchmark and evidence gaps remain in `PROJECT_STATUS.md`.
+
 Baseline imported: V5.0 Fast Filters + Semantic Verifier.
 
 Current repository iteration: V5.0.1 hours evidence. The parser now keeps

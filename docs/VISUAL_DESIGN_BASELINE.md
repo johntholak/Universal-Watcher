@@ -9,7 +9,17 @@ The approved visual mockups are the target for the finished Universal Watcher ex
 
 Primary visual reference:
 
-- `docs/design/universal_watcher_movies_visual_reference.jpg`
+- `docs/design/universal_watcher_movies_visual_reference.png`
+
+## Reference recovery — September 8, 2026
+
+The originally committed JPEG is unreadable (12,099 bytes; image decoders reject
+it). The PNG is the exact original attachment recovered from Universal Watcher
+Planning, not a regenerated mockup: 1224 × 1285, 2,015,422 bytes, SHA-256
+`c75822b27bd3cb6e36cdc125f231edbdb2b6e25c5abd0c65641be6cc397249d0`.
+The old JPEG remains only for provenance; use the PNG for visual comparison.
+The reference's Tickets entry is superseded by the Home scope decision. Sample
+movies, theaters, prices, seats, and matches are illustrative, not runtime data.
 
 ## Shared visual language
 

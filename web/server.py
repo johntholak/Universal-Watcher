@@ -29,7 +29,6 @@ from core.contracts import Evidence, WatchDefinition, WatchResult
 
 SUPPORTED_MODULES = (
     {"id": "movies", "name": "Movies", "description": "Seat availability and showtimes"},
-    {"id": "tickets", "name": "Tickets", "description": "Events, prices, and inventory"},
     {"id": "family-deals", "name": "Family Deals", "description": "Nearby offers that fit"},
 )
 SUPPORTED_MODULE_IDS = {module["id"] for module in SUPPORTED_MODULES}

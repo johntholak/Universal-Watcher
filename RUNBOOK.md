@@ -2,6 +2,21 @@
 
 This file answers one question: **How do I safely pick this project up on any computer?**
 
+## Recovery checkpoint — September 8, 2026
+
+Read `docs/RECOVERY_CHECKPOINT.md` after the four root docs, then the UX/design
+baselines before web work. The active shell choices are Movies and Family Deals.
+Tickets commands below preserve a shelved engine; they are not an instruction to
+resume provider work. Drops is future-only. The approved original mockup is
+`docs/design/universal_watcher_movies_visual_reference.png`; the older JPEG is
+unreadable. Existing shell styling/workflows are not the approved finished UI.
+
+On this restricted Windows recovery environment, Python 3.12.14 is available;
+the documented Python 3.14 setup contract is unchanged. See the checkpoint for
+the exact offline validation limitations. Do not install or launch browsers here.
+For offline setup on a supported machine use `python manage.py setup` without
+`--browsers`; browser setup below is only for a suitable live-test machine.
+
 ## New machine: start here
 
 This is the repository's **New Machine Start up** reference. After setup, open
@@ -145,7 +160,7 @@ modules/seat-watcher/
 
 It was reconstructed from the uploaded V44 Depth/Layering baseline using the saved August 28 Codex handoff. It is not a byte-for-byte recovery of lost commit `7a19015`.
 
-A local Git repository is initialized, the reconstructed V44.6 baseline is
+A local Git repository is initialized, the reconstructed V44.7 baseline is
 committed, and the shared GitHub remote is configured as `origin`. The current
 remote baseline is the `main` branch. Before changing files on another
 computer, pull first and confirm a clean status.
@@ -166,7 +181,9 @@ python -m unittest discover -s core -p "test_*.py" -v
 
 These contracts are not connected to live modules yet. Keep the existing
 Movies, Tickets, and Family Deals engines behind adapters until Movies seating
-reliability and Mac acceptance regression are complete. Catalog access now works.
+reliability and Mac acceptance regression are complete. Catalog access worked
+in the September 4 sample; current live access is not
+rechecked by offline recovery.
 
 ---
 
@@ -566,7 +583,9 @@ python -m unittest discover -s web -p "test_*.py" -v
 
 The shell now speaks to the shared watch/result contracts through the in-memory
 preview API, including validated lifecycle transitions and an honest empty
-results state. The next step is real adapter wiring after Movies seat reliability
+results state. Implement the approved Home and module-specific search/Watch UX
+against the PNG reference; the generic draft form is not that implementation.
+Live adapter wiring remains after Movies seat reliability
 and Mac acceptance regression. Do not change the protected Seat
 Watcher engine as part of shell work.
 

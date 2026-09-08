@@ -1,8 +1,31 @@
 # PROJECT_STATUS.md — Universal Watcher
 
-**Status date:** September 4, 2026
+**Status date:** September 8, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Universal Watcher Web Shell V1 + minimal shared contracts; Movies catalog works, final seating/Mac acceptance remains pending
+**Current milestone:** Recovered GitHub baseline and locked UX scope; approved web implementation remains pending, with live integration gated on Movies Mac acceptance
+
+## September 8 recovery checkpoint
+
+Recovered clean `main` at `6a9a9982fb97879ec6088dd982b640d40d0e05c4` and
+inspected history, all four authoritative docs, module status, web/core/adapters,
+and the six UX/product/design baselines. See `docs/RECOVERY_CHECKPOINT.md` for
+the implementation gap matrix, verification, and resume sequence.
+
+- Movies and Family Deals are the only active user-facing modules. Tickets is
+  shelved: hidden from shell navigation/cards/draft choices and `/api/modules`;
+  new Ticket drafts are rejected. Engine, contracts, adapter, and tests survive.
+- Drops remains documented future scope only; placeholder module cards removed.
+- Restored the exact original visual mockup as a valid PNG. The committed JPEG
+  was unreadable. The PNG is the target, not loose inspiration.
+- Existing shell remains a light-themed generic draft preview. Approved Home,
+  Movies, Family Deals, search-to-Watch flows, and visual fidelity are **not built**.
+- No provider calls, browser launches, engine rewrites, or live acceptance claims.
+- Verification: **105 offline tests passed** (core 5, web 10, adapters 12,
+  Family Deals 19, Tickets 12, Movies 47), plus structure and JavaScript syntax
+  checks. Recovery used Python 3.12.14 with the pinned dependency versions;
+  fresh Python 3.14 setup and rendered-browser acceptance remain unverified.
+- This fresh clone contains no recovered credentials or pre-existing user edits.
+  Historical `.env` statements below refer to the original machine, not this clone.
 
 ## September 4 AMC reliability pass — V44.7
 
@@ -86,10 +109,10 @@ live web adapters gated until that acceptance passes.
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
 | Universal Watcher Core | 🟡 | Minimal watch/result contracts + Family Deals and Ticket mappings | Yes | Keep live execution gated; add execution boundary after Movies acceptance |
-| Universal Watcher Web App | 🟡 | V1 shell + in-memory lifecycle and results/evidence preview | Yes | Wire real adapters after Movies acceptance |
+| Universal Watcher Web App | 🟡 | Generic draft preview; Movies/Family Deals choices only; approved UX not yet implemented | Yes | Build approved Home → Movies → Family Deals → Watches; live execution gated |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier; V5.0.1 conservative hours parsing; isolated result adapter mapping | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
 | Seat Watcher | 🟡 reconstructed / live regression in progress | V44.7; catalog authorized; 32/32 sampled showtimes; final seat fixes offline-only; 47 Movies tests | Yes | Mac seat-map comparison, then broader reliability/NEXT BEST acceptance |
-| Ticket Watcher | 🟡 | Bundle V1.11; Ticketmaster live watcher path V1.9; isolated result adapter mapping | Yes, intact import | Preserve Ticketmaster; decide approved marketplace expansion path |
+| Ticket Watcher | Shelved / hidden | Bundle V1.11; Ticketmaster V1.9 path and isolated mapping preserved | Yes | Preserve only; reactivation requires a new decision |
 | Theater Discovery | 🟠 | Separate-workstream decision made | Placeholder | Build non-AMC providers independently, then normalize into Seat Watcher |
 | Drop Watch | ⚪ | Planned | Placeholder | Start only after Universal shell/integration foundation |
 | Automated Job Hunter | ⚪ | Planned | Placeholder | After Drop Watch |
@@ -104,12 +127,12 @@ Universal Watcher work is intentionally split into two connected lanes:
 1. **Module verification:** Movies is the current live proof lane because its
    AMC date and inventory behavior is the highest-risk unfinished area.
 2. **Platform foundation:** the shared contracts and web shell are being built
-   for Movies, Tickets, Family Deals, and future modules together.
+   for the active Movies and Family Deals product, with preserved contracts
+   that can support later approved modules.
 
-The platform work does not replace or narrow the module roadmap. Once Movies'
-API/Mac acceptance gate is complete, proven Family Deals, Ticket Watcher, and
-Seat Watcher engines will be connected through adapters, followed by theater
-discovery expansion and the later planned modules.
+After Movies API/Mac acceptance, connect proven Movies and Family Deals engines
+through adapters. Tickets remains shelved even after that gate passes. Theater
+discovery and later modules remain roadmap work, not competing priorities.
 
 While the Movies gate is waiting on AMC/API and Mac access, isolated adapter
 mapping is allowed when it only translates an existing module job record and
@@ -254,7 +277,11 @@ Also proven or covered:
 - CityWalk canonical route handling
 - nine offline regression tests passing at the handoff
 
-## Remaining
+## Historical progression and remaining acceptance
+
+The dated V44.2–V44.6 observations below are historical; the V44.7 September 4
+section above supersedes authorization and capture-only conclusions. The final
+seat reader still needs Mac acceptance.
 
 - V44.2 live testing on Sept. 1 proved current-day discovery/seat checking but exposed false-empty future-date discovery and an overly short stopping policy. V44.4 followed AMC's selectable calendar, but the Sept. 2 acceptance evidence still showed skipped real dates and failed inventory capture.
 - V44.5 now requires the selected date's showtime results to reach a stable, meaningful state before extraction; waits for tracked seat-response parsing work; accepts AMC's documented `seatName` field without changing grouping logic; and distinguishes captured-no-match from inventory-unavailable throughout aggregation and final messaging.
@@ -276,7 +303,10 @@ Do not casually rewrite the AMC engine. See `AGENTS.md`.
 
 ---
 
-# 4. Ticket Watcher
+# 4. Ticket Watcher — shelved / hidden
+
+Preserve the following historical capability baseline. No current marketplace
+expansion or live web integration is authorized by this roadmap.
 
 ## Baseline
 
@@ -355,7 +385,7 @@ protected Movies engine.
 
 ### Milestone C — Module integration
 - Family Deals adapter (isolated result mapping started; live execution pending)
-- Ticket Watcher adapter (isolated result mapping started; live execution pending)
+- Ticket Watcher mapping preserved; integration shelved until explicitly reactivated
 - Seat Watcher adapter/local-helper strategy
 - Theater discovery expansion
 
@@ -411,4 +441,4 @@ Car Search Aggregator remains a strong possible Universal Watcher module but is 
 - The adapter is optional and reads `AMC_VENDOR_KEY` from the environment or the ignored module-local `.env` file.
 - API discovery reuses existing movie similarity, format classification, time filtering, showtime normalization, and browser seat capture.
 - No AMC key is bundled, and the browser fallback remains intact.
-- Local uncommitted user data: `modules/seat-watcher/.env` contains the issued key and is intentionally Git-ignored. Never commit or quote it.
+- Historical original-machine local data: `modules/seat-watcher/.env` held the issued key and was intentionally Git-ignored. This does not establish its presence on a new clone. Never commit or quote credentials.

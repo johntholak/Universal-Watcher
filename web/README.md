@@ -5,15 +5,24 @@ It is deliberately a front-end preview: it does not start a watcher or persist
 account data. When served through `server.py`, it calls only the local,
 in-memory preview API.
 
-## V1 shell surfaces
+## Recovery status
 
-- module chooser for Movies, Tickets, and Family Deals
+This remains the older light-themed generic draft shell, not the approved V1 UX.
+Home/module-specific searches, criteria-preserving Watch continuation, and the
+dark layered PNG design target remain implementation work. Follow the root
+`docs/*UX_BASELINE.md` and `docs/VISUAL_DESIGN_BASELINE.md`; do not reduce existing
+engine controls to this preview's name field. `/api/modules` and new drafts
+allow only Movies and Family Deals. Existing Tickets engine/contracts remain.
+
+## Existing shell surfaces
+
+- module chooser for Movies and Family Deals only; Tickets is shelved/hidden
 - create-watch dialog that creates a clearly labeled local draft
 - active-watch and recent-activity areas
 - module-neutral matches and evidence area (honest empty state until an adapter publishes results)
 - local draft lifecycle controls: start, pause, resume, and stop
 - responsive layout with keyboard focus states
-- planned-module placeholder without claiming an integration exists
+- no shelved or future-module placeholder cards
 
 The shell uses plain HTML, CSS, and JavaScript so it can be opened without a
 framework or dependency install. Existing module engines remain unchanged.
@@ -52,6 +61,7 @@ python -m unittest discover -s web -p "test_*.py" -v
 
 The shell already reads the shared watch/result contracts at the preview
 boundary. The next integration milestone is to connect proven module adapters
-after the Movies API deployment and Mac acceptance regression. Do not represent
+after Movies seat reliability and Mac acceptance regression. The API deployment
+schedule is not an outstanding proven explanation for access failures. Do not represent
 local drafts or an unavailable source as live monitoring or as a verified
 match.

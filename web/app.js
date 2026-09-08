@@ -13,7 +13,6 @@
 
   const moduleLabels = {
     movies: "Movies",
-    tickets: "Tickets",
     "family-deals": "Family Deals",
   };
   const state = { watches: [], activities: [], results: [] };
@@ -33,7 +32,7 @@
     watchCount.textContent = String(state.watches.length);
     if (!state.watches.length) {
       watchList.className = "empty-state";
-      watchList.innerHTML = `<span class="empty-icon" aria-hidden="true">⌁</span><h3>No watches yet</h3><p>Your Movies, Tickets, and Family Deals watches will appear here.</p><button class="button button-secondary" type="button" data-open-create>Start your first watch</button>`;
+      watchList.innerHTML = `<span class="empty-icon" aria-hidden="true">⌁</span><h3>No watches yet</h3><p>Your Movies and Family Deals watches will appear here.</p><button class="button button-secondary" type="button" data-open-create>Start your first watch</button>`;
       return;
     }
     watchList.className = "watch-list";
@@ -172,7 +171,7 @@
       if (!response.ok) return;
       const watches = await response.json();
       if (!Array.isArray(watches)) return;
-      state.watches = watches;
+      state.watches = watches.filter((watch) => Object.hasOwn(moduleLabels, watch.module));
       renderWatches();
     } catch (_error) {
       // Opening the shell through a static file server is supported; drafts stay local.
@@ -185,7 +184,7 @@
       if (!response.ok) return;
       const results = await response.json();
       if (!Array.isArray(results)) return;
-      state.results = results;
+      state.results = results.filter((result) => Object.hasOwn(moduleLabels, result.module));
       renderResults();
     } catch (_error) {
       // A static-only shell simply keeps the honest empty state.

@@ -1,5 +1,11 @@
 # Build Status
 
+**Recovery state (September 8, 2026): V44.7 remains current.** Historical
+sections below are provenance; the final V44.7 section supersedes earlier
+authorization/capture claims. Live Mac acceptance remains pending. The web
+Movies workflow is not yet implemented; preserve every capability in the root
+`docs/MOVIES_UX_BASELINE.md` and use the recovered PNG visual target.
+
 **Build label:** Seat Watcher V44 Reconstructed Post-Codex  
 **Created:** September 1, 2026
 

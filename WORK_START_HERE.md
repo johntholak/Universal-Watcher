@@ -4,14 +4,10 @@
 
 This repository is the authoritative working package for **Universal Watcher**.
 
-Universal Watcher is one product with simple user-facing modules such as:
-
-- Movies
-- Tickets
-- Family Deals
-- Drops
-- Jobs
-- Event Copilot later
+Universal Watcher currently exposes Movies and Family Deals only. Tickets is
+shelved/hidden with its engine preserved. Drops, Jobs, and Event Copilot are
+future scope. Read `docs/RECOVERY_CHECKPOINT.md` for the recovered state and
+`docs/VISUAL_DESIGN_BASELINE.md` for the restored original PNG target.
 
 Do not use **HUNT** as a new user-facing product/module name. Legacy internal names may remain until those files are naturally touched. Do not perform a risky rename-only rewrite.
 
@@ -42,8 +38,8 @@ translates existing module output and does not start live monitoring.
 This priority is a verification lane, not a change to the product scope. The
 Universal Watcher core and web-shell work may continue when it is module-
 neutral and does not disturb the protected Movies engine. The end state still
-includes working Movies, Tickets, Family Deals, theater discovery, and later
-planned modules behind one control center.
+prioritizes Movies and Family Deals behind one control center. Tickets stays
+shelved; theater discovery and other modules remain later work.
 
 The current Movies implementation is the reconstructed AMC Seat Watcher V44.7 inside:
 
@@ -173,7 +169,8 @@ Follow the global NEXT TASK and live-test V44.7 on the Mac to verify that it:
 7. add focused offline regression coverage
 8. produce a clear live diagnostic log for the same Odyssey acceptance case
 
-Do not redesign the UI.
+Do not redesign the protected desktop UI during Movies verification. The
+approved web UX baselines govern separate shell implementation.
 Do not alter another module's proven engine as part of Movies verification.
 Module-neutral platform work and isolated adapter mappings may continue while
 the Movies gate is pending. Do not perform broad architecture cleanup.

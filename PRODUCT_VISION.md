@@ -19,14 +19,15 @@ A user should be able to sign in from a Mac, PC, phone, or browser and see one c
 - open the destination when a match appears
 - manage notifications and devices
 
-Example module entry points:
+Current user-facing module entry points are **Movies** and **Family Deals**.
+Tickets is shelved/hidden; its existing engine remains preserved. Drops is
+documented future scope only. Jobs, Event Copilot, and Car Search are later
+roadmap/parking-lot concepts, not current product choices.
 
-- Movie Seats
-- Tickets
-- Family Dinner Deals
-- Drop Watch
-- Jobs
-- future modules such as Car Search
+Search/discovery is primary; a Watch optionally continues the exact configured
+search. The approved Home, Movies, Family Deals, Watch, and visual baselines in
+`docs/` define the implementation target. A generic watch form is not equivalent
+to the established module workflows.
 
 ## Product architecture
 
@@ -176,8 +177,10 @@ The existing modules remain independent engines. Accounts, persistent shared
 watches, scheduled workers, notifications, and cross-device runtime state are
 future work, not features delivered by repository portability.
 
-The current milestone is reliable cross-machine development and preservation
-of those engines. Live integration remains gated on Movies API/Mac acceptance;
+The current milestone is recovery and implementation of the approved web UX
+around preserved engines. The existing light-themed generic draft shell does
+not yet implement the approved dark, layered Movies workspace or module flows.
+Live integration remains gated on Movies API/Mac acceptance;
 see PROJECT_STATUS.md for the single next task and current evidence.
 
 The restaurant PDF menu builder is explicitly outside this product.

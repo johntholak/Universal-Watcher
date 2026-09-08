@@ -27,6 +27,21 @@ The intended end state is a single web-based Universal Watcher control center wi
 
 Individual modules may use different backend mechanisms. Browser automation, local helpers, APIs, crawlers, and server-side workers can all exist behind the same web product.
 
+## Locked product and UX scope
+
+Active user-facing modules are **Movies and Family Deals only**. Tickets is
+shelved and hidden from navigation, module choices, and new web drafts; preserve
+its engine, tests, and isolated adapter. Drops is future-only, not an active build.
+Do not reactivate shelved modules merely because their code exists.
+
+Before web work, read `docs/HOME_UX_BASELINE.md`, `docs/MOVIES_UX_BASELINE.md`,
+`docs/FAMILY_DEALS_UX_BASELINE.md`, `docs/WATCH_UX_BASELINE.md`, and
+`docs/VISUAL_DESIGN_BASELINE.md`. The recovered PNG reference is the implementation
+target. Its illustrative Tickets navigation and sample results do not override
+current module scope or authorize invented live results. Search comes first;
+a Watch continues the same saved criteria. Do not replace module capabilities
+with a generic reduced watch form. The existing shell is not UX acceptance.
+
 ## Naming
 
 - Overall product: **Universal Watcher**
@@ -187,7 +202,8 @@ not a guessed classification.
 
 ### Ticket Watcher
 
-Preserve the working Ticketmaster watcher while experimenting with additional marketplaces independently.
+Preserve the working Ticketmaster watcher while Tickets is shelved. Marketplace
+expansion and user-facing reactivation are not current work.
 
 Do not bypass anti-bot or access controls. Prefer documented/approved APIs or other permitted integrations when a marketplace blocks automation.
 

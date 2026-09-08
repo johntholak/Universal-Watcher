@@ -27,7 +27,6 @@
       <nav class="nav-list" aria-label="Views">
         <button class="nav-item is-active" type="button" data-view="overview">Overview</button>
         <button class="nav-item" type="button" data-view="movies">Movies</button>
-        <button class="nav-item" type="button" data-view="tickets">Tickets</button>
         <button class="nav-item" type="button" data-view="family-deals">Family Deals</button>
       </nav>
 
@@ -67,7 +66,7 @@
           <div id="watch-list" class="empty-state">
             <span class="empty-icon" aria-hidden="true">⌁</span>
             <h3>No watches yet</h3>
-            <p>Your Movies, Tickets, and Family Deals watches will appear here.</p>
+            <p>Your Movies and Family Deals watches will appear here.</p>
             <button class="button button-secondary" type="button" data-open-create>Start your first watch</button>
           </div>
         </article>
@@ -116,20 +115,11 @@
             <span class="module-card-copy"><strong>Movies</strong><small>Seat availability and showtimes</small></span>
             <span class="module-arrow" aria-hidden="true">→</span>
           </button>
-          <button class="module-card" type="button" data-module="tickets">
-            <span class="module-icon tickets-icon" aria-hidden="true">◆</span>
-            <span class="module-card-copy"><strong>Tickets</strong><small>Events, prices, and inventory</small></span>
-            <span class="module-arrow" aria-hidden="true">→</span>
-          </button>
           <button class="module-card" type="button" data-module="family-deals">
             <span class="module-icon family-icon" aria-hidden="true">✦</span>
             <span class="module-card-copy"><strong>Family Deals</strong><small>Nearby offers that fit</small></span>
             <span class="module-arrow" aria-hidden="true">→</span>
           </button>
-          <div class="module-card module-card-disabled" aria-disabled="true">
-            <span class="module-icon planned-icon" aria-hidden="true">…</span>
-            <span class="module-card-copy"><strong>More watchers</strong><small>Coming after the foundation</small></span>
-          </div>
         </div>
       </section>
     </main>
@@ -147,7 +137,6 @@
       <label for="watch-module">Watch type</label>
       <select id="watch-module" name="module">
         <option value="movies">Movies</option>
-        <option value="tickets">Tickets</option>
         <option value="family-deals">Family Deals</option>
       </select>
       <label for="watch-name">What are you watching for?</label>
