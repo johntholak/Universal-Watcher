@@ -15,11 +15,18 @@ The primary V1 user experience is now locked as resume-first search:
 
 Manual/specific search remains a secondary mode and still uses the resume-derived profile for fit evaluation.
 
-The V1 scoring philosophy and initial scoring model are also locked. See `docs/JOB_SCORING_V1.md`.
+The V1 scoring philosophy and initial scoring model are locked in `docs/JOB_SCORING_V1.md`.
+
+The V1 resume intelligence/profile model is locked in `docs/JOB_RESUME_PROFILE_V1.md`. The resume is treated as structured, evidence-backed career history, not merely a keyword source. User corrections are first-class data and material profile changes create a new profile version.
 
 ## Locked V1 direction
 
 - Resume-first search is the primary entry point; users should not need to build a large candidate profile manually before searching.
+- Resume parsing must preserve explicit facts, accomplishments, scope, chronology, and evidence provenance.
+- Resume-derived facts distinguish explicit, strongly derived, tentative inference, and user-confirmed states.
+- Direct, adjacent, and transferable role families are generated from responsibilities/capabilities, not title text alone.
+- User-confirmed corrections override automated inference without rewriting the original resume evidence.
+- Searches and watches record the resume/profile version used.
 - Search first, application automation later.
 - Supported/authorized ATS data only.
 - Search broadly, understand deeply, rank aggressively, and eliminate cautiously.
@@ -37,7 +44,7 @@ The V1 scoring philosophy and initial scoring model are also locked. See `docs/J
 - Numeric thresholds are guide rails, not unquestionable truth; major required gaps can cap a bucket and strong equivalent experience can outperform weak direct-title alignment.
 - Searches can become watches for newly posted or materially changed qualifying roles.
 
-See `docs/JOB_RESUME_SEARCH_V1.md` for the detailed locked V1 search experience and `docs/JOB_SCORING_V1.md` for the scoring/evidence model.
+See `docs/JOB_RESUME_SEARCH_V1.md` for the locked search experience, `docs/JOB_RESUME_PROFILE_V1.md` for resume intelligence, and `docs/JOB_SCORING_V1.md` for the scoring/evidence model.
 
 ## V1 scoring baseline
 
@@ -90,6 +97,7 @@ LinkedIn/Indeed are not V1 dependencies.
 - `docs/JOB_DATA_SOURCE_BASELINE.md`
 - `docs/JOB_MATCHING_BASELINE.md`
 - `docs/JOB_RESUME_SEARCH_V1.md`
+- `docs/JOB_RESUME_PROFILE_V1.md`
 - `docs/JOB_SCORING_V1.md`
 
 ## Verification
@@ -101,11 +109,12 @@ The scaffold was created as a GitHub bootstrap while local/Work execution was un
 1. Create a dedicated `Automated-Job-Hunter` repository from this bootstrap.
 2. Run the scaffold tests from that repository and establish a clean baseline commit.
 3. Fix only genuine scaffold issues revealed by those tests.
-4. Implement one Greenhouse adapter with offline fixtures before adding any second provider.
-5. Normalize Greenhouse postings into the shared job model.
-6. Verify hard filters, deduplication, provenance, and the locked explainable scoring model against fixtures.
-7. Build a human-labeled validation set and measure worthwhile-job recall before enabling aggressive hiding.
-8. Add a second provider only after the Greenhouse path is stable.
+4. Implement resume parsing/profile extraction against offline PDF/DOCX fixtures.
+5. Implement one Greenhouse adapter with offline fixtures before adding any second provider.
+6. Normalize Greenhouse postings into the shared job model.
+7. Verify hard filters, deduplication, provenance, resume evidence matching, and the locked explainable scoring model against fixtures.
+8. Build a human-labeled validation set and measure worthwhile-job recall before enabling aggressive hiding.
+9. Add a second provider only after the Greenhouse path is stable.
 
 ## Product quality target
 
