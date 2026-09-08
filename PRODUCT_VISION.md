@@ -177,10 +177,10 @@ The existing modules remain independent engines. Accounts, persistent shared
 watches, scheduled workers, notifications, and cross-device runtime state are
 future work, not features delivered by repository portability.
 
-The current milestone is recovery and implementation of the approved web UX
-around preserved engines. The existing light-themed generic draft shell does
-not yet implement the approved dark, layered Movies workspace or module flows.
-Live integration remains gated on Movies API/Mac acceptance;
-see PROJECT_STATUS.md for the single next task and current evidence.
+The current milestone is implementation of the approved web UX around preserved
+engines. The dark layered Home and offline Movies workspace now establish the
+shared visual and interaction system; Family Deals and the complete shared
+Watches experience remain. Live integration remains gated on Movies API/Mac
+acceptance; see PROJECT_STATUS.md for the single next task and current evidence.
 
 The restaurant PDF menu builder and Automated Job Hunter are explicitly outside this product.

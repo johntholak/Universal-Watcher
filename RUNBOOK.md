@@ -522,15 +522,11 @@ Not built yet.
 
 ---
 
-# 8. Automated Job Hunter
+# 8. Automated Job Hunter — separate product
 
-Placeholder path:
-
-```text
-modules/job-hunter/
-```
-
-Not built yet.
+Automated Job Hunter is not a Universal Watcher module. Do not add it to this
+web application's navigation, module choices, or roadmap. Any retained legacy
+placeholder is non-product historical structure only.
 
 ---
 
@@ -548,7 +544,7 @@ Not built yet.
 
 # 10. Universal Watcher web app
 
-The first dependency-free shell preview is in:
+The dependency-free Home and Movies web preview is in:
 
 ```text
 web/
@@ -560,11 +556,12 @@ Preferred local preview with the contract boundary, from the repository root:
 python web/server.py
 ```
 
-Open `http://127.0.0.1:8080/`. This preview supports module navigation and
-clearly labeled local watch drafts, including start/pause/resume/stop lifecycle
-controls. It also has a module-neutral Matches & evidence surface backed by an
-empty `GET /api/results` preview endpoint. It does not start Movies, Tickets,
-or Family Deals monitoring and must not be treated as a production web app.
+Open `http://127.0.0.1:8080/`. Home follows the approved two-module hierarchy.
+Movies provides the approved search controls, a live criteria summary, truthful
+AMC-blocked preview behavior, and exact-criteria Save as Watch drafts with
+start/pause/resume/stop lifecycle controls. Matches remains backed by the
+module-neutral `GET /api/results` preview endpoint. This does not start Movies,
+Tickets, or Family Deals monitoring and must not be treated as a production app.
 
 For a static-only preview without the local draft API:
 
@@ -581,11 +578,11 @@ Verify the shell:
 python -m unittest discover -s web -p "test_*.py" -v
 ```
 
-The shell now speaks to the shared watch/result contracts through the in-memory
+The shell speaks to the shared watch/result contracts through the in-memory
 preview API, including validated lifecycle transitions and an honest empty
-results state. Implement the approved Home and module-specific search/Watch UX
-against the PNG reference; the generic draft form is not that implementation.
-Live adapter wiring remains after Movies seat reliability
+results state. Home and Movies now implement the approved visual and workflow
+baseline. Implement Family Deals next, then complete shared Watches. Live
+adapter wiring remains after Movies seat reliability
 and Mac acceptance regression. Do not change the protected Seat
 Watcher engine as part of shell work.
 

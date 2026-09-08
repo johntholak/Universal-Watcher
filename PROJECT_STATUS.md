@@ -2,7 +2,32 @@
 
 **Status date:** September 8, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Recovered GitHub baseline and locked UX scope; approved web implementation remains pending, with live integration gated on Movies Mac acceptance
+**Current milestone:** Approved Home and Movies web presentation implemented; Family Deals is the next web screen, with live integration still gated on Movies acceptance
+
+## September 8 Home and Movies web checkpoint
+
+- Replaced the generic light shell with the approved dark navy, purple, blue,
+  and green layered visual system, including responsive top/side navigation.
+- Home now follows the approved two-module hierarchy: Movies and Family Deals
+  only. Active Watches and Recent Results remain hidden until records exist.
+- Movies now exposes the approved five-step workflow: movie discovery/title,
+  location/radius/theater selection, all three date modes and time bounds, seat
+  count/minimum row, formats, ranking preferences, and advanced exclusions.
+- The live summary updates from the configured search, and Save as Watch sends
+  the exact Movies criteria through the existing in-memory watch contract.
+- All provider-facing actions are explicitly offline-preview behavior. Search
+  reports the AMC-blocked source as unavailable rather than inventing results or
+  treating it as no match. No AMC request, browser engine, or module code changed.
+- Rendered Home and Movies checks passed in the local browser; exact-criteria
+  Watch creation was exercised with no browser console errors.
+- Offline verification: **108 tests passed** (core 6, web 12, adapters 12,
+  Family Deals 19, Tickets 12, Movies 47), plus repository structure checks.
+
+**NEXT TASK:** Implement the approved Family Deals web search and deal-first
+results presentation in the shared visual system, preserving location, full
+radius, party size, total budget, cuisine multi-select, and all four restaurant
+type choices. Keep execution offline until the existing engine's live benchmark
+and adapter gate are ready; then complete the shared Watches presentation.
 
 ## September 8 recovery checkpoint
 
@@ -17,8 +42,8 @@ the implementation gap matrix, verification, and resume sequence.
 - Drops remains documented future scope only; placeholder module cards removed.
 - Restored the exact original visual mockup as a valid PNG. The committed JPEG
   was unreadable. The PNG is the target, not loose inspiration.
-- Existing shell remains a light-themed generic draft preview. Approved Home,
-  Movies, Family Deals, search-to-Watch flows, and visual fidelity are **not built**.
+- The former light-themed generic shell was superseded by the September 8 Home
+  and Movies web checkpoint above. Family Deals and full Watches UX remain.
 - No provider calls, browser launches, engine rewrites, or live acceptance claims.
 - Verification: **105 offline tests passed** (core 5, web 10, adapters 12,
   Family Deals 19, Tickets 12, Movies 47), plus structure and JavaScript syntax
@@ -88,7 +113,7 @@ the implementation gap matrix, verification, and resume sequence.
 - Credentials remain ignored on the original machine and must be configured
   securely on a new machine; Git does not synchronize runtime state.
 
-**NEXT TASK:** On the Mac, after AMC access/rate limits permit, run one small
+**LIVE ACCEPTANCE GATE:** On the Mac, after AMC access/rate limits permit, run one small
 V44.7 catalog-plus-seat comparison using the original Odyssey / IMAX 70MM /
 CityWalk case and Burbank's ordinary-seat case. Verify the final structured
 decoder and full-map agreement before expanding to the documented >90%
@@ -109,13 +134,13 @@ live web adapters gated until that acceptance passes.
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
 | Universal Watcher Core | 🟡 | Minimal watch/result contracts + Family Deals and Ticket mappings | Yes | Keep live execution gated; add execution boundary after Movies acceptance |
-| Universal Watcher Web App | 🟡 | Generic draft preview; Movies/Family Deals choices only; approved UX not yet implemented | Yes | Build approved Home → Movies → Family Deals → Watches; live execution gated |
+| Universal Watcher Web App | 🟡 | Approved dark Home and offline Movies search/Watch flow | Yes | Build Family Deals, then complete shared Watches; live execution gated |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier; V5.0.1 conservative hours parsing; isolated result adapter mapping | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
 | Seat Watcher | 🟡 reconstructed / live regression in progress | V44.7; catalog authorized; 32/32 sampled showtimes; final seat fixes offline-only; 47 Movies tests | Yes | Mac seat-map comparison, then broader reliability/NEXT BEST acceptance |
 | Ticket Watcher | Shelved / hidden | Bundle V1.11; Ticketmaster V1.9 path and isolated mapping preserved | Yes | Preserve only; reactivation requires a new decision |
 | Theater Discovery | 🟠 | Separate-workstream decision made | Placeholder | Build non-AMC providers independently, then normalize into Seat Watcher |
 | Drop Watch | ⚪ | Planned | Placeholder | Start only after Universal shell/integration foundation |
-| Automated Job Hunter | ⚪ | Planned | Placeholder | After Drop Watch |
+| Automated Job Hunter | 🚫 | Separate product | No user-facing module | Maintain in its own project/repository |
 | Event Producer Copilot | ⚪ | Planned, deliberately last | Placeholder | Do not lose; build after prior modules |
 | Car Search | ⚪ parking lot | Feasibility explored | Parking-lot note | Not active roadmap |
 | Restaurant PDF Menu Builder | 🚫 | Separate project | No | Keep separate |
@@ -392,10 +417,7 @@ protected Movies engine.
 ### Milestone D — Drop Watch
 Build using the common platform.
 
-### Milestone E — Automated Job Hunter
-Build after Drop Watch.
-
-### Milestone F — Event Producer Copilot
+### Milestone E — Event Producer Copilot
 Build last after the watcher system is mature.
 
 ## Parking lot

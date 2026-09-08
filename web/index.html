@@ -1,152 +1,53 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Universal Watcher control center preview">
-  <title>Universal Watcher</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Universal Watcher — find it once, or let us keep watching"><title>Universal Watcher</title>
+  <link rel="stylesheet" href="styles.css"><script src="app.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="topbar">
+    <button class="brand" type="button" data-view="home" aria-label="Universal Watcher home"><span class="eye-mark" aria-hidden="true"><span></span></span><span><strong>UNIVERSAL WATCHER</strong><small>Find it once. Or let us keep watching.</small></span></button>
+    <nav class="topnav" aria-label="Primary navigation"><button class="topnav-item is-active" type="button" data-view="home">⌂ Home</button><button class="topnav-item" type="button" data-view="watches">♧ My Watches</button><button class="topnav-item" type="button" data-view="matches">▣ Matches</button></nav>
+    <button class="icon-button mobile-menu" type="button" aria-label="Open navigation" data-mobile-menu>☰</button>
+  </header>
   <div class="app-shell">
-    <aside class="sidebar" aria-label="Universal Watcher navigation">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">UW</span>
-        <span>
-          <strong>Universal Watcher</strong>
-          <small>Control center</small>
-        </span>
-      </div>
-
-      <button class="button button-primary sidebar-create" type="button" data-open-create>
-        <span aria-hidden="true">+</span> New watch
-      </button>
-
-      <nav class="nav-list" aria-label="Views">
-        <button class="nav-item is-active" type="button" data-view="overview">Overview</button>
-        <button class="nav-item" type="button" data-view="movies">Movies</button>
-        <button class="nav-item" type="button" data-view="family-deals">Family Deals</button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <span class="status-dot" aria-hidden="true"></span>
-        <span>Local shell preview</span>
-      </div>
+    <aside class="sidebar" aria-label="Module navigation">
+      <button class="button button-primary new-watch" type="button" data-view="home">＋ New Search</button>
+      <nav class="side-links" aria-label="Views"><button class="side-link is-active" type="button" data-view="home"><span>⌂</span> Home</button><button class="side-link" type="button" data-view="watches"><span>♧</span> My Watches</button><button class="side-link" type="button" data-view="matches"><span>▣</span> Matches</button></nav>
+      <p class="side-label">DISCOVERY MODULES</p>
+      <nav class="side-links module-links" aria-label="Discovery modules"><button class="side-link" type="button" data-view="movies"><span class="module-glyph movie-glyph">▦</span> Movies</button><button class="side-link" type="button" data-view="family-deals"><span class="module-glyph family-glyph">♨</span> Family Deals</button></nav>
+      <div class="sidebar-note"><span class="status-dot"></span><span>Local preview<br><small>No providers are contacted</small></span></div>
     </aside>
-
     <main id="main-content" class="main-content">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Personal internet agent</p>
-          <h1 id="page-title">Overview</h1>
-        </div>
-        <button class="button button-icon" type="button" data-open-create aria-label="Create a new watch">+</button>
-      </header>
-
-      <section class="hero" aria-labelledby="hero-title">
-        <div>
-          <p class="eyebrow">Discover · verify · monitor · act</p>
-          <h2 id="hero-title">Let Universal Watcher keep looking.</h2>
-          <p class="hero-copy">Create a watch once, then keep the useful results and evidence in one place.</p>
-        </div>
-        <button class="button button-primary" type="button" data-open-create>Create a watch</button>
+      <section class="view is-visible" data-page="home" aria-labelledby="home-title">
+        <div class="home-hero"><div class="hero-orb" aria-hidden="true"><span class="eye-mark"><span></span></span></div><p class="eyebrow">YOUR PERSONAL DISCOVERY AGENT</p><h1 id="home-title">Find what fits.<br><span>Keep watching when it doesn’t.</span></h1><p>Search specialized sources, apply the criteria that matter, and get a truthful answer — or save the exact search and let Universal Watcher continue.</p></div>
+        <section class="home-modules" aria-labelledby="choose-module-title"><div class="section-heading centered"><p class="eyebrow">START A SEARCH</p><h2 id="choose-module-title">What are you looking for?</h2></div><div class="home-module-grid">
+          <button class="home-module-card movies-card" type="button" data-view="movies"><span class="home-module-art" aria-hidden="true"><span class="film-icon">▦</span></span><span class="home-module-copy"><span class="availability">AVAILABLE NOW</span><strong>Movies</strong><small>Find nearby showtimes, formats, and seats that meet your exact preferences.</small><b>Find Movie Seats <span>→</span></b></span></button>
+          <button class="home-module-card deals-card" type="button" data-view="family-deals"><span class="home-module-art" aria-hidden="true"><span class="deal-icon">♨</span></span><span class="home-module-copy"><span class="availability">AVAILABLE NOW</span><strong>Family Deals</strong><small>Find verified nearby meal deals that fit your family, budget, and taste.</small><b>Find Family Deals <span>→</span></b></span></button>
+        </div></section>
+        <section id="home-watch-section" class="conditional-section" hidden aria-labelledby="home-watches-title"><div class="section-heading"><p class="eyebrow">STILL LOOKING</p><h2 id="home-watches-title">Active Watches</h2></div><div id="home-watch-list" class="compact-list"></div></section>
+        <section id="home-result-section" class="conditional-section" hidden aria-labelledby="home-results-title"><div class="section-heading"><p class="eyebrow">JUST FOUND</p><h2 id="home-results-title">Recent Results</h2></div><div id="home-result-list" class="compact-list"></div></section>
       </section>
-
-      <section class="dashboard-grid" aria-label="Watch summary">
-        <article class="panel">
-          <header class="panel-header">
-            <div>
-              <p class="eyebrow">Monitoring</p>
-              <h2>Active watches</h2>
-            </div>
-            <span class="count-badge" id="watch-count">0</span>
-          </header>
-          <div id="watch-list" class="empty-state">
-            <span class="empty-icon" aria-hidden="true">⌁</span>
-            <h3>No watches yet</h3>
-            <p>Your Movies and Family Deals watches will appear here.</p>
-            <button class="button button-secondary" type="button" data-open-create>Start your first watch</button>
-          </div>
-        </article>
-
-        <article class="panel">
-          <header class="panel-header">
-            <div>
-              <p class="eyebrow">Evidence trail</p>
-              <h2>Recent activity</h2>
-            </div>
-          </header>
-          <ol id="activity-list" class="activity-list">
-            <li class="activity-empty">Activity will appear when a watch runs.</li>
-          </ol>
-        </article>
+      <section class="view" data-page="movies" aria-labelledby="movies-title">
+        <header class="page-header"><span class="page-icon movie-glyph">▦</span><div><h1 id="movies-title">Movies</h1><p>Find showtimes and the best seats, or keep watching until they appear.</p></div><button class="button button-quiet how-button" type="button" data-help>ⓘ &nbsp; How It Works</button></header>
+        <div class="offline-banner" role="status"><span>◷</span><div><strong>Preview mode — search controls are safe to explore</strong><small>AMC is temporarily blocking normal requests. This page will not contact AMC or start the Movies engine.</small></div></div>
+        <form id="movie-search-form" class="movie-workspace">
+          <div class="movie-columns"><div class="workflow-column">
+            <article class="workflow-card"><header class="workflow-heading"><span>1</span><div><h2>Choose the Movie</h2><p>Search for a movie that’s playing near you.</p></div></header><div class="input-action-row"><label class="field icon-field"><span>⌕</span><input id="movie-title" name="movie" value="The Odyssey" autocomplete="off" aria-label="Movie title"></label><button class="button button-outline" type="button" data-preview-action="movies">⌕ &nbsp; Find Movies</button></div><div class="selection-preview"><div class="poster-placeholder" aria-hidden="true">THE<br>ODYSSEY</div><div><strong id="selected-movie-title">The Odyssey</strong><span class="now-badge">Title entered</span><small>Editable title · fuzzy matching stays in the protected engine</small></div></div></article>
+            <article class="workflow-card"><header class="workflow-heading"><span>2</span><div><h2>Choose Where</h2><p>Find theaters near a location and select which ones to search.</p></div></header><div class="input-action-row"><label class="field icon-field"><span>⌖</span><input id="movie-location" name="location" value="West Hills, CA" aria-label="Location"></label><button class="button button-outline" type="button" data-location>⌖ &nbsp; Use My Location</button></div><div class="two-fields"><label>Radius<select id="movie-radius" name="radius"><option>5 miles</option><option>10 miles</option><option selected>30 miles</option><option>50 miles</option></select></label><label>Format<select id="movie-format" name="format"><option selected>Any Format</option><option>IMAX</option><option>IMAX 70MM</option><option>70MM</option><option>Dolby Cinema</option><option>3D</option><option>Standard</option></select></label></div><button class="button button-wide button-outline" type="button" data-preview-action="theaters">⌕ &nbsp; Find Theaters</button><div class="theater-heading"><strong>Select Theaters <span>(4 saved locally)</span></strong><button type="button" data-select-all>☑ Select All</button></div><div class="theater-list" id="theater-list"><label><input type="checkbox" name="theaters" value="AMC Topanga 12" checked><span>AMC Topanga 12</span><small>0.8 mi</small></label><label><input type="checkbox" name="theaters" value="AMC Fallbrook 7" checked><span>AMC Fallbrook 7</span><small>3.2 mi</small></label><label><input type="checkbox" name="theaters" value="AMC Burbank 16" checked><span>AMC Burbank 16</span><small>16.4 mi</small></label><label><input type="checkbox" name="theaters" value="AMC Universal CityWalk 19" checked><span>AMC Universal CityWalk 19</span><small>18.4 mi</small></label></div></article>
+          </div><div class="workflow-column">
+            <article class="workflow-card"><header class="workflow-heading"><span>3</span><div><h2>Choose When</h2><p>Pick the dates and time window to check.</p></div></header><fieldset class="radio-stack" id="date-mode"><legend class="sr-only">Date mode</legend><label><input type="radio" name="date-mode" value="Today"> Today</label><label><input type="radio" name="date-mode" value="Tomorrow"> Tomorrow</label><label><input type="radio" name="date-mode" value="Next best available" checked> Next best available date</label><label class="radio-with-field"><input type="radio" name="date-mode" value="Specific date"> Specific date <input type="date" id="specific-date" aria-label="Specific date"></label><label class="radio-with-range"><input type="radio" name="date-mode" value="Date range"> Date range <span><input type="date" id="date-from" aria-label="Date range start"><input type="date" id="date-to" aria-label="Date range end"></span></label></fieldset><div class="time-fields"><label>After<input id="earliest-time" type="time" value="13:00"></label><label>Before<input id="latest-time" type="time" value="19:15"></label></div></article>
+            <article class="workflow-card"><header class="workflow-heading"><span>4</span><div><h2>Seat Preferences</h2><p>Tell us what makes a good seat for you.</p></div></header><div class="two-fields"><label>Seats together<select id="seat-count"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label><label>Minimum row<input id="minimum-row" type="text" value="5" maxlength="3"></label></div></article>
+            <article class="workflow-card more-card"><header class="workflow-heading"><span>5</span><div><h2>More Options</h2><p>Fine-tune your search (optional).</p></div></header><details><summary><span>Format Preferences</span><small>Any supported format</small></summary><p>Choose a preferred format above. The protected engine keeps its exact format classification.</p></details><details><summary><span>Priorities</span><small>Better row, time, distance, center</small></summary><div class="priority-grid"><label><input type="checkbox" checked> Prefer better rows</label><label><input type="checkbox" checked> Prefer center seats</label><label><input type="checkbox" checked> Prefer earlier times</label><label><input type="checkbox" checked> Prefer nearby theaters</label></div></details><details><summary><span>Advanced Options</span><small>Distance and theater exclusions</small></summary><label class="stacked-field">Exclude theaters<input id="excluded-theaters" type="text" placeholder="Optional theater names"></label></details></article>
+          </div></div>
+          <aside class="search-summary" aria-labelledby="summary-title"><header><h2 id="summary-title">Your Search</h2><button type="button" data-focus-first>✎ Edit</button></header><dl><div><dt>Movie</dt><dd id="summary-movie">The Odyssey</dd></div><div><dt>Location</dt><dd id="summary-location">West Hills, CA (30 miles)</dd></div><div><dt>Theaters</dt><dd id="summary-theaters">4 selected</dd></div><div><dt>Date</dt><dd id="summary-date">Next best available date</dd></div><div><dt>Time Window</dt><dd id="summary-time">1:00 PM – 7:15 PM</dd></div><div><dt>Seats</dt><dd id="summary-seats">4 together (min row 5)</dd></div><div><dt>Format</dt><dd id="summary-format">Any Format</dd></div></dl><button class="button button-primary button-wide" type="submit">⌕ &nbsp; Search for Seats</button><button class="button button-watch button-wide" type="button" data-save-watch>♧ &nbsp; Save as Watch</button><p>Save these exact criteria. No provider checks run in this preview.</p></aside>
+        </form><section id="movie-preview-result" class="preview-result" hidden aria-live="polite"></section>
       </section>
-
-      <section class="results-section" aria-labelledby="results-title">
-        <article class="panel results-panel">
-          <header class="panel-header">
-            <div>
-              <p class="eyebrow">Verified outcomes</p>
-              <h2 id="results-title">Matches &amp; evidence</h2>
-            </div>
-            <span class="count-badge" id="result-count">0</span>
-          </header>
-          <div id="result-list" class="empty-state">
-            <span class="empty-icon" aria-hidden="true">✓</span>
-            <h3>No verified matches yet</h3>
-            <p>Results and the evidence behind them will appear here as module adapters come online.</p>
-          </div>
-        </article>
-      </section>
-
-      <section class="modules" aria-labelledby="modules-title">
-        <header class="section-header">
-          <div>
-            <p class="eyebrow">Watch types</p>
-            <h2 id="modules-title">Choose a starting point</h2>
-          </div>
-          <p class="section-note">The shell is ready for module adapters.</p>
-        </header>
-        <div class="module-grid">
-          <button class="module-card" type="button" data-module="movies">
-            <span class="module-icon movies-icon" aria-hidden="true">▦</span>
-            <span class="module-card-copy"><strong>Movies</strong><small>Seat availability and showtimes</small></span>
-            <span class="module-arrow" aria-hidden="true">→</span>
-          </button>
-          <button class="module-card" type="button" data-module="family-deals">
-            <span class="module-icon family-icon" aria-hidden="true">✦</span>
-            <span class="module-card-copy"><strong>Family Deals</strong><small>Nearby offers that fit</small></span>
-            <span class="module-arrow" aria-hidden="true">→</span>
-          </button>
-        </div>
-      </section>
+      <section class="view" data-page="family-deals" aria-labelledby="deals-title"><header class="page-header"><span class="page-icon family-glyph">♨</span><div><h1 id="deals-title">Family Deals</h1><p>Find verified nearby meals that fit your family, budget, and taste.</p></div></header><div class="coming-panel"><span class="page-icon family-glyph">♨</span><h2>Family Deals is next</h2><p>The existing full-radius engine remains protected. Its approved location, radius, party size, budget, cuisine, and restaurant-type flow will be brought into this same visual system next.</p><button class="button button-primary" type="button" data-view="home">Back to Home</button></div></section>
+      <section class="view" data-page="watches" aria-labelledby="watches-title"><header class="page-header"><span class="page-icon">♧</span><div><h1 id="watches-title">My Watches</h1><p>Saved continuations of searches you already configured.</p></div></header><div id="watch-list" class="full-list empty-state"><span>♧</span><h2>No watches yet</h2><p>Save a Movies search and its exact criteria will appear here.</p><button class="button button-primary" type="button" data-view="movies">Start a Movies Search</button></div></section>
+      <section class="view" data-page="matches" aria-labelledby="matches-title"><header class="page-header"><span class="page-icon">▣</span><div><h1 id="matches-title">Matches</h1><p>Qualifying results and the evidence behind them.</p></div></header><div id="result-list" class="full-list empty-state"><span>✓</span><h2>No verified matches yet</h2><p>Nothing is invented in preview mode. Real results will appear only after a proven adapter publishes them.</p></div></section>
     </main>
-  </div>
-
-  <dialog id="create-dialog" class="create-dialog" aria-labelledby="dialog-title">
-    <form id="create-form" method="dialog">
-      <div class="dialog-header">
-        <div>
-          <p class="eyebrow">New watch</p>
-          <h2 id="dialog-title">Start with a simple draft</h2>
-        </div>
-        <button class="dialog-close" type="button" data-close-dialog aria-label="Close">×</button>
-      </div>
-      <label for="watch-module">Watch type</label>
-      <select id="watch-module" name="module">
-        <option value="movies">Movies</option>
-        <option value="family-deals">Family Deals</option>
-      </select>
-      <label for="watch-name">What are you watching for?</label>
-      <input id="watch-name" name="name" type="text" placeholder="Example: The Odyssey at CityWalk" required>
-      <p class="form-note">This preview creates a local draft only. It does not start a live search.</p>
-      <div class="dialog-actions">
-        <button class="button button-secondary" type="button" data-close-dialog>Cancel</button>
-        <button class="button button-primary" type="submit">Create draft</button>
-      </div>
-    </form>
-  </dialog>
-</body>
-</html>
+  </div><div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body></html>
