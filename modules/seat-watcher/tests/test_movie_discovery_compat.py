@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from movie_discovery_compat import (
     candidate_showtime_urls,
     extract_link_title,
+    h1_looks_like_movie_title,
     heading_looks_like_movie_title,
 )
 
@@ -16,6 +17,19 @@ class MovieDiscoveryCompatTests(unittest.TestCase):
         self.assertEqual(
             extract_link_title("The Odyssey\n2 HR 52 MIN\nR"),
             "The Odyssey",
+        )
+
+    def test_current_h1_movie_title_is_accepted_without_sibling_runtime(self):
+        self.assertTrue(h1_looks_like_movie_title("The Odyssey", "AMC Topanga 12"))
+
+    def test_showtimes_h1_is_not_a_movie(self):
+        self.assertFalse(h1_looks_like_movie_title("Showtimes", "AMC Topanga 12"))
+
+    def test_trailer_heading_is_not_a_movie(self):
+        self.assertFalse(
+            h1_looks_like_movie_title(
+                "The Odyssey Trailers and Info", "AMC Topanga 12"
+            )
         )
 
     def test_rendered_heading_with_runtime_is_movie_title(self):
@@ -58,7 +72,7 @@ class MovieDiscoveryCompatTests(unittest.TestCase):
             "https://www.amctheatres.com/movie-theatres/undefined/amc-topanga-12/showtimes",
         )
         self.assertIn(
-            "https://www.amctheatres.com/movie-theatres/los-angeles/amc-dine-in-topanga-12/showtimes",
+            "https://www.amctheatres.com/movie-theatres/los-angeles/amc-topanga-12/showtimes",
             urls,
         )
 
@@ -67,8 +81,24 @@ class MovieDiscoveryCompatTests(unittest.TestCase):
             {"name": "AMC Fallbrook 7", "slug": "amc-fallbrook-7"}
         )
         self.assertIn(
-            "https://www.amctheatres.com/movie-theatres/amc-fallbrook-7/amc-fallbrook-7/showtimes",
+            "https://www.amctheatres.com/movie-theatres/west-hills/amc-fallbrook-7/showtimes",
             urls,
+        )
+
+    def test_northridge_and_porter_ranch_current_routes_are_available(self):
+        north = candidate_showtime_urls(
+            {"name": "AMC Northridge 10", "slug": "amc-northridge-10"}
+        )
+        porter = candidate_showtime_urls(
+            {"name": "AMC Porter Ranch 9", "slug": "amc-porter-ranch-9"}
+        )
+        self.assertIn(
+            "https://www.amctheatres.com/movie-theatres/los-angeles/amc-northridge-10/showtimes",
+            north,
+        )
+        self.assertIn(
+            "https://www.amctheatres.com/movie-theatres/los-angeles/amc-porter-ranch-9/showtimes",
+            porter,
         )
 
 
