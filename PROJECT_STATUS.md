@@ -15,6 +15,8 @@ The primary V1 user experience is now locked as resume-first search:
 
 Manual/specific search remains a secondary mode and still uses the resume-derived profile for fit evaluation.
 
+The V1 scoring philosophy and initial scoring model are also locked. See `docs/JOB_SCORING_V1.md`.
+
 ## Locked V1 direction
 
 - Resume-first search is the primary entry point; users should not need to build a large candidate profile manually before searching.
@@ -27,13 +29,45 @@ Manual/specific search remains a secondary mode and still uses the resume-derive
 - Only objective, user-authorized constraints should eliminate jobs early.
 - Unknown facts remain unknown rather than silently becoming pass/fail decisions.
 - Fit must be explainable by dimension and distinguish direct, equivalent, transferable, gap, and unknown evidence.
-- Career fit and practical fit should remain separately inspectable.
-- Assessment confidence should reflect evidence completeness/quality.
+- Career Fit and Practical Fit remain separately inspectable.
+- Assessment Confidence reflects evidence completeness/quality rather than candidate quality.
+- Transferable experience is a first-class evidence type and can receive substantial credit when the underlying responsibility/scope is genuinely comparable.
 - Do not use a fixed top-N quota; return every job that clears the configured quality bar.
 - Results should surface Excellent Match, Strong Match, Worth a Look, and Transferable/Interesting opportunities, with filtered-out jobs remaining inspectable.
+- Numeric thresholds are guide rails, not unquestionable truth; major required gaps can cap a bucket and strong equivalent experience can outperform weak direct-title alignment.
 - Searches can become watches for newly posted or materially changed qualifying roles.
 
-See `docs/JOB_RESUME_SEARCH_V1.md` for the detailed locked V1 search experience and ranking philosophy.
+See `docs/JOB_RESUME_SEARCH_V1.md` for the detailed locked V1 search experience and `docs/JOB_SCORING_V1.md` for the scoring/evidence model.
+
+## V1 scoring baseline
+
+Career Fit default dimensions total 100 points:
+
+- role/function alignment: 20
+- responsibility overlap: 20
+- seniority/scope: 15
+- skills/experience evidence: 15
+- leadership responsibility: 10
+- scale/complexity: 10
+- industry/domain relevance: 5
+- education/certifications/preferred qualifications: 5
+
+Practical Fit default dimensions total 100 points across known evidence:
+
+- location/distance: 30
+- work arrangement: 25
+- compensation: 25
+- employment type: 10
+- travel/schedule expectations: 10
+
+Initial recommendation guide rails:
+
+- Excellent Match: normally Career Fit ~85+ with no hard blocker or major unsupported required qualification and sufficient evidence
+- Strong Match: normally Career Fit ~75+ with no hard blocker and only manageable gaps
+- Worth a Look: normally Career Fit ~62+ or a stronger career match with meaningful uncertainty/concerns
+- Transferable/Interesting: credible equivalent/transferable evidence makes the role genuinely worthwhile even when title/function alignment is indirect
+
+Unknowns reduce confidence, not qualification by default.
 
 ## Initial provider candidates
 
@@ -56,6 +90,7 @@ LinkedIn/Indeed are not V1 dependencies.
 - `docs/JOB_DATA_SOURCE_BASELINE.md`
 - `docs/JOB_MATCHING_BASELINE.md`
 - `docs/JOB_RESUME_SEARCH_V1.md`
+- `docs/JOB_SCORING_V1.md`
 
 ## Verification
 
@@ -68,8 +103,9 @@ The scaffold was created as a GitHub bootstrap while local/Work execution was un
 3. Fix only genuine scaffold issues revealed by those tests.
 4. Implement one Greenhouse adapter with offline fixtures before adding any second provider.
 5. Normalize Greenhouse postings into the shared job model.
-6. Verify hard filters, deduplication, provenance, and explainable scoring against fixtures.
-7. Add a second provider only after the Greenhouse path is stable.
+6. Verify hard filters, deduplication, provenance, and the locked explainable scoring model against fixtures.
+7. Build a human-labeled validation set and measure worthwhile-job recall before enabling aggressive hiding.
+8. Add a second provider only after the Greenhouse path is stable.
 
 ## Product quality target
 
@@ -77,4 +113,6 @@ The key validation metric is recall of worthwhile opportunities:
 
 > Of the jobs the user considers genuinely worth applying to, how many did Job Hunter successfully surface?
 
-The system should earn the right to narrow aggressively only after this recall is consistently high.
+Provisional V1 target: surface at least 95% of jobs labeled `Definitely Apply` or `Probably Apply` in the human-reviewed validation set before relying on aggressive automatic narrowing.
+
+False negatives on worthwhile jobs are considered more serious than showing an occasional extra `Worth a Look` result.
