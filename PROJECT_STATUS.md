@@ -25,6 +25,8 @@ The end-to-end search/watch execution behavior is locked in `docs/JOB_SEARCH_WAT
 
 The conceptual V1 domain/data model required to implement these behaviors is locked in `docs/JOB_DATA_MODEL_V1.md`. The existing Python scaffold remains intentionally minimal and should be evolved incrementally only after migration to the dedicated repository and baseline test execution.
 
+The V1 validation/calibration plan is locked in `docs/JOB_VALIDATION_V1.md`. Aggressive narrowing is not trusted until a held-out human-reviewed validation set reaches the worthwhile-job recall target and major miss classes are understood.
+
 ## Locked V1 direction
 
 - Resume-first search is the primary entry point; users should not need to build a large candidate profile manually before searching.
@@ -60,8 +62,10 @@ The conceptual V1 domain/data model required to implement these behaviors is loc
 - Searches can become watches for newly posted or materially changed qualifying roles.
 - Provider postings and user-facing LogicalJobs are separate concepts so duplicates can merge without losing provenance.
 - Resume facts, user preferences, scoring evidence, source observations, and user feedback are separate data domains rather than one mutable profile blob.
+- Validation separates source misses from ranking misses; scoring changes cannot be used to hide source-coverage failures.
+- Any missed `Definitely Apply` or `Probably Apply` job gets root-cause review and, where appropriate, a regression test.
 
-See `docs/JOB_RESUME_SEARCH_V1.md` for the locked search experience, `docs/JOB_RESUME_PROFILE_V1.md` for resume intelligence, `docs/JOB_SCORING_V1.md` for scoring, `docs/JOB_SOURCE_COVERAGE_V1.md` for source discovery/coverage, `docs/JOB_SEARCH_WATCH_V1.md` for execution/watches, and `docs/JOB_DATA_MODEL_V1.md` for the conceptual V1 domain model.
+See `docs/JOB_RESUME_SEARCH_V1.md` for the locked search experience, `docs/JOB_RESUME_PROFILE_V1.md` for resume intelligence, `docs/JOB_SCORING_V1.md` for scoring, `docs/JOB_SOURCE_COVERAGE_V1.md` for source discovery/coverage, `docs/JOB_SEARCH_WATCH_V1.md` for execution/watches, `docs/JOB_DATA_MODEL_V1.md` for the conceptual V1 domain model, and `docs/JOB_VALIDATION_V1.md` for calibration/acceptance.
 
 ## V1 scoring baseline
 
@@ -119,6 +123,7 @@ LinkedIn/Indeed are not V1 dependencies.
 - `docs/JOB_SOURCE_COVERAGE_V1.md`
 - `docs/JOB_SEARCH_WATCH_V1.md`
 - `docs/JOB_DATA_MODEL_V1.md`
+- `docs/JOB_VALIDATION_V1.md`
 
 ## Verification
 
@@ -138,7 +143,7 @@ Current official source checks confirm that Greenhouse exposes public unauthenti
 8. Normalize Greenhouse postings into the shared provider-posting/logical-job model.
 9. Implement SearchRun/coverage reporting and the locked search execution pipeline.
 10. Verify hard filters, deduplication, provenance, resume evidence matching, source-coverage reporting, and explainable scoring against fixtures.
-11. Build a human-labeled validation set and measure worthwhile-job recall before enabling aggressive hiding.
+11. Build the human-labeled development/calibration/held-out validation sets defined in `docs/JOB_VALIDATION_V1.md` and measure worthwhile-job recall before enabling aggressive hiding.
 12. Implement watches only after one-shot search behavior is reliable, then add Lever and Ashby after Greenhouse is stable.
 
 ## Product quality target
@@ -147,6 +152,6 @@ The key validation metric is recall of worthwhile opportunities:
 
 > Of the jobs the user considers genuinely worth applying to, how many did Job Hunter successfully surface?
 
-Provisional V1 target: surface at least 95% of jobs labeled `Definitely Apply` or `Probably Apply` in the human-reviewed validation set before relying on aggressive automatic narrowing.
+Provisional V1 target: surface at least 95% of jobs labeled `Definitely Apply` or `Probably Apply` in the held-out human-reviewed validation set before relying on aggressive automatic narrowing.
 
 False negatives on worthwhile jobs are considered more serious than showing an occasional extra `Worth a Look` result.
