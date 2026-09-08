@@ -32,11 +32,17 @@ Do not roll back the V44.7 seat-decoder/map-verification fixes that were live-pr
 
 Do not add a new showtimes API merely to work around this incident unless recovery of the original flow is conclusively shown to be impossible.
 
+## Mac retest result
+
+After pulling the restored launcher path, the user made one controlled `Find Movies` attempt and AMC still served the `Sorry, you have been blocked` page. Treat this as current AMC access state on the Mac/session, not evidence that the restored V44 callback is wrong. Do not issue more repeated AMC browser requests during this block window and do not redesign the Movies architecture in response to the block.
+
+The September 8 CityWalk V44.7 seat-map/decoder comparison remains valid evidence: the protected seat decoder captured and verified the displayed map and excluded accessibility-specific positions from ordinary-seat groups.
+
 ## Next Mac acceptance step
 
-After pulling `main`, run the full offline suite first. If it passes, launch Movies through the restored entrypoint. Because AMC displayed a temporary block during the previous repeated browser attempts, do not hammer Find Movies repeatedly. One controlled Find Movies attempt is enough. If AMC still serves a block page, record that as access state rather than changing the product architecture again.
+Wait until AMC no longer serves the block page, then perform one controlled normal-flow acceptance run. The application already allows an editable free-form movie title, so `Find Movies` remains a convenience/discovery action rather than the only way to enter a film.
 
-Commands from the repository root:
+Commands from the repository root when retesting is appropriate:
 
 ```bash
 cd "/Users/holakhomac/Desktop/Universal Watcher GitHub"
@@ -48,9 +54,9 @@ git pull --ff-only
 Acceptance order after the block is no longer present:
 
 1. Existing four local theaters remain selected/discoverable.
-2. `Find movies` populates the movie combo using the restored V44 callback.
-3. The Odyssey can be selected/typed and fuzzy matched.
+2. `Find Movies` populates the movie combo using the restored V44 callback.
+3. The Odyssey can be selected or typed and fuzzy matched.
 4. Continue the ordinary-seat Burbank comparison.
 5. Keep the already-passed CityWalk V44.7 seat-map/decoder evidence.
 
-Nothing is considered fully accepted until the normal user flow works end to end again.
+Nothing is considered fully accepted until the normal user flow works end to end again. While AMC access is blocked, Universal Watcher platform/UI work may continue without altering the protected Movies engine.
