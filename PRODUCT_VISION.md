@@ -21,8 +21,9 @@ A user should be able to sign in from a Mac, PC, phone, or browser and see one c
 
 Current user-facing module entry points are **Movies** and **Family Deals**.
 Tickets is shelved/hidden; its existing engine remains preserved. Drops is
-documented future scope only. Jobs, Event Copilot, and Car Search are later
-roadmap/parking-lot concepts, not current product choices.
+documented future scope only. **Automated Job Hunter is a separate product and
+is explicitly outside Universal Watcher.** Event Copilot and Car Search remain
+later roadmap/parking-lot concepts, not current product choices.
 
 Search/discovery is primary; a Watch optionally continues the exact configured
 search. The approved Home, Movies, Family Deals, Watch, and visual baselines in
@@ -52,7 +53,6 @@ Universal Watcher API / Watch Manager
   verification/ranking    Ticket Watcher
   schedules/history       Family Deals
   alerts/results          Drop Watch
-                          Job Hunter
           |
           v
 Server Workers and, where necessary,
@@ -123,9 +123,9 @@ Teaches Universal Watcher:
 
 Will test whether the common watcher infrastructure generalizes cleanly to releases, restocks, price/availability changes, and similar conditions.
 
-### Automated Job Hunter
+### Automated Job Hunter — separate product
 
-Will test broad multi-source discovery, deduplication, fit scoring, monitoring, and prioritization.
+Automated Job Hunter no longer belongs in the Universal Watcher product or module roadmap. It is a separate future product with its own UX, source strategy, execution model, and repository/project structure. It may reuse general engineering patterns learned here, but it must not appear as a Universal Watcher module or placeholder.
 
 ### Event Producer Copilot
 
@@ -183,4 +183,4 @@ not yet implement the approved dark, layered Movies workspace or module flows.
 Live integration remains gated on Movies API/Mac acceptance;
 see PROJECT_STATUS.md for the single next task and current evidence.
 
-The restaurant PDF menu builder is explicitly outside this product.
+The restaurant PDF menu builder and Automated Job Hunter are explicitly outside this product.
