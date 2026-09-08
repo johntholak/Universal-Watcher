@@ -18,16 +18,24 @@ from seat_watcher_v44 import (
 )
 
 
-# Known current AMC canonical-route exceptions observed during the Sept. 8, 2026
-# Mac acceptance pass. Existing theater_url values are still tried first.
+# Current canonical showtime routes for the local acceptance theatres. Existing
+# theater_url values are still tried first so previously saved data keeps working.
 CANONICAL_SHOWTIME_URL_OVERRIDES = {
     "amc-topanga-12": (
         "https://www.amctheatres.com/movie-theatres/los-angeles/"
-        "amc-dine-in-topanga-12/showtimes"
+        "amc-topanga-12/showtimes"
     ),
     "amc-fallbrook-7": (
-        "https://www.amctheatres.com/movie-theatres/amc-fallbrook-7/"
+        "https://www.amctheatres.com/movie-theatres/west-hills/"
         "amc-fallbrook-7/showtimes"
+    ),
+    "amc-northridge-10": (
+        "https://www.amctheatres.com/movie-theatres/los-angeles/"
+        "amc-northridge-10/showtimes"
+    ),
+    "amc-porter-ranch-9": (
+        "https://www.amctheatres.com/movie-theatres/los-angeles/"
+        "amc-porter-ranch-9/showtimes"
     ),
 }
 
@@ -42,6 +50,8 @@ _BAD_TITLE_EXACT = {
     "digital",
     "sign in",
     "join",
+    "get tickets",
+    "movie info",
 }
 
 _BAD_TITLE_PARTS = (
@@ -53,29 +63,16 @@ _BAD_TITLE_PARTS = (
     "closed caption",
     "audio description",
     "movies start ",
+    "movies showing",
     "no remaining showtimes",
     "try tomorrow",
+    "trailers and info",
+    "showtimes & movie tickets",
 )
 
 
-def extract_link_title(text: str) -> str | None:
-    """Preserve the compact-link extraction V44 already used."""
-    value = str(text or "").strip()
-    if not value or len(value) > 140:
-        return None
-    lines = [line.strip() for line in value.splitlines() if line.strip()]
-    if not lines:
-        return None
-    title = lines[0]
-    if len(title) < 2 or title.lower() in _BAD_TITLE_EXACT:
-        return None
-    return title
-
-
-def heading_looks_like_movie_title(title: str, nearby_text: str, theater_name: str = "") -> bool:
-    """Recognize a rendered movie heading by the runtime evidence beside it."""
+def _basic_title_shape(title: str, theater_name: str = "") -> bool:
     title = str(title or "").strip()
-    nearby_text = str(nearby_text or "")
     if not title or len(title) < 2 or len(title) > 140:
         return False
 
@@ -90,8 +87,31 @@ def heading_looks_like_movie_title(title: str, nearby_text: str, theater_name: s
         return False
     if re.fullmatch(r"(?:g|pg|pg13|pg-13|r|nc-17|nr)", title, re.I):
         return False
+    return True
 
-    return bool(_RUNTIME_RE.search(nearby_text))
+
+def extract_link_title(text: str) -> str | None:
+    """Preserve the compact-link extraction V44 already used."""
+    value = str(text or "").strip()
+    if not value or len(value) > 140:
+        return None
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if not lines:
+        return None
+    title = lines[0]
+    return title if _basic_title_shape(title) else None
+
+
+def heading_looks_like_movie_title(title: str, nearby_text: str, theater_name: str = "") -> bool:
+    """Legacy-compatible heading check using nearby runtime evidence."""
+    if not _basic_title_shape(title, theater_name):
+        return False
+    return bool(_RUNTIME_RE.search(str(nearby_text or "")))
+
+
+def h1_looks_like_movie_title(title: str, theater_name: str = "") -> bool:
+    """AMC's current showtimes page renders each movie name as an H1."""
+    return _basic_title_shape(title, theater_name)
 
 
 def candidate_showtime_urls(theater: dict) -> list[str]:
@@ -141,8 +161,22 @@ async def _titles_from_legacy_links(page) -> list[str]:
     return movies
 
 
+async def _titles_from_current_h1s(page, theater_name: str) -> list[str]:
+    """Read AMC's current server-rendered movie-title structure directly."""
+    headings = page.locator("h1")
+    movies: list[str] = []
+    for index in range(await headings.count()):
+        try:
+            title = (await headings.nth(index).inner_text()).strip()
+            if h1_looks_like_movie_title(title, theater_name):
+                movies.append(title)
+        except Exception:
+            continue
+    return movies
+
+
 async def _titles_from_rendered_headings(page, theater_name: str) -> list[str]:
-    """Fallback for AMC pages that render titles without legacy /movies/ anchors."""
+    """Fallback when a page uses other heading levels around movie cards."""
     headings = page.locator("h1, h2, h3, h4")
     movies: list[str] = []
 
@@ -153,18 +187,8 @@ async def _titles_from_rendered_headings(page, theater_name: str) -> list[str]:
             evidence = await heading.evaluate(
                 """
                 (el) => {
-                  const chunks = [];
-                  let node = el.nextElementSibling;
-                  let steps = 0;
-                  while (node && steps < 5) {
-                    if (/^H[1-4]$/.test(node.tagName)) break;
-                    chunks.push(node.innerText || '');
-                    if (chunks.join('\n').length > 500) break;
-                    node = node.nextElementSibling;
-                    steps += 1;
-                  }
-                  if (chunks.join('\n').trim()) return chunks.join('\n');
-                  return (el.parentElement && el.parentElement.innerText) || '';
+                  const parent = el.parentElement;
+                  return (parent && parent.innerText) || '';
                 }
                 """
             )
@@ -189,15 +213,28 @@ async def discover_movies_at_theater_compat(browser, theater, semaphore, emit=No
             try:
                 page = await browser.new_page()
                 await page.goto(theater_url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_timeout(900)
+                try:
+                    await page.wait_for_selector("h1", timeout=5000)
+                except Exception:
+                    pass
+                await page.wait_for_timeout(500)
 
+                # Preserve V44 first. AMC's current H1 movie-title structure is
+                # the compatibility path that follows it.
                 movies = await _titles_from_legacy_links(page)
                 if not movies:
-                    movies = await _titles_from_rendered_headings(page, theater.get("name", ""))
+                    movies = await _titles_from_current_h1s(
+                        page, theater.get("name", "")
+                    )
+                if not movies:
+                    movies = await _titles_from_rendered_headings(
+                        page, theater.get("name", "")
+                    )
 
                 if movies:
                     if attempt:
                         say(f"Movie discovery route refreshed for {theater['name']}.")
+                    say(f"  Found {len(set(movies))} movie titles at {theater['name']}.")
                     return movies
             except Exception:
                 pass
