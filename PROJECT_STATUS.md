@@ -21,6 +21,10 @@ The V1 resume intelligence/profile model is locked in `docs/JOB_RESUME_PROFILE_V
 
 The V1 source-coverage strategy is locked in `docs/JOB_SOURCE_COVERAGE_V1.md`. Coverage is treated as a first-class product problem: provider adapters are paired with a persistent source registry, dynamic board discovery, direct-source verification, and explicit search coverage reporting.
 
+The end-to-end search/watch execution behavior is locked in `docs/JOB_SEARCH_WATCH_V1.md`, including immutable search snapshots, broad retrieval, selective enrichment, freshness handling, watch duplicate protection, and profile-version pinning.
+
+The conceptual V1 domain/data model required to implement these behaviors is locked in `docs/JOB_DATA_MODEL_V1.md`. The existing Python scaffold remains intentionally minimal and should be evolved incrementally only after migration to the dedicated repository and baseline test execution.
+
 ## Locked V1 direction
 
 - Resume-first search is the primary entry point; users should not need to build a large candidate profile manually before searching.
@@ -37,6 +41,9 @@ The V1 source-coverage strategy is locked in `docs/JOB_SOURCE_COVERAGE_V1.md`. C
 - Prefer direct ATS/company-source truth for active job details and freshness verification.
 - Never translate a provider failure into `no jobs found`.
 - Every search retains an auditable coverage report of providers/boards attempted, successes/failures, discovered boards, and raw posting counts.
+- Each search is an immutable SearchRun snapshot tied to profile, filters, source coverage, and scoring-model versions.
+- Watches repeat the same search decision logic against new observations and must prevent duplicate alerts.
+- Existing watches remain pinned to the profile version used at creation by default; profile updates must not silently change their meaning.
 - Search broadly, understand deeply, rank aggressively, and eliminate cautiously.
 - Optimize first for recall of worthwhile opportunities, then precision.
 - Normalize and deduplicate before ranking.
@@ -51,8 +58,10 @@ The V1 source-coverage strategy is locked in `docs/JOB_SOURCE_COVERAGE_V1.md`. C
 - Results should surface Excellent Match, Strong Match, Worth a Look, and Transferable/Interesting opportunities, with filtered-out jobs remaining inspectable.
 - Numeric thresholds are guide rails, not unquestionable truth; major required gaps can cap a bucket and strong equivalent experience can outperform weak direct-title alignment.
 - Searches can become watches for newly posted or materially changed qualifying roles.
+- Provider postings and user-facing LogicalJobs are separate concepts so duplicates can merge without losing provenance.
+- Resume facts, user preferences, scoring evidence, source observations, and user feedback are separate data domains rather than one mutable profile blob.
 
-See `docs/JOB_RESUME_SEARCH_V1.md` for the locked search experience, `docs/JOB_RESUME_PROFILE_V1.md` for resume intelligence, `docs/JOB_SCORING_V1.md` for scoring, and `docs/JOB_SOURCE_COVERAGE_V1.md` for source discovery/coverage.
+See `docs/JOB_RESUME_SEARCH_V1.md` for the locked search experience, `docs/JOB_RESUME_PROFILE_V1.md` for resume intelligence, `docs/JOB_SCORING_V1.md` for scoring, `docs/JOB_SOURCE_COVERAGE_V1.md` for source discovery/coverage, `docs/JOB_SEARCH_WATCH_V1.md` for execution/watches, and `docs/JOB_DATA_MODEL_V1.md` for the conceptual V1 domain model.
 
 ## V1 scoring baseline
 
@@ -108,6 +117,8 @@ LinkedIn/Indeed are not V1 dependencies.
 - `docs/JOB_RESUME_PROFILE_V1.md`
 - `docs/JOB_SCORING_V1.md`
 - `docs/JOB_SOURCE_COVERAGE_V1.md`
+- `docs/JOB_SEARCH_WATCH_V1.md`
+- `docs/JOB_DATA_MODEL_V1.md`
 
 ## Verification
 
@@ -120,13 +131,15 @@ Current official source checks confirm that Greenhouse exposes public unauthenti
 1. Create a dedicated `Automated-Job-Hunter` repository from this bootstrap.
 2. Run the scaffold tests from that repository and establish a clean baseline commit.
 3. Fix only genuine scaffold issues revealed by those tests.
-4. Implement resume parsing/profile extraction against offline PDF/DOCX fixtures.
-5. Implement the Source Registry data model and health/freshness semantics.
-6. Implement one Greenhouse adapter with offline fixtures before adding any second provider.
-7. Normalize Greenhouse postings into the shared job model.
-8. Verify hard filters, deduplication, provenance, resume evidence matching, source-coverage reporting, and the locked explainable scoring model against fixtures.
-9. Build a human-labeled validation set and measure worthwhile-job recall before enabling aggressive hiding.
-10. Add Lever, then Ashby, only after the Greenhouse path is stable.
+4. Evolve the bootstrap data models incrementally toward `docs/JOB_DATA_MODEL_V1.md` with tests at each step.
+5. Implement resume parsing/profile extraction against offline PDF/DOCX fixtures.
+6. Implement the Source Registry data model and health/freshness semantics.
+7. Implement one Greenhouse adapter with offline fixtures before adding any second provider.
+8. Normalize Greenhouse postings into the shared provider-posting/logical-job model.
+9. Implement SearchRun/coverage reporting and the locked search execution pipeline.
+10. Verify hard filters, deduplication, provenance, resume evidence matching, source-coverage reporting, and explainable scoring against fixtures.
+11. Build a human-labeled validation set and measure worthwhile-job recall before enabling aggressive hiding.
+12. Implement watches only after one-shot search behavior is reliable, then add Lever and Ashby after Greenhouse is stable.
 
 ## Product quality target
 
