@@ -1,186 +1,74 @@
-# PRODUCT_VISION.md — Universal Watcher
+# PRODUCT_VISION.md — Automated Job Hunter
 
 ## One-sentence vision
 
-Universal Watcher is a personal internet agent that continuously searches fragmented sources, understands a user's real criteria, verifies what it finds, and alerts or routes the user to the right opportunity when it appears.
+Automated Job Hunter is a personal career agent that continuously finds relevant jobs, removes noise, explains fit, and helps the user decide what is actually worth applying to.
 
-## End product
+## The problem
 
-The end product is **one usable web application**, not separate standalone products.
+Job search is fragmented across company career pages, ATS platforms, aggregators, recruiters, and stale duplicates. Search results often optimize for volume rather than fit, forcing the user to repeatedly scan the same jobs and re-evaluate the same criteria.
 
-A user should be able to sign in from a Mac, PC, phone, or browser and see one control center:
+## Product promise
 
-- create a new watch
-- see active watches
-- see matches and evidence
-- pause/resume watches
-- change criteria
-- review history
-- open the destination when a match appears
-- manage notifications and devices
+The user defines what a worthwhile job looks like once. The product searches supported sources, filters out obvious misses, ranks credible matches, explains its reasoning, and can keep watching for newly posted opportunities.
 
-Current user-facing module entry points are **Movies** and **Family Deals**.
-Tickets is shelved/hidden; its existing engine remains preserved. Drops is
-documented future scope only. **Automated Job Hunter is a separate product and
-is explicitly outside Universal Watcher.** Event Copilot and Car Search remain
-later roadmap/parking-lot concepts, not current product choices.
+## V1 workflow
 
-Search/discovery is primary; a Watch optionally continues the exact configured
-search. The approved Home, Movies, Family Deals, Watch, and visual baselines in
-`docs/` define the implementation target. A generic watch form is not equivalent
-to the established module workflows.
+1. Candidate/search profile
+2. Job discovery
+3. Normalization and deduplication
+4. Hard eligibility filtering
+5. Fit scoring and explanation
+6. Review queue: Strong Fit / Maybe / Skip
+7. Save search as a watch
+8. Basic application status tracking
 
-## Product architecture
+## Candidate/search profile
 
-The web application is the control plane.
+The framework should support:
 
-Not every watcher must literally run inside the browser.
+- target titles / role families
+- seniority range
+- location and commute radius
+- remote / hybrid / onsite preferences
+- employment type
+- minimum compensation when known
+- industries / company types
+- required and preferred skills
+- travel tolerance
+- must-have criteria
+- exclusion criteria
 
-A likely architecture is:
+Candidate history and resume content may later enrich fit scoring, but the system should not require a perfect structured resume before it can search.
 
-```text
-Universal Watcher Web App
-          |
-          v
-Universal Watcher API / Watch Manager
-          |
-          +--------------------+
-          |                    |
-          v                    v
- Shared Core Services      Module Adapters
-          |                    |
-  discovery/filtering     Seat Watcher
-  verification/ranking    Ticket Watcher
-  schedules/history       Family Deals
-  alerts/results          Drop Watch
-          |
-          v
-Server Workers and, where necessary,
-a small Universal Watcher local helper
-for browser-dependent tasks.
-```
+## Fit philosophy
 
-For modules such as Seat Watcher or certain ticket marketplaces, a local helper may eventually run browser automation on a user's computer while the web app remains the single interface.
+A fit score is an explanation aid, not an oracle. It should be decomposable into dimensions such as role match, seniority/scope, experience/skills, industry/domain, location/work arrangement, compensation, and explicit requirements.
 
-## The reusable engine
+Hard disqualifiers should not be hidden inside a weighted score. Unknown data should remain unknown rather than being treated as a pass or fail.
 
-The common product pattern is:
+## Result experience
 
-**Discover → Normalize → Filter → Verify → Rank → Monitor → Alert → Act**
+Each result should make it easy to answer:
 
-This is more than search.
+- What is the job?
+- Why does it fit me?
+- What might be a problem?
+- What information is missing?
+- How fresh is the posting?
+- Where did it come from?
+- What should I do next?
 
-A normal search engine returns pages. Universal Watcher should do the scavenger hunt:
+## V1 boundaries
 
-- identify the relevant universe
-- search enough sources to justify coverage
-- understand the user's actual constraint
-- distinguish real matches from misleading nearby text
-- keep checking when the condition can change
-- explain what was checked
-- surface only defensible matches
-- route the user to the next action
+Do not make V1 an auto-application bot. Do not depend on LinkedIn/Indeed scraping or bypass access controls. Do not invent missing facts. Do not optimize for application count.
 
-## Module strategy
+The product should first become excellent at finding and prioritizing the right opportunities. Application assistance, resume tailoring, outreach, interview prep, and automation can be separate later phases.
 
-Existing modules are laboratories for the common platform.
+## Reusable pattern
 
-### Family Deals
+The architecture can reuse the same conceptual pattern proven elsewhere:
 
-Teaches Universal Watcher:
+`Discover -> Normalize -> Filter -> Verify -> Rank -> Monitor -> Alert`
 
-- geographic universe discovery
-- source resolution
-- deduplication
-- evidence extraction
-- semantic verification
-- full-coverage transparency
-- caching and concurrency
-
-### Seat Watcher
-
-Teaches Universal Watcher:
-
-- dynamic site automation
-- live inventory monitoring
-- complex structured extraction
-- ranking
-- exact-match alerting
-- browser handoff
-
-### Ticket Watcher
-
-Teaches Universal Watcher:
-
-- event matching
-- multiple marketplaces
-- price thresholds
-- live offer monitoring
-- source-specific capabilities
-- anti-automation/API constraints
-
-### Drop Watch
-
-Will test whether the common watcher infrastructure generalizes cleanly to releases, restocks, price/availability changes, and similar conditions.
-
-### Automated Job Hunter — separate product
-
-Automated Job Hunter no longer belongs in the Universal Watcher product or module roadmap. It is a separate future product with its own UX, source strategy, execution model, and repository/project structure. It may reuse general engineering patterns learned here, but it must not appear as a Universal Watcher module or placeholder.
-
-### Event Producer Copilot
-
-Remains on the roadmap but comes after the watcher platform is mature.
-
-## Integration principle
-
-Do not rewrite proven engines merely because the final product is web-based.
-
-Instead, progressively separate:
-
-```text
-module UI
-    |
-module engine
-```
-
-into:
-
-```text
-Universal Watcher Web UI
-        |
-Universal Watcher API
-        |
-module adapter
-        |
-proven module engine
-```
-
-Seat Watcher is the clearest example: the valuable AMC engine survives. Its current CustomTkinter interface can eventually become a legacy development interface once the web app controls the engine.
-
-## Product quality principles
-
-1. **Correctness over quantity.**
-2. **Coverage should be visible.**
-3. **Uncertainty should be labeled, not guessed away.**
-4. **Speed should come from architecture, not hidden reductions in coverage.**
-5. **Modules should share infrastructure without erasing necessary source-specific logic.**
-6. **One account and one interface should eventually manage every watch.**
-7. **A user should not need to understand scraping, APIs, browser automation, or workers.**
-8. **The product should feel like an agent doing work, not a developer dashboard.**
-
-## Current product milestone
-
-The repository and GitHub baseline now exist. The current implementation has
-minimal shared contracts, a dependency-free web preview with in-memory draft
-lifecycle/results endpoints, and isolated Family Deals/Tickets result mappings.
-The existing modules remain independent engines. Accounts, persistent shared
-watches, scheduled workers, notifications, and cross-device runtime state are
-future work, not features delivered by repository portability.
-
-The current milestone is recovery and implementation of the approved web UX
-around preserved engines. The existing light-themed generic draft shell does
-not yet implement the approved dark, layered Movies workspace or module flows.
-Live integration remains gated on Movies API/Mac acceptance;
-see PROJECT_STATUS.md for the single next task and current evidence.
-
-The restaurant PDF menu builder and Automated Job Hunter are explicitly outside this product.
+That architectural similarity does not make Job Hunter part of Universal Watcher. They are separate products.
