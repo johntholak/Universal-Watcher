@@ -118,14 +118,7 @@ Initial provider order:
 
 LinkedIn and Indeed are not V1 dependencies.
 
-Current official documentation checks confirm useful public company-scoped job data patterns for the initial ATS families. In particular:
-
-- Greenhouse public Job Board GET endpoints require no authentication; the board token is the durable API identity and board metadata can return the organization name.
-- Lever public postings are scoped by site name and distinguish global/EU instances.
-- Ashby public postings are scoped by the hosted job-board name.
-- SmartRecruiters public posting endpoints are company-identifier scoped; adapter access behavior should remain explicitly capability-driven because provider API product/auth details can evolve.
-
-These are implementation inputs, not claims that adapters already exist.
+Current official documentation checks confirm useful public company-scoped job data patterns for the initial ATS families. These are implementation inputs, not claims that adapters already exist.
 
 ## Locked Source Registry architecture
 
@@ -164,6 +157,37 @@ Source Registry rules include:
 - each search retains an auditable coverage/freshness report
 
 Detailed behavior is locked in `docs/JOB_SOURCE_REGISTRY_V1.md` and regression scenarios in `docs/JOB_SOURCE_REGISTRY_FIXTURES_V1.md`.
+
+## Seed employer universe
+
+The day-one source universe is also a first-class part of V1.
+
+The seed must be personalized from the resume/profile and preferences but must never become a hidden whitelist or career boundary.
+
+Locked seed design:
+
+- maintain a reusable global base of verified supported ATS boards
+- derive a user-specific priority universe from direct, adjacent, and transferable role families plus geography/work-arrangement preferences
+- use seed priority to control discovery and refresh effort, not whether a company/job is allowed to appear
+- allow any legitimate newly discovered employer/source outside the seed to enter the registry and compete normally
+- preserve why an employer was prioritized so seed behavior remains auditable
+
+For the current bootstrap profile, the initial user-specific universe should intentionally over-cover:
+
+- events and experiential leadership
+- media, entertainment, streaming, sports, and live experiences
+- technology companies with major event/field-marketing organizations
+- event technology, AV, broadcast, production, and managed services
+- hospitality, venues, convention, and destination organizations
+- brand marketing and field activation organizations
+- senior program/project/operations transfer opportunities
+- selective Chief of Staff/business-operations adjacency where the function matches
+- Southern California employers inside user-selected geography rules
+- US-remote employers with relevant direct/adjacent/transferable roles
+
+Provisional initial coverage goal: roughly **250 verified employers/sources** in the first useful seed, diversified across these lanes rather than concentrated in one industry, expanding toward **1,000+** through discovery as the product matures. These are coverage targets, not search limits or completeness claims.
+
+The complete strategy is locked in `docs/JOB_SEED_UNIVERSE_V1.md`.
 
 ## Indexed corpus and freshness
 
@@ -208,14 +232,7 @@ Key design:
 
 The end-to-end search/watch pipeline is locked in `docs/JOB_SEARCH_WATCH_V1.md`.
 
-Each SearchRun is an immutable snapshot tied to:
-
-- ProfileVersion
-- search preferences
-- generated/manual search intent
-- source coverage/freshness
-- scoring-model version
-- results/order
+Each SearchRun is an immutable snapshot tied to ProfileVersion, search preferences, search intent, source coverage/freshness, scoring-model version, and result order.
 
 Watches repeat the same decision logic against new observations and prevent duplicate notifications. Existing watches remain pinned to the profile version used at creation unless deliberately changed.
 
@@ -225,19 +242,7 @@ Watches are not implemented until one-shot search behavior is reliable.
 
 The conceptual domain model is locked in `docs/JOB_DATA_MODEL_V1.md`.
 
-Important separations:
-
-- ResumeDocument vs ProfileVersion
-- resume facts vs user preferences
-- CompanyIdentity vs SourceRegistryEntry
-- ProviderPosting vs LogicalJob
-- JobObservation vs current job identity
-- JobRequirement vs EvidenceMatch
-- Career Fit vs Practical Fit vs Confidence
-- FilterDecision vs FitAssessment
-- SearchRun vs Watch
-- ApplicationRecord vs posting availability
-- user feedback vs explicit search criteria
+Important separations include ResumeDocument vs ProfileVersion, resume facts vs user preferences, CompanyIdentity vs SourceRegistryEntry, ProviderPosting vs LogicalJob, JobObservation vs current job identity, JobRequirement vs EvidenceMatch, Career Fit vs Practical Fit vs Confidence, FilterDecision vs FitAssessment, SearchRun vs Watch, ApplicationRecord vs posting availability, and user feedback vs explicit search criteria.
 
 The existing Python scaffold remains intentionally minimal and should evolve incrementally with tests, not via a giant rewrite.
 
@@ -286,6 +291,7 @@ Product/spec docs:
 - `docs/JOB_SCORING_V1.md`
 - `docs/JOB_SOURCE_COVERAGE_V1.md`
 - `docs/JOB_SOURCE_REGISTRY_V1.md`
+- `docs/JOB_SEED_UNIVERSE_V1.md`
 - `docs/JOB_SEARCH_WATCH_V1.md`
 - `docs/JOB_DATA_MODEL_V1.md`
 - `docs/JOB_UI_V1.md`
@@ -307,21 +313,22 @@ Implementation/test specs:
 4. Evolve bootstrap models incrementally toward `JOB_DATA_MODEL_V1.md`, starting with provenance and CompanyIdentity/SourceRegistryEntry.
 5. Implement provider source-identifier parsers and Source Registry state/health transitions against `JOB_SOURCE_REGISTRY_FIXTURES_V1.md`.
 6. Implement resume text extraction/profile building against `JOB_RESUME_FIXTURES_V1.md`.
-7. Create a small deterministic seed registry.
+7. Implement the seed-universe generator/prioritizer from `JOB_SEED_UNIVERSE_V1.md` and create a small deterministic test seed.
 8. Implement Greenhouse board verification and the Greenhouse adapter against offline fixtures.
-9. Persist normalized provider snapshots into the current indexed corpus.
-10. Implement hard filters and broad relevance screening.
-11. Implement requirement/evidence matching and explainable scoring against `JOB_MATCHING_FIXTURES_V1.md`.
-12. Implement SearchRun, coverage reporting, indexed-corpus query, and selective stale-source refresh.
-13. Build a human-labeled held-out validation set and measure worthwhile-job recall.
-14. Fix false negatives by the responsible subsystem until the recall target is met.
-15. Build the V1 UI against stable backend contracts.
-16. Implement watches only after one-shot search behavior is reliable.
-17. Add Lever, then Ashby, repeating provider and registry fixture discipline.
-18. Expand scheduled source discovery and registry health maintenance.
+9. Expand the verified bootstrap registry toward the provisional initial coverage target while preserving provider/source verification evidence.
+10. Persist normalized provider snapshots into the current indexed corpus.
+11. Implement hard filters and broad relevance screening.
+12. Implement requirement/evidence matching and explainable scoring against `JOB_MATCHING_FIXTURES_V1.md`.
+13. Implement SearchRun, coverage reporting, indexed-corpus query, and selective stale-source refresh.
+14. Build a human-labeled held-out validation set and measure worthwhile-job recall.
+15. Fix false negatives by the responsible subsystem until the recall target is met.
+16. Build the V1 UI against stable backend contracts.
+17. Implement watches only after one-shot search behavior is reliable.
+18. Add Lever, then Ashby, repeating provider and registry fixture discipline.
+19. Expand scheduled source discovery and registry health maintenance.
 
 ## Current resume point
 
 The project is implementation-ready at the specification level.
 
-When execution access returns, do **not** restart product design. Begin with repository migration, baseline tests, Source Registry/provenance models, and the existing fixture-driven implementation checklist.
+When execution access returns, do **not** restart product design. Begin with repository migration, baseline tests, Source Registry/provenance models, resume fixtures, seed-universe generation, and the existing fixture-driven implementation checklist.
