@@ -50,7 +50,7 @@ def main():
     entries = {
         'web': ('web', 'server.py', []),
         'family-deals': ('modules/family-deals', 'server.py', []),
-        'movies': ('modules/seat-watcher', 'seat_watcher_premium.py', []),
+        'movies': ('modules/seat-watcher', 'run_movies_compat.py', []),
         'tickets': ('modules/ticket-watcher', 'ticketmaster_live_watcher.py', []),
         'tickets-demo': ('modules/ticket-watcher', 'app.py', ['--demo', '--once']),
     }
