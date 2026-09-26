@@ -21,13 +21,29 @@
   const selectedTheaters = () => all('input[name="theaters"]:checked').map((input) => input.value);
   function movieCriteria() {
     const dateMode = document.querySelector('input[name="date-mode"]:checked')?.value || "Next best available";
-    return { movie: byId("movie-title").value.trim(), location: byId("movie-location").value.trim(), radius: byId("movie-radius").value, theaters: selectedTheaters(), date_mode: dateMode, specific_date: byId("specific-date").value, date_from: byId("date-from").value, date_to: byId("date-to").value, earliest_time: byId("earliest-time").value, latest_time: byId("latest-time").value, seats_together: Number(byId("seat-count").value), minimum_row: byId("minimum-row").value.trim(), format: byId("movie-format").value, excluded_theaters: byId("excluded-theaters").value.trim() };
+    return { schema_version: 1, movie: byId("movie-title").value.trim(), location: byId("movie-location").value.trim(), radius: byId("movie-radius").value, theaters: selectedTheaters(), date_mode: dateMode, specific_date: byId("specific-date").value, date_from: byId("date-from").value, date_to: byId("date-to").value, earliest_time: byId("earliest-time").value, latest_time: byId("latest-time").value, seats_together: Number(byId("seat-count").value), minimum_row: byId("minimum-row").value.trim(), format: byId("movie-format").value, excluded_theaters: byId("excluded-theaters").value.trim() };
   }
   function updateSummary() {
     const c = movieCriteria(); byId("selected-movie-title").textContent = c.movie || "Enter a movie"; byId("summary-movie").textContent = c.movie || "Not selected";
     byId("summary-location").textContent = `${c.location || "Not selected"} (${c.radius})`; byId("summary-theaters").textContent = `${c.theaters.length} selected`;
     let dateText = c.date_mode; if (c.date_mode === "Specific date" && c.specific_date) dateText = c.specific_date; if (c.date_mode === "Date range" && (c.date_from || c.date_to)) dateText = `${c.date_from || "Start"} – ${c.date_to || "End"}`;
     byId("summary-date").textContent = dateText; byId("summary-time").textContent = `${formatTime(c.earliest_time)} – ${formatTime(c.latest_time)}`; byId("summary-seats").textContent = `${c.seats_together} together${c.minimum_row ? ` (min row ${c.minimum_row})` : ""}`; byId("summary-format").textContent = c.format;
+  }
+  const restaurantTypes = { any: "Any", independent_local: "Independent + local", independent: "Independent only", chains: "Chains only" };
+  function dealCriteria() {
+    const location = byId("deal-location").value.trim();
+    return { schema_version: 1, location, radius_miles: Number(byId("deal-radius").value), party_size: Number(byId("deal-party-size").value), max_total_price: Number(byId("deal-budget").value), cuisines: all('input[name="deal-cuisine"]:checked').map((input) => input.value), restaurant_type: byId("deal-restaurant-type").value, open_tonight: byId("deal-open-tonight").checked };
+  }
+  function updateDealSummary() {
+    const c = dealCriteria();
+    byId("deal-summary-location").textContent = c.location || "Add a location";
+    byId("deal-summary-radius").textContent = `${c.radius_miles || "?"} miles`;
+    byId("deal-summary-party").textContent = `${c.party_size} people`;
+    byId("deal-summary-budget").textContent = byId("deal-budget").value ? `$${c.max_total_price.toFixed(2)} total` : "Add a maximum";
+    const names = all('input[name="deal-cuisine"]:checked').map((input) => input.parentElement.textContent.trim());
+    byId("deal-summary-cuisine").textContent = names.join(", ") || "Any cuisine";
+    byId("deal-summary-type").textContent = restaurantTypes[c.restaurant_type];
+    byId("deal-summary-hours").textContent = c.open_tonight ? "Open tonight, if verified" : "Any availability";
   }
   function showToast(message) {
     const toast = byId("toast"); toast.textContent = message; toast.classList.add("is-visible"); window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 3600);
@@ -37,9 +53,16 @@
     panel.innerHTML = '<div class="result-state-icon">◷</div><div><p class="eyebrow">SEARCH READY</p><h2>Your criteria are configured</h2><p>The interface did not contact AMC. Live Movies search remains paused while AMC is serving its temporary block page; this is an unavailable provider state, not a no-match result.</p></div><button class="button button-watch" type="button" data-save-watch>♧ &nbsp; Keep Watching</button>';
     panel.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+  function showDealPreview() {
+    const panel = byId("deal-preview-result"); panel.hidden = false;
+    panel.innerHTML = '<div class="result-state-icon">◷</div><div><p class="eyebrow">SEARCH CONFIGURED</p><h2>Live deal verification is unavailable in this preview</h2><p>No restaurants were checked, so there is no result or coverage count yet. The production search will show deals first with verified total price, serving capacity, included food, source, distance, and last checked time. Sources that cannot be verified will appear in coverage details.</p></div><button class="button button-watch" type="button" data-save-deal-watch>♧ &nbsp; Save this Search</button>';
+    panel.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
   const statusLabel = (status) => ({ draft: "Saved", active: "Watching", paused: "Paused", completed: "Stopped", error: "Needs attention" })[status] || "Saved";
   function criteriaSummary(watch) {
-    const c = watch.criteria || {}; if (watch.module !== "movies") return watch.query;
+    const c = watch.criteria || {};
+    if (watch.module === "family-deals") return `${c.location || "Location pending"} · ${c.radius_miles || "?"} miles · ${c.party_size || "?"} people · $${c.max_total_price || "?"} total`;
+    if (watch.module !== "movies") return watch.query;
     return `${c.location || "Location pending"} · ${Array.isArray(c.theaters) ? c.theaters.length : 0} theaters · ${c.seats_together || "?"} seats · ${c.format || "Any format"}`;
   }
   function watchControls(watch) {
@@ -50,7 +73,7 @@
   }
   function renderWatches() {
     const list = byId("watch-list"), section = byId("home-watch-section"), homeList = byId("home-watch-list"); section.hidden = !state.watches.length;
-    if (!state.watches.length) { list.className = "full-list empty-state"; list.innerHTML = '<span>♧</span><h2>No watches yet</h2><p>Save a Movies search and its exact criteria will appear here.</p><button class="button button-primary" type="button" data-view="movies">Start a Movies Search</button>'; homeList.innerHTML = ""; return; }
+    if (!state.watches.length) { list.className = "full-list empty-state"; list.innerHTML = '<span>♧</span><h2>No watches yet</h2><p>Save a search and its exact criteria will appear here as a preview draft.</p><button class="button button-primary" type="button" data-view="home">Start a Search</button>'; homeList.innerHTML = ""; return; }
     const markup = state.watches.map((watch) => `<article class="watch-item"><span class="page-icon ${watch.module === "movies" ? "movie-glyph" : "family-glyph"}">${watch.module === "movies" ? "▦" : "♨"}</span><div><strong>${escapeHtml(watch.query)}</strong><small>${escapeHtml(moduleLabels[watch.module] || watch.module)} · ${escapeHtml(criteriaSummary(watch))}</small></div><span class="watch-status watch-status-${escapeHtml(watch.status)}">${statusLabel(watch.status)}</span><div class="watch-actions">${watchControls(watch)}</div></article>`).join("");
     list.className = "full-list"; list.innerHTML = markup; homeList.innerHTML = markup;
   }
@@ -59,11 +82,15 @@
     const markup = state.results.map((result) => `<article class="watch-item"><span class="result-badge result-${escapeHtml(result.outcome)}">${escapeHtml(result.outcome)}</span><div><strong>${escapeHtml(result.title)}</strong><small>${escapeHtml(result.reason || result.verification || "Evidence recorded")}</small></div></article>`).join(""); list.className = "full-list"; list.innerHTML = markup; homeList.innerHTML = markup;
   }
   function addDraft(watch) { state.watches.unshift(watch); renderWatches(); showToast("Search criteria saved as a local preview watch."); }
-  async function createDraft() {
-    const criteria = movieCriteria(); if (!criteria.movie) { byId("movie-title").focus(); showToast("Enter a movie title first."); return; }
-    const payload = { module: "movies", query: criteria.movie, criteria };
+  async function createDraft(module = "movies") {
+    const form = byId(module === "movies" ? "movie-search-form" : "deal-search-form");
+    if (!form.reportValidity()) return;
+    const criteria = module === "movies" ? movieCriteria() : dealCriteria();
+    const query = module === "movies" ? criteria.movie : `Family deals near ${criteria.location}`;
+    if (!query) { byId("movie-title").focus(); showToast("Enter a movie title first."); return; }
+    const payload = { module, query, criteria };
     try { const response = await fetch("/api/watches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!response.ok) throw new Error("Local preview API unavailable"); addDraft(await response.json()); }
-    catch (_error) { addDraft({ watch_id: `browser-draft-${Date.now()}`, module: "movies", query: criteria.movie, criteria, status: "draft" }); }
+    catch (_error) { addDraft({ watch_id: `browser-draft-${Date.now()}`, module, query, criteria, status: "draft" }); }
   }
   async function changeWatchStatus(watchId, status) {
     const watch = state.watches.find((item) => item.watch_id === watchId); if (!watch) return;
@@ -77,9 +104,15 @@
     const viewButton = event.target.closest("[data-view]"); if (viewButton) selectView(viewButton.dataset.view);
     if (event.target.closest("[data-mobile-menu]")) document.body.classList.toggle("menu-open"); if (event.target.closest("[data-focus-first]")) byId("movie-title").focus();
     if (event.target.closest("[data-select-all]")) { const boxes = all('input[name="theaters"]'); const select = boxes.some((box) => !box.checked); boxes.forEach((box) => { box.checked = select; }); updateSummary(); }
-    if (event.target.closest("[data-save-watch]")) createDraft(); if (event.target.closest("[data-preview-action]")) showToast("Provider request skipped — AMC block protection is active."); if (event.target.closest("[data-location]")) showToast("Location access is not requested in this offline preview."); if (event.target.closest("[data-help]")) showToast("Configure a search, search once, then save the same criteria as a Watch.");
+    if (event.target.closest("[data-save-watch]")) createDraft(); if (event.target.closest("[data-save-deal-watch]")) createDraft("family-deals"); if (event.target.closest("[data-focus-deal]")) byId("deal-location").focus();
+    if (event.target.closest("[data-preview-action]")) showToast("Provider request skipped — AMC block protection is active."); if (event.target.closest("[data-location]")) showToast("Location access is not requested in this offline preview."); if (event.target.closest("[data-help]")) showToast("Configure a search, search once, then save the same criteria as a Watch.");
+    if (event.target.closest("[data-deal-location]")) {
+      if (!navigator.geolocation) { showToast("Location is unavailable in this browser. Enter an address or ZIP instead."); return; }
+      navigator.geolocation.getCurrentPosition(({ coords }) => { byId("deal-location").value = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`; updateDealSummary(); }, () => showToast("Location access was unavailable. Enter an address or ZIP instead."), { timeout: 10000, maximumAge: 300000 });
+    }
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
   });
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
-  updateSummary(); renderWatches(); renderResults(); hydrate();
+  byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); showDealPreview(); });
+  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate();
 })();

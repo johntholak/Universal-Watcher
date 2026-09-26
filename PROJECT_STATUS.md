@@ -1,8 +1,17 @@
 # PROJECT_STATUS.md — Universal Watcher
 
-**Status date:** September 25, 2026
+**Status date:** September 26, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Repository reconciliation checkpoint; cloud production architecture is documented but not implemented
+**Current milestone:** Family Deals search UI preview is built; cloud API and execution are not implemented
+
+## September 26 Family Deals web checkpoint
+
+- The September 25 reconciliation is now published on GitHub as `1fab91b234d12b3e43f0b427e758997d75f8f267` (same tree as the previously tested local commit `e7b1040`). The checkout is aligned with remote `main`.
+- Replaced the Family Deals placeholder with responsive location/current-location, unrestricted restaurant-count radius, party size 4–10, maximum total price, cuisine multi-select, restaurant type, and dinner-hours controls in the approved visual system.
+- The search summary updates live. The local preview honestly reports that no source was checked; exact versioned criteria can be saved as an in-memory draft. It does not claim a verified deal or running Watch. The V5 engine and isolated adapter are unchanged.
+- The next layer must render real deal-first cards only from verified normalized results, with coverage and uncertain sources kept distinct. The preview cannot generate sample matches.
+
+**NEXT TASK:** Build the common `/api/v1` request/response contract and D1 schema for Searches, jobs, Watches and normalized Family Deals results. Wire the Family Deals screen to queued Searches only when that backend is ready. Then implement leases, dispatch and the preserved V5 adapter in narrow checkpoints. No live provider work or paid service setup during contract work.
 
 ## September 25 reconciliation checkpoint
 
@@ -30,7 +39,7 @@
 - Offline verification: **108 tests passed** (core 6, web 12, adapters 12,
   Family Deals 19, Tickets 12, Movies 47), plus repository structure checks.
 
-**NEXT TASK:** After this reconciliation checkpoint is clean and pushed, implement the approved Family Deals web search and deal-first results as the first cloud architecture proof, preserving full-radius coverage and the V5 engine. See `docs/PRODUCTION_ARCHITECTURE.md`. Do not begin until the checkpoint report is complete.
+The reconciliation gate is complete; the current single NEXT TASK is above.
 
 ## September 8 recovery checkpoint
 

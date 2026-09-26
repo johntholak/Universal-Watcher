@@ -565,8 +565,13 @@ python web/server.py
 
 Open `http://127.0.0.1:8080/`. Home follows the approved two-module hierarchy.
 Movies provides the approved search controls, a live criteria summary, truthful
-AMC-blocked preview behavior, and exact-criteria Save as Watch drafts with
-start/pause/resume/stop lifecycle controls. Matches remains backed by the
+AMC-blocked preview behavior, and exact-criteria Save as Watch drafts. Family
+Deals provides location/current-location, radius, party size 4–10, maximum
+total price, multi-select cuisine, restaurant type, and dinner-hours controls.
+Its search preview reports zero sources checked and can save the exact criteria
+as an in-memory draft. Current location requires browser permission and a
+supported secure browser context. Local draft lifecycle controls change preview
+status only; they do not start checks. Matches remains backed by the
 module-neutral `GET /api/results` preview endpoint. This does not start Movies,
 Tickets, or Family Deals monitoring and must not be treated as a production app.
 
@@ -587,11 +592,11 @@ python -m unittest discover -s web -p "test_*.py" -v
 
 The shell speaks to the shared watch/result contracts through the in-memory
 preview API, including validated lifecycle transitions and an honest empty
-results state. Home and Movies now implement the approved visual and workflow
-baseline. Implement Family Deals next, then complete shared Watches. Live
-adapter wiring remains after Movies seat reliability
-and Mac acceptance regression. Do not change the protected Seat
-Watcher engine as part of shell work.
+results state. Home, Movies and Family Deals search controls now share the
+approved visual system. Next build the common `/api/v1` and D1 contracts,
+then job execution and real deal-first results. The preserved V5 engine is
+not called by this preview. Do not change the protected Seat Watcher engine
+as part of Family Deals work.
 
 ## 11. Isolated module adapter checks
 

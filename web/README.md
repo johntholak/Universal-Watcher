@@ -7,12 +7,15 @@ in-memory preview API.
 
 ## Current status
 
-Home and Movies now implement the approved dark layered visual direction. Home
+Home, Movies and Family Deals search controls use the approved dark layered visual direction. Home
 shows only Movies and Family Deals and conditionally reveals Watches/Results.
 Movies preserves the approved five-step control hierarchy and saves the exact
 configured criteria as an in-memory Watch draft. Provider-facing buttons remain
 offline while AMC access is blocked; unavailable is never shown as no match.
-Family Deals and the complete shared Watches experience are the next web work.
+Family Deals has location, radius, party size, total budget, cuisine multi-select,
+restaurant type and open-tonight controls, a live summary, and truthful unavailable
+preview. No deal results or coverage are invented. The complete shared Watches
+experience and real backend results remain future work.
 `/api/modules` and new drafts allow only Movies and Family Deals. Existing
 Tickets engine/contracts remain preserved and hidden.
 
@@ -21,6 +24,7 @@ Tickets engine/contracts remain preserved and hidden.
 - module chooser for Movies and Family Deals only; Tickets is shelved/hidden
 - approved Movies search workspace and live criteria summary
 - exact-criteria Movies Save as Watch flow
+- exact-criteria Family Deals draft flow without contacting restaurant sources
 - active-watch and recent-activity areas
 - module-neutral matches and evidence area (honest empty state until an adapter publishes results)
 - local draft lifecycle controls: start, pause, resume, and stop
@@ -63,7 +67,7 @@ python -m unittest discover -s web -p "test_*.py" -v
 ```
 
 The shell reads the shared watch/result contracts at the preview boundary. The
-next presentation milestone is Family Deals, followed by complete shared Watch
-views. Live module integration remains gated on the documented acceptance work.
+next milestone is the common `/api/v1` and D1 contracts, followed by a real
+queued search and deal-first result cards from normalized V5 output.
 Do not represent local drafts or an unavailable source as live monitoring or a
 verified match.

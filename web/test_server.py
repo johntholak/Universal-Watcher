@@ -60,6 +60,16 @@ class PreviewServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(watches[0]["watch_id"], draft["watch_id"])
 
+    def test_family_deals_draft_preserves_exact_search_criteria(self):
+        criteria = {"location": "91304", "radius_miles": 2, "party_size": 7,
+                    "max_total_price": 85, "cuisines": ["pizza_italian", "bbq"],
+                    "restaurant_type": "independent_local", "open_tonight": True}
+        status, draft = self.request("POST", "/api/watches", {
+            "module": "family-deals", "query": "Family deals near 91304", "criteria": criteria})
+        self.assertEqual(status, 201)
+        self.assertEqual(draft["criteria"], criteria)
+        self.assertEqual(draft["status"], "draft")
+
     def test_invalid_drafts_are_rejected(self):
         status, _ = self.request("POST", "/api/watches", {"module": "movies", "query": ""})
         self.assertEqual(status, 400)
