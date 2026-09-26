@@ -4,12 +4,17 @@
 **Overall stage:** Foundation / consolidation  
 **Current milestone:** Family Deals UI, offline Search/Watch API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
 
+## September 26 browser-fixture gate
+
+- Added a Node VM regression that executes the exact JavaScript injected by the V5 bridge with mocked page controls. It verifies an unclamped radius/budget and coordinate parsing without any provider request.
+- Added `cloud/test_v5_browser_fixture.py` to exercise the real V5 page with local verifier responses and intercepted Overpass data; all non-loopback requests are aborted. It is skipped when Chromium is absent. A local attempt to install the pinned Playwright Chromium headless shell failed because the downloaded archive was truncated, so no browser acceptance run is claimed.
+
+**NEXT TASK:** Run `python -m unittest cloud.test_v5_browser_fixture -v` on a suitable Chromium runner and fix any fixture failures; then review actual free account quotas and perform one controlled live provider acceptance before considering cloud deployment. Notifications and provider circuit breakers remain later work.
+
 ## September 26 bounded failure checkpoint
 
 - Added an authenticated execution/provider failure route and changed the GitHub runner to report execution exceptions there rather than falsely finalizing a result. Execution retries at most three claims with backoff; Cron finalizes an expired third lease. Watch exhaustion pauses the Watch with one meaningful failure event; provider failure stays `UNAVAILABLE` without automatic retry.
 - Claim and dispatch exclude exhausted jobs. Unfinalized result chunks are hidden from public reads and cleared before retry after a failure or expired lease, preventing stale candidate cards from surviving a crashed attempt. Offline tests cover stale claims, backoff exhaustion, expired leases, Watch history and provider unavailability. No live browser/provider or cloud resource was run.
-
-**NEXT TASK:** Controlled V5 headless-browser acceptance with local fixture responses, followed by account quota review and a carefully gated live provider run before any cloud deployment. Notifications and provider circuit breakers remain later work.
 
 ## September 26 Watch criteria-version checkpoint
 

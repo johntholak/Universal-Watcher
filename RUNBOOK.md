@@ -64,6 +64,18 @@ Cron marks an expired third lease failed. A Watch then pauses with a history
 entry instead of burning runs indefinitely. Provider failure is unavailable,
 not a false no-match. There is still no live GitHub/Cloudflare acceptance.
 
+The offline `cloud/test_browser_bridge.mjs` executes the V5 bridge's injected
+JavaScript against mocked controls and coordinates; it is included in
+`node --test cloud/test_*.mjs`. It is not a real Chromium run. A September 26
+headless-shell download attempt here produced a truncated archive, so browser
+fixture acceptance remains for a suitable Mac/Linux or CI runner with the
+pinned Playwright Chromium installed. Keep fixtures local and intercept all
+provider routes before enabling a live scan. Run
+`python -m unittest cloud.test_v5_browser_fixture -v` from the repo root.
+The fixture runs the actual V5 page but serves local verifier responses and
+intercepts Overpass; it skips cleanly when Chromium is absent. A skip is not
+acceptance. Do not trigger the GitHub production workflow just to test it.
+
 ## Recovery checkpoint — September 8, 2026
 
 Read `docs/RECOVERY_CHECKPOINT.md` after the four root docs, then the UX/design
