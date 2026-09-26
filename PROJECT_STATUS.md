@@ -2,14 +2,23 @@
 
 **Status date:** September 26, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals UI and an offline authenticated queue/lease slice are built; cloud execution is not implemented
+**Current milestone:** Family Deals UI and an offline one-time Search API slice are built; cloud execution is not implemented
+
+## September 26 result intake checkpoint
+
+- Added bounded result chunks with stable IDs, payload digests, compact evidence and transactional insert. Repeated chunks do not duplicate results; conflicting payloads are rejected. A five-result chunk size is an invocation bound, not an overall result cap.
+- A Family Deals `MATCH` must carry a defensible total in cents within budget, capacity for the selected party, restaurant/deal identity and explicit meal, price, capacity and location evidence flags. Dinner hours are required when selected.
+- Added idempotent one-time Search completion, truthful coverage checks, and user-scoped paginated result/detail reads. A partial scan cannot finalize as `NO_MATCH`.
+- Tested against in-memory SQLite with 12 results across three chunks, duplicate delivery, conflicting payload, false negative rejection and pagination. No engine, provider, GitHub Actions or Cloudflare resource was invoked.
+
+**NEXT TASK:** Implement the GitHub Actions batch worker and Family Deals V5 execution adapter, then immediate `workflow_dispatch` and Cloudflare Cron. Keep credentials out of payloads and the UI. Add exact-criteria Watches and history after the one-time cloud loop works. Do not deploy this partial API yet.
 
 ## September 26 job lease checkpoint
 
 - Added a separate worker-secret boundary for internal calls, atomic bounded D1 job claims (up to ten), expired-lease reclamation, and heartbeat renewal tied to the current `claim_id`.
 - Claims include exact stored criteria only after authentication. A stale or mismatched heartbeat returns conflict. Offline tests verify authentication, bounded claiming and renewal; no GitHub runner is configured.
 
-**NEXT TASK:** Design and implement transactional, idempotent result submission without capping the number of actual Family Deals matches. Include truthful partial/unavailable states, compact evidence, and a safe finalization step before adding dispatch, Cron and Watches. Keep the incomplete API undeployed.
+The result intake checkpoint is recorded above; the next gate is real worker execution and dispatch.
 
 ## September 26 first Worker slice
 

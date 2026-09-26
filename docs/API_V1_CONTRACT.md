@@ -1,8 +1,9 @@
 # Universal Watcher `/api/v1` contract
 
-**Status:** Offline D1 migration and initial Worker slice. Session creation,
-Family Deals Search creation, Search lookup, internal bounded claims and lease
-heartbeat exist in `cloud/worker.mjs`, but
+**Status:** Offline D1 migration and partial Worker API. Session creation,
+Family Deals Search creation/lookup, internal bounded claims and lease
+heartbeat, chunked result intake, finalization, and paginated result reads
+exist in `cloud/worker.mjs`, but
 no route is deployed or wired to the browser. Dispatch is explicitly
 `not_connected`, and all other routes below remain planned. The current
 `/api/*` endpoints in `web/server.py` are local, in-memory previews.
@@ -27,7 +28,7 @@ errors. Timestamps are UTC ISO 8601 strings.
 | PATCH | `/api/v1/watches/:id` | Pause, resume, stop, keep watching or edit exact module criteria; edits use module validation and versioning. |
 | POST | `/api/v1/watches/:id/check` | Queue an immediate check with per-Watch deduplication and capacity guard. |
 | DELETE | `/api/v1/watches/:id` | Stop/soft-delete user-facing Watch without erasing its result audit trail. |
-| GET | `/api/v1/results` | Paginated results filtered by Search/Watch. |
+| GET | `/api/v1/results` | Cursor-paginated results filtered by Search/Watch. |
 | GET | `/api/v1/results/:id` | One result and its compact evidence. |
 | GET | `/api/v1/system/status` | Safe public health/capacity status, no secrets or internal diagnostics. |
 
@@ -68,7 +69,8 @@ and log no credentials or private criteria.
 | --- | --- | --- |
 | POST | `/api/v1/internal/jobs/claim` | Atomically claim a bounded due batch; return criteria, `claim_id`, attempt number, lease expiry. Reclaim expired leases. |
 | POST | `/api/v1/internal/jobs/:id/heartbeat` | Extend only the matching active claim. |
-| POST | `/api/v1/internal/jobs/:id/result` | Accept normalized result, evidence and coverage for the matching claim. Transactional/idempotent by job and stable result IDs; update Search/Watch and meaningful history. |
+| POST | `/api/v1/internal/jobs/:id/results` | Accept one to five compact normalized results/evidence for a matching active claim per chunk; repeat chunks safely with stable IDs and payload digests. No overall match cap. |
+| POST | `/api/v1/internal/jobs/:id/complete` | Idempotently finalize the one-time Search with outcome/coverage. Incomplete coverage cannot become `NO_MATCH`. Watch finalization/history remains future work. |
 | POST | `/api/v1/internal/jobs/:id/failure` | Record provider versus execution failure, circuit state and retry/delay without false no-match. |
 
 Cloudflare Cron is the authoritative scheduler. It queues due Watches and

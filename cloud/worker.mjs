@@ -1,4 +1,5 @@
 import { validateFamilyDealsCriteria } from "./criteria.mjs";
+import { validateResultChunk, verifyFamilyMatch, validateCompletion, digest } from "./results.mjs";
 
 const COOKIE = "__Host-uw_session";
 const MAX_BODY_BYTES = 4096;
@@ -33,11 +34,11 @@ async function session(request, env) {
   } catch { return null; }
 }
 async function csrf(env, token) { return encode(await hmac(env.SESSION_KEY, `csrf:${token}`)); }
-async function bodyObject(request) {
+async function bodyObject(request, maxBytes = MAX_BODY_BYTES) {
   const length = Number(request.headers.get("Content-Length") || 0);
-  if (length > MAX_BODY_BYTES) throw new Error("Request is too large");
+  if (length > maxBytes) throw new Error("Request is too large");
   const body = await request.text();
-  if (new TextEncoder().encode(body).length > MAX_BODY_BYTES) throw new Error("Request is too large");
+  if (new TextEncoder().encode(body).length > maxBytes) throw new Error("Request is too large");
   const object = JSON.parse(body);
   if (!object || typeof object !== "object" || Array.isArray(object)) throw new Error("Expected a JSON object");
   return object;
@@ -94,6 +95,68 @@ export default {
           return updated ? json({ lease_expires_at: expires }) : json({ error: "Claim is no longer active" }, 409);
         } catch { return json({ error: "Lease renewal unavailable" }, 503); }
       }
+      const chunk = /^\/api\/v1\/internal\/jobs\/([0-9a-f-]{36})\/results$/.exec(path);
+      if (request.method === "POST" && chunk) {
+        let input; try { input = validateResultChunk(await bodyObject(request, 32_768)); } catch (error) { return json({ error: error.message }, 400); }
+        const stamp = now();
+        try {
+          const job = await env.DB.prepare("SELECT id,user_id,search_id,watch_id,module,status,claim_id,lease_expires_at FROM jobs WHERE id=?").bind(chunk[1]).first();
+          if (!job || job.claim_id !== input.claim_id || !["CLAIMED", "RUNNING"].includes(job.status) || job.lease_expires_at < stamp) return json({ error: "Claim is no longer active" }, 409);
+          const source = job.search_id ? await env.DB.prepare("SELECT criteria_json FROM searches WHERE id=? AND user_id=?").bind(job.search_id, job.user_id).first() : await env.DB.prepare("SELECT criteria_json FROM watches WHERE id=? AND user_id=?").bind(job.watch_id, job.user_id).first();
+          if (!source) return json({ error: "Job criteria unavailable" }, 409);
+          const criteria = JSON.parse(source.criteria_json);
+          if (job.module === "family-deals") {
+            try { input.items.forEach((item) => verifyFamilyMatch(item, criteria)); }
+            catch (error) { return json({ error: error.message }, 400); }
+          }
+          const statements = [];
+          const expected = [];
+          for (const item of input.items) {
+            const hash = await digest(item);
+            expected.push([item.id, hash]);
+            statements.push(env.DB.prepare(`INSERT OR IGNORE INTO results(id,user_id,job_id,search_id,watch_id,module,outcome,verification,title,summary,details_json,fingerprint,payload_digest,destination_url,observed_at,created_at)
+              SELECT ?,user_id,id,search_id,watch_id,module,?,?,?,?,?,?,?,?,?,? FROM jobs WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=?`)
+              .bind(item.id, item.outcome, item.verification, item.title, item.summary, JSON.stringify(item.details), item.fingerprint, hash, item.destination_url, stamp, stamp, job.id, input.claim_id, stamp));
+            for (let index = 0; index < item.evidence.length; index++) {
+              const entry = item.evidence[index];
+              statements.push(env.DB.prepare(`INSERT OR IGNORE INTO result_evidence(id,user_id,result_id,source,source_url,summary,captured_at)
+                SELECT ?,user_id,id,?,?,?,? FROM results WHERE id=? AND job_id=? AND payload_digest=?`)
+                .bind(`${item.id}:e${index}`, entry.source, entry.url, entry.summary, entry.captured_at || stamp, item.id, job.id, hash));
+            }
+          }
+          await env.DB.batch(statements);
+          for (const [id, hash] of expected) {
+            const row = await env.DB.prepare("SELECT payload_digest FROM results WHERE id=? AND job_id=? AND user_id=?").bind(id, job.id, job.user_id).first();
+            if (!row || row.payload_digest !== hash) return json({ error: "Conflicting or expired result submission" }, 409);
+          }
+          return json({ accepted: expected.length });
+        } catch { return json({ error: "Result storage unavailable; retry same IDs" }, 503); }
+      }
+      const complete = /^\/api\/v1\/internal\/jobs\/([0-9a-f-]{36})\/complete$/.exec(path);
+      if (request.method === "POST" && complete) {
+        let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+        try {
+          const job = await env.DB.prepare("SELECT id,user_id,search_id,status,claim_id,lease_expires_at,final_digest FROM jobs WHERE id=?").bind(complete[1]).first();
+          if (!job || !job.search_id || job.claim_id !== input.claim_id) return json({ error: "Claim unavailable" }, 409);
+          const counted = await env.DB.prepare("SELECT count(*) AS total FROM results WHERE job_id=? AND user_id=? AND outcome='MATCH' AND verification='VERIFIED'").bind(job.id, job.user_id).first();
+          const normalized = validateCompletion(input, counted?.total || 0);
+          const hash = await digest(normalized);
+          if (job.final_digest) return job.final_digest === hash ? json({ finalized: true, idempotent: true }) : json({ error: "Conflicting completion" }, 409);
+          const stamp = now();
+          if (!["CLAIMED", "RUNNING"].includes(job.status) || job.lease_expires_at < stamp) return json({ error: "Claim is no longer active" }, 409);
+          const jobState = normalized.outcome === "ERROR" ? "FAILED" : "COMPLETED";
+          const searchState = normalized.outcome === "ERROR" ? "FAILED" : "COMPLETED";
+          await env.DB.batch([
+            env.DB.prepare(`UPDATE jobs SET status=?,final_digest=?,lease_expires_at=NULL,updated_at=?
+              WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=?`).bind(jobState, hash, stamp, job.id, normalized.claim_id, stamp),
+            env.DB.prepare(`UPDATE searches SET status=?,last_outcome=?,coverage_json=?,updated_at=?,completed_at=?
+              WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND final_digest=?)`)
+              .bind(searchState, normalized.outcome, JSON.stringify(normalized.coverage), stamp, stamp, job.search_id, job.user_id, job.id, hash),
+          ]);
+          const finalized = await env.DB.prepare("SELECT final_digest FROM jobs WHERE id=? AND user_id=?").bind(job.id, job.user_id).first();
+          return finalized?.final_digest === hash ? json({ finalized: true, idempotent: false }) : json({ error: "Completion raced with another claim" }, 409);
+        } catch (error) { return error.status === 400 ? json({ error: error.message }, 400) : json({ error: "Finalization unavailable; retry same completion" }, 503); }
+      }
       return json({ error: "Internal route not implemented" }, 404);
     }
 
@@ -122,6 +185,32 @@ export default {
       catch { return json({ error: "Storage temporarily unavailable" }, 503); }
       if (!row) return json({ error: "Search not found" }, 404);
       return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
+    }
+    if (request.method === "GET" && path === "/api/v1/results") {
+      const searchId = url.searchParams.get("search_id"), watchId = url.searchParams.get("watch_id");
+      const limit = Number(url.searchParams.get("limit") || 20);
+      const before = url.searchParams.get("before"), beforeId = url.searchParams.get("before_id");
+      if (!!searchId === !!watchId || !/^[0-9a-f-]{36}$/.test(searchId || watchId) || !Number.isInteger(limit) || limit < 1 || limit > 50 || (!!before !== !!beforeId) || (before && (!Number.isFinite(Date.parse(before)) || !/^[0-9a-f-]{36}$/.test(beforeId)))) return json({ error: "Invalid result query" }, 400);
+      const column = searchId ? "search_id" : "watch_id";
+      const args = [identity.user_id, searchId || watchId];
+      let cursorClause = "";
+      if (before) { cursorClause = " AND (created_at < ? OR (created_at = ? AND id < ?))"; args.push(before, before, beforeId); }
+      try {
+        const rows = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results WHERE user_id=? AND ${column}=?${cursorClause} ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...args, limit + 1).all();
+        const page = (rows.results || []).slice(0, limit);
+        const last = page.at(-1);
+        return json({ results: page.map(({ details_json, coverage_json, ...row }) => ({ ...row, details: details_json ? JSON.parse(details_json) : null, coverage: coverage_json ? JSON.parse(coverage_json) : null })), next_cursor: (rows.results || []).length > limit && last ? { before: last.created_at, before_id: last.id } : null });
+      } catch { return json({ error: "Result query unavailable" }, 503); }
+    }
+    const resultMatch = /^\/api\/v1\/results\/([0-9a-f-]{36})$/.exec(path);
+    if (request.method === "GET" && resultMatch) {
+      try {
+        const row = await env.DB.prepare("SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results WHERE id=? AND user_id=?").bind(resultMatch[1], identity.user_id).first();
+        if (!row) return json({ error: "Result not found" }, 404);
+        const evidence = await env.DB.prepare("SELECT source,source_url,summary,captured_at FROM result_evidence WHERE result_id=? AND user_id=? ORDER BY id").bind(row.id, identity.user_id).all();
+        const { details_json, coverage_json, ...publicRow } = row;
+        return json({ ...publicRow, details: details_json ? JSON.parse(details_json) : null, coverage: coverage_json ? JSON.parse(coverage_json) : null, evidence: evidence.results || [] });
+      } catch { return json({ error: "Result query unavailable" }, 503); }
     }
     return json({ error: "Route not implemented" }, 404);
   },
