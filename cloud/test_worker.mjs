@@ -48,6 +48,11 @@ async function login(env) {
 }
 const criteria = { schema_version: 1, location: "91304", radius_miles: 2, party_size: 7, max_total_price: 85, cuisines: ["pizza_italian"], restaurant_type: "any", open_tonight: false };
 
+test("scheduled tick is inert before guarded dispatch is configured", async () => {
+  const { env } = environment();
+  await worker.scheduled({ cron: "*/15 * * * *" }, env);
+});
+
 test("session denies wrong secret and origin; cookie is secure", async () => {
   const { env } = environment();
   assert.equal((await worker.fetch(request("/api/v1/session", "POST", { access_secret: "wrong" }), env)).status, 401);

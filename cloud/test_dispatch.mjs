@@ -1,0 +1,54 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
+import { dispatchPending } from "./dispatch.mjs";
+
+function environment() {
+  const sqlite = new DatabaseSync(":memory:");
+  for (const migration of ["0001_initial.sql", "0002_dispatch_gate.sql"])
+    sqlite.exec(readFileSync(new URL(`./migrations/${migration}`, import.meta.url), "utf8"));
+  sqlite.prepare("INSERT INTO users(id,created_at) VALUES (?,?)").run("u", "2026-09-26T00:00:00.000Z");
+  sqlite.prepare("INSERT INTO searches(id,user_id,module,criteria_json,schema_version,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)")
+    .run("s", "u", "family-deals", "{}", 1, "QUEUED", "2026-09-26T00:00:00.000Z", "2026-09-26T00:00:00.000Z");
+  sqlite.prepare("INSERT INTO jobs(id,user_id,search_id,module,status,due_at,idempotency_key,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
+    .run("j", "u", "s", "family-deals", "QUEUED", "2026-09-26T00:00:00.000Z", "search:s", "2026-09-26T00:00:00.000Z", "2026-09-26T00:00:00.000Z");
+  const DB = { prepare(sql) { return { bind(...args) { return {
+    async first() { return sqlite.prepare(sql).get(...args) || null; },
+  }; } }; } };
+  return { sqlite, env: { DB, DISPATCH_ENABLED: "true", DISPATCH_DAILY_LIMIT: "1", GITHUB_DISPATCH_TOKEN: "t".repeat(40) } };
+}
+
+test("dispatch sends only a work signal and respects cooldown and daily reservation", async (t) => {
+  const { sqlite, env } = environment();
+  t.after(() => sqlite.close());
+  const requests = [];
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => { requests.push({ url, options }); return { status: 204 }; };
+  t.after(() => { globalThis.fetch = oldFetch; });
+  const time = new Date("2026-09-26T01:00:00.000Z");
+  assert.equal(await dispatchPending(env, time), "signaled");
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:16:00.000Z")), "deferred");
+  assert.equal(requests.length, 1);
+  assert.deepEqual(JSON.parse(requests[0].options.body), { ref: "main" });
+  assert.match(requests[0].url, /family-deals-worker\.yml\/dispatches$/);
+  assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 1);
+  assert.equal(await dispatchPending(env, new Date("2026-09-27T01:00:00.000Z")), "signaled");
+  assert.equal(requests.length, 2);
+});
+
+test("disabled dispatch never contacts GitHub; failed dispatch stays queued with conservative reservation", async (t) => {
+  const { sqlite, env } = environment();
+  t.after(() => sqlite.close());
+  const oldFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; throw new Error("temporary failure"); };
+  t.after(() => { globalThis.fetch = oldFetch; });
+  env.DISPATCH_ENABLED = "false";
+  assert.equal(await dispatchPending(env), "not_connected");
+  env.DISPATCH_ENABLED = "true";
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "deferred");
+  assert.equal(calls, 1);
+  assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id='j'").get().status, "QUEUED");
+  assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 1);
+});

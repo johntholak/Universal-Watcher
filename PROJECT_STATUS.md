@@ -2,7 +2,15 @@
 
 **Status date:** September 26, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals UI, offline one-time Search API, and an unconnected GitHub batch runner are built; cloud execution is not deployed
+**Current milestone:** Family Deals UI, offline Search API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
+
+## September 26 guarded dispatch checkpoint
+
+- Added an opt-in GitHub workflow signal after queued Search creation and on a Cloudflare scheduled tick. A one-row D1 gate reserves a daily run before the network call, limits dispatch to one per 15 minutes, and keeps ambiguous failures charged against the configured allowance. The payload contains only the branch ref, never criteria.
+- `DISPATCH_ENABLED` defaults off; an explicit daily run limit and a GitHub dispatch token are required. The optional Cron template has a D1 placeholder. This bound cannot account for Actions minutes consumed by other repositories, so free-account capacity and failure policy still need review before activation.
+- Offline tests exercise the dispatch payload, cooldown, daily cap, disabled state, failure reservation and schema. No GitHub workflow was triggered or Cloudflare resource deployed.
+
+**NEXT TASK:** Implement exact-criteria Family Deals Watches and history, then finish free-capacity behavior and a controlled V5 browser acceptance pass before any deployment.
 
 ## September 26 V5 batch runner checkpoint
 
@@ -10,8 +18,6 @@
 - The bridge invokes the preserved V5 page for geocoding, complete-radius Overpass discovery, deduplication, restaurant filters and official-source verification. It expands the old slider bounds to preserve exact radius and budget. The verifier now reports restaurant-level checked, unavailable and unresolved counts even when restaurants share a source.
 - V5 candidates are labeled `PARTIAL` because a chain-wide official source does not prove applicability at the specific location and V5 does not expose a separate deal name. Missing coverage or an unmappable candidate cannot become `NO_MATCH`.
 - Offline bridge/runner and coverage tests pass. The loopback server health route was exercised; headless Chromium execution against live sources, GitHub Actions execution and Cloudflare integration remain unverified. No live provider request or deployment occurred.
-
-**NEXT TASK:** Connect the one-time Search queue to bounded GitHub `workflow_dispatch` with capacity and failure handling, then implement Cloudflare Cron and exact-criteria Watches/history. Review the zero-cost account setup and run controlled V5 browser acceptance before deployment.
 
 ## September 26 result intake checkpoint
 

@@ -19,13 +19,20 @@ discovery/verification and result upload, then exits. The V5 page is served on
 an ephemeral loopback port inside the runner. A claimed job contains the exact
 stored criteria; the dispatch payload contains none.
 
-Before this workflow can be used, the Worker API and D1 migration must be
-deployed together with the remaining dispatch, Cron, Watch, private-beta and
-capacity handling. Configure repository Actions secrets `UW_API_BASE` as the
+Before this workflow can be used, the Worker API and both ordered D1 migrations
+must be deployed together with the remaining Watch, private-beta and capacity
+handling. `cloud/wrangler.example.toml` records the proposed 15-minute Cron
+but is not a deployed configuration. Configure repository Actions secrets
+`UW_API_BASE` as the
 HTTPS Worker origin and `UW_WORKER_SECRET` as the same 32-character-or-longer
 secret configured on the Worker. Do not put these in workflow inputs, logs, or
-committed files. Search currently reports `dispatch: not_connected`, so creating
-a Search does not launch the workflow. Do not run the workflow against the
+committed files. The Worker defaults to `dispatch: not_connected`. Its guarded
+dispatch requires `DISPATCH_ENABLED=true`, the Cloudflare secret
+`GITHUB_DISPATCH_TOKEN` with GitHub Actions workflow dispatch permission, and
+`DISPATCH_DAILY_LIMIT` calculated conservatively from remaining free account
+capacity. The gate reserves daily runs before sending, holds a 15-minute
+cooldown, and retries pending work on Cron; it does not see usage from other
+repositories. Do not enable it or run the workflow against the
 incomplete API; its live browser path has only offline adapter tests so far.
 
 Run the offline cloud checks with `python -m unittest discover -s cloud -p

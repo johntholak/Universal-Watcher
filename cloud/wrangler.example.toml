@@ -1,0 +1,12 @@
+# Deployment template only. Fill in the D1 ID after reviewing free capacity.
+name = "universal-watcher-api"
+main = "worker.mjs"
+compatibility_date = "2026-09-26"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "universal-watcher"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[triggers]
+crons = ["*/15 * * * *"]

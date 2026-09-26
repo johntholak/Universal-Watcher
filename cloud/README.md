@@ -1,14 +1,18 @@
 # Cloud API boundary
 
-`migrations/0001_initial.sql` defines the first D1 schema. `worker.mjs` has a
+`migrations/0001_initial.sql` defines the first D1 schema; apply
+`0002_dispatch_gate.sql` after it for the one-row dispatch reservation gate.
+`worker.mjs` has a
 private-beta session route, a Family Deals one-time Search queue/retrieval
 slice, separately authenticated bounded job claims and lease heartbeat, chunked
 result intake, finalization, and paginated result reads. Result chunks are at
 most five records each to keep an invocation bounded; there is no overall
 result limit. Stable IDs and payload digests make duplicate delivery safe.
-This is offline code, not a deployed or complete API. Search responses
-explicitly say `dispatch: not_connected`; no restaurant source is contacted by
-the API. `docs/API_V1_CONTRACT.md` defines the remaining route shapes.
+This is offline code, not a deployed or complete API. `dispatch.mjs` can signal
+the fixed GitHub workflow after a Search and on a Cron tick, but defaults to
+`dispatch: not_connected`. `wrangler.example.toml` shows the intended 15-minute
+Cron and still has a D1 placeholder. No restaurant source is contacted by the
+API. `docs/API_V1_CONTRACT.md` defines the remaining route shapes.
 No credential or database ID is stored here.
 
 The schema retains exact versioned criteria in compact JSON, separates one-time
@@ -28,6 +32,17 @@ marks V5 candidates partial until an explicit deal name and applicability to
 the particular restaurant location can be proved. Zero results become
 `NO_MATCH` only after complete restaurant coverage.
 
+Dispatch is enabled only when `DISPATCH_ENABLED=true`, a Cloudflare secret
+`GITHUB_DISPATCH_TOKEN` with permission to dispatch this repository's workflow,
+and an integer `DISPATCH_DAILY_LIMIT` (1–100) are configured. Set that limit
+only after calculating a conservative allowance from the account's free Actions
+balance and the 120-minute workflow timeout. The D1 gate reserves one run
+before contacting GitHub, limits signals to one per 15 minutes and retains
+ambiguous failures as reservations. Pending work stays queued for a later Cron
+tick. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria from
+D1 through the authenticated API. The dispatch limit is local to this Worker;
+it cannot see other repositories' use of the same account's Actions balance.
+
 Run the offline migration test from the repository root:
 
 ```text
@@ -35,7 +50,7 @@ python -m unittest discover -s cloud -p "test_*.py" -v
 node --test cloud/test_*.mjs
 ```
 
-Do not run a remote D1 migration or deploy until dispatch, Cron, Watch endpoints,
+Do not run a remote D1 migration or deploy until Watch endpoints, complete
 free-capacity handling and live adapter acceptance are completed and the private beta
 auth, zero-cost account setup and quota behavior are reviewable together. The
 site and API must share an origin for the strict cookie and CSRF checks.

@@ -1,5 +1,6 @@
 import { validateFamilyDealsCriteria } from "./criteria.mjs";
 import { validateResultChunk, verifyFamilyMatch, validateCompletion, digest } from "./results.mjs";
+import { dispatchPending } from "./dispatch.mjs";
 
 const COOKIE = "__Host-uw_session";
 const MAX_BODY_BYTES = 4096;
@@ -45,6 +46,10 @@ async function bodyObject(request, maxBytes = MAX_BODY_BYTES) {
 }
 
 export default {
+  async scheduled(_controller, env) {
+    if (!requireConfig(env)) return;
+    try { await dispatchPending(env); } catch { /* Next tick retries queued work. */ }
+  },
   async fetch(request, env) {
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
     const url = new URL(request.url);
@@ -179,7 +184,9 @@ export default {
           env.DB.prepare("INSERT INTO jobs(id,user_id,search_id,module,status,due_at,idempotency_key,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(jobId, identity.user_id, id, "family-deals", "QUEUED", stamp, `search:${id}`, stamp, stamp),
         ]);
       } catch { return json({ error: "Storage temporarily unavailable; search was not confirmed" }, 503); }
-      return json({ id, module: "family-deals", status: "QUEUED", dispatch: "not_connected", created_at: stamp }, 202);
+      let dispatch;
+      try { dispatch = await dispatchPending(env); } catch { dispatch = "deferred"; }
+      return json({ id, module: "family-deals", status: "QUEUED", dispatch, created_at: stamp }, 202);
     }
     const match = /^\/api\/v1\/searches\/([0-9a-f-]{36})$/.exec(path);
     if (request.method === "GET" && match) {

@@ -5,12 +5,14 @@ from pathlib import Path
 
 
 SCHEMA = (Path(__file__).parent / "migrations" / "0001_initial.sql").read_text(encoding="utf-8")
+DISPATCH = (Path(__file__).parent / "migrations" / "0002_dispatch_gate.sql").read_text(encoding="utf-8")
 
 
 class D1SchemaTests(unittest.TestCase):
     def setUp(self):
         self.db = sqlite3.connect(":memory:")
         self.db.executescript(SCHEMA)
+        self.db.executescript(DISPATCH)
         self.db.execute("INSERT INTO users(id,created_at) VALUES (?,?)", ("u1", "2026-09-26T00:00:00Z"))
 
     def tearDown(self):
@@ -21,6 +23,7 @@ class D1SchemaTests(unittest.TestCase):
         self.assertTrue({"users", "searches", "watches", "jobs", "watch_runs", "results", "result_evidence", "provider_status", "notifications"} <= names)
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index'")}
         self.assertTrue({"watches_due", "jobs_due", "results_user_created", "notifications_unread"} <= indexes)
+        self.assertEqual(self.db.execute("SELECT runs_today FROM dispatch_gate WHERE id=1").fetchone()[0], 0)
 
     def test_versioned_search_criteria_and_one_time_job(self):
         now = "2026-09-26T00:00:00Z"
