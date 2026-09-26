@@ -2,7 +2,15 @@
 
 **Status date:** September 26, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals search UI preview is built; cloud API and execution are not implemented
+**Current milestone:** Family Deals search UI and offline API/D1 schema are built; cloud execution is not implemented
+
+## September 26 API/D1 contract checkpoint
+
+- Added `docs/API_V1_CONTRACT.md` for public and internal routes, exact versioned criteria, truthful results, security boundaries and dispatch behavior. It defines a contract, not a running endpoint.
+- Added an unapplied D1 migration for users, searches, Watches, leased jobs, meaningful Watch events, results/evidence, provider state and deduplicated in-app notifications, with due/user/status indexes.
+- Added SQLite migration integrity tests to the offline suite. No Cloudflare resources were created, no credentials were handled, and no remote migrations ran.
+
+**NEXT TASK:** Implement the Cloudflare Worker `/api/v1` against this schema with private-beta session and worker authentication, CSRF protection, user-scoped queries, bounded input, and honest free-capacity error handling. Keep it local and offline until those routes and tests are complete; then add dispatch and the V5 adapter in narrow checkpoints.
 
 ## September 26 Family Deals web checkpoint
 
@@ -11,7 +19,7 @@
 - The search summary updates live. The local preview honestly reports that no source was checked; exact versioned criteria can be saved as an in-memory draft. It does not claim a verified deal or running Watch. The V5 engine and isolated adapter are unchanged.
 - The next layer must render real deal-first cards only from verified normalized results, with coverage and uncertain sources kept distinct. The preview cannot generate sample matches.
 
-**NEXT TASK:** Build the common `/api/v1` request/response contract and D1 schema for Searches, jobs, Watches and normalized Family Deals results. Wire the Family Deals screen to queued Searches only when that backend is ready. Then implement leases, dispatch and the preserved V5 adapter in narrow checkpoints. No live provider work or paid service setup during contract work.
+The contract/schema checkpoint is recorded above; no browser route is connected to it yet.
 
 ## September 25 reconciliation checkpoint
 

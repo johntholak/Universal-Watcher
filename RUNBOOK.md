@@ -598,6 +598,12 @@ then job execution and real deal-first results. The preserved V5 engine is
 not called by this preview. Do not change the protected Seat Watcher engine
 as part of Family Deals work.
 
+The offline production contract is `docs/API_V1_CONTRACT.md`; its unapplied D1
+schema is `cloud/migrations/0001_initial.sql`. Test it with
+`python -m unittest discover -s cloud -p "test_*.py" -v` (also included in
+`python manage.py test` under the verified Python setup). There is no deployed
+`/api/v1` handler yet. Do not substitute the local `/api/*` preview routes.
+
 ## 11. Isolated module adapter checks
 
 The Family Deals mapping is in `adapters/family_deals.py`. It translates

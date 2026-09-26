@@ -41,7 +41,7 @@ def main():
         parser.error('Run python manage.py setup first.')
     if args.command == 'test':
         call([PYTHON, 'tools/verify_repo.py'])
-        for folder, suite in [('.', 'core'), ('.', 'web'), ('.', 'adapters'),
+        for folder, suite in [('.', 'core'), ('.', 'web'), ('.', 'adapters'), ('.', 'cloud'),
                               ('modules/family-deals', 'tests'),
                               ('modules/ticket-watcher', 'tests'),
                               ('modules/seat-watcher', 'tests')]:

@@ -67,7 +67,8 @@ python -m unittest discover -s web -p "test_*.py" -v
 ```
 
 The shell reads the shared watch/result contracts at the preview boundary. The
-next milestone is the common `/api/v1` and D1 contracts, followed by a real
-queued search and deal-first result cards from normalized V5 output.
+offline `/api/v1` and D1 contract is documented in `docs/API_V1_CONTRACT.md`.
+Next implement the authenticated Worker routes, followed by a real queued
+search and deal-first result cards from normalized V5 output.
 Do not represent local drafts or an unavailable source as live monitoring or a
 verified match.
