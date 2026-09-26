@@ -2,7 +2,14 @@
 
 **Status date:** September 26, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals UI and an offline authenticated Search queue slice are built; cloud execution is not implemented
+**Current milestone:** Family Deals UI and an offline authenticated queue/lease slice are built; cloud execution is not implemented
+
+## September 26 job lease checkpoint
+
+- Added a separate worker-secret boundary for internal calls, atomic bounded D1 job claims (up to ten), expired-lease reclamation, and heartbeat renewal tied to the current `claim_id`.
+- Claims include exact stored criteria only after authentication. A stale or mismatched heartbeat returns conflict. Offline tests verify authentication, bounded claiming and renewal; no GitHub runner is configured.
+
+**NEXT TASK:** Design and implement transactional, idempotent result submission without capping the number of actual Family Deals matches. Include truthful partial/unavailable states, compact evidence, and a safe finalization step before adding dispatch, Cron and Watches. Keep the incomplete API undeployed.
 
 ## September 26 first Worker slice
 
@@ -11,7 +18,7 @@
 - No GitHub dispatch, claim, Watch scheduling, result submission, frontend wiring, deployment, or live provider call exists yet. Do not present a queued Search as an active check.
 - Node offline tests cover validation, session rejection, CSRF and queuing. The preserved V5 engine remains untouched.
 
-**NEXT TASK:** Complete secure internal job claim/lease/idempotent result routes and GitHub `workflow_dispatch`, then Cloudflare Cron, before deploying or wiring the Family Deals screen to `/api/v1`. Continue with exact-criteria Watches and result cards afterward.
+The claim/lease checkpoint is recorded above; result submission remains the next gate.
 
 ## September 26 API/D1 contract checkpoint
 

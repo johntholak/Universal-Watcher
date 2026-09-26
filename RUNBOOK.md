@@ -604,7 +604,8 @@ schema is `cloud/migrations/0001_initial.sql`. Test it with
 `python manage.py test` under the verified Python setup). Run the offline Worker
 checks with `node --test cloud/test_*.mjs`. `cloud/worker.mjs` queues Family
 Deals one-time Searches behind a private-beta signed cookie and CSRF check,
-but its response explicitly says `dispatch: not_connected`. There is no
+and has separately authenticated bounded claims and lease renewal. Search
+responses explicitly say `dispatch: not_connected`. There is no
 deployed `/api/v1` handler or background execution yet. Do not substitute the
 local `/api/*` preview routes or wire this incomplete slice into the browser.
 

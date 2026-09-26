@@ -15,6 +15,13 @@ function equal(a, b) { if (a.length !== b.length) return false; let difference =
 function cookieValue(request) { const item = request.headers.get("Cookie")?.split("; ").find((part) => part.startsWith(`${COOKIE}=`)); return item?.slice(COOKIE.length + 1) || ""; }
 function sameOrigin(request) { return request.headers.get("Origin") === new URL(request.url).origin; }
 function requireConfig(env) { return env?.DB && typeof env.ACCESS_SECRET === "string" && env.ACCESS_SECRET.length >= 32 && typeof env.SESSION_KEY === "string" && env.SESSION_KEY.length >= 32; }
+async function workerAuthorized(request, env) {
+  const secret = env.WORKER_SECRET;
+  if (typeof secret !== "string" || secret.length < 32) return false;
+  const header = request.headers.get("Authorization") || "";
+  if (!header.startsWith("Bearer ")) return false;
+  return equal(encode(await hmac(secret, header.slice(7))), encode(await hmac(secret, secret)));
+}
 
 async function session(request, env) {
   const token = cookieValue(request);
@@ -55,6 +62,39 @@ export default {
       try { await env.DB.prepare("INSERT OR IGNORE INTO users(id,created_at) VALUES (?,?)").bind("private-beta", stamp).run(); }
       catch { return json({ error: "Storage temporarily unavailable" }, 503); }
       return json({ authenticated: true, csrf_token: await csrf(env, token) }, 200, { "Set-Cookie": `${COOKIE}=${token}; Path=/; Max-Age=${SESSION_SECONDS}; HttpOnly; Secure; SameSite=Strict` });
+    }
+
+    if (path.startsWith("/api/v1/internal/")) {
+      if (!(await workerAuthorized(request, env))) return json({ error: "Worker authentication required" }, 401);
+      if (request.method === "POST" && path === "/api/v1/internal/jobs/claim") {
+        let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+        const limit = input.limit ?? 10;
+        if (!Number.isInteger(limit) || limit < 1 || limit > 10) return json({ error: "Batch limit must be 1 through 10" }, 400);
+        const stamp = now(), expires = new Date(Date.now() + 5 * 60 * 1000).toISOString(), claimId = crypto.randomUUID();
+        try {
+          const claimed = await env.DB.prepare(`UPDATE jobs SET status='CLAIMED', claim_id=?, claimed_at=?, lease_expires_at=?, attempt_number=attempt_number+1, updated_at=?
+            WHERE id IN (SELECT id FROM jobs WHERE ((status IN ('QUEUED','RETRYABLE') AND due_at<=?) OR (status IN ('CLAIMED','RUNNING') AND lease_expires_at<?))
+            ORDER BY due_at,id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, stamp, stamp, limit).all();
+          const jobs = [];
+          for (const row of claimed.results || []) {
+            const source = row.search_id ? await env.DB.prepare("SELECT criteria_json,schema_version FROM searches WHERE id=? AND user_id=?").bind(row.search_id, row.user_id).first() : await env.DB.prepare("SELECT criteria_json,schema_version FROM watches WHERE id=? AND user_id=?").bind(row.watch_id, row.user_id).first();
+            if (!source) throw new Error("Missing job source");
+            jobs.push({ id: row.id, module: row.module, search_id: row.search_id, watch_id: row.watch_id, claim_id: row.claim_id, attempt_number: row.attempt_number, lease_expires_at: row.lease_expires_at, criteria: JSON.parse(source.criteria_json) });
+          }
+          return json({ jobs });
+        } catch { return json({ error: "Job claim unavailable; retry after checking service state" }, 503); }
+      }
+      const heartbeat = /^\/api\/v1\/internal\/jobs\/([0-9a-f-]{36})\/heartbeat$/.exec(path);
+      if (request.method === "POST" && heartbeat) {
+        let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+        if (typeof input.claim_id !== "string" || !/^[0-9a-f-]{36}$/.test(input.claim_id)) return json({ error: "Invalid claim ID" }, 400);
+        const stamp = now(), expires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        try {
+          const updated = await env.DB.prepare("UPDATE jobs SET status='RUNNING', lease_expires_at=?, updated_at=? WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=? RETURNING id").bind(expires, stamp, heartbeat[1], input.claim_id, stamp).first();
+          return updated ? json({ lease_expires_at: expires }) : json({ error: "Claim is no longer active" }, 409);
+        } catch { return json({ error: "Lease renewal unavailable" }, 503); }
+      }
+      return json({ error: "Internal route not implemented" }, 404);
     }
 
     const identity = await session(request, env);
