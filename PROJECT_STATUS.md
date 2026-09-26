@@ -4,12 +4,17 @@
 **Overall stage:** Foundation / consolidation  
 **Current milestone:** Family Deals UI, offline Search/Watch API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
 
+## September 26 Watch criteria-version checkpoint
+
+- Watch criteria can now be edited by completing a new Family Deals Search, then copying that Search's exact versioned payload. Edits are refused while the Watch has a pending/running job; previous criteria snapshots remain available, and meaningful run history records the version it checked.
+- The fourth ordered D1 migration adds criteria versions and backfills existing Watches. Offline tests verify the edit boundary and that subsequent claims run the new criteria. No provider request or cloud deployment occurred.
+
+**NEXT TASK:** Implement bounded worker-failure/retry handling and source-aware capacity safeguards, then run controlled V5 browser acceptance and verify actual account quotas before deployment.
+
 ## September 26 free-capacity state checkpoint
 
 - When the configured daily GitHub run allowance is exhausted, due Family Deals jobs are marked `DELAYED` with `free_capacity`, and their Search/Watch state is visibly delayed. Cron requeues them at the next UTC-day reset; paused/stopped Watches are not resumed by this recovery.
 - Temporary dispatch errors remain queued and retain a conservative run reservation because the remote outcome may be ambiguous. Offline tests cover Search and Watch delay/recovery, including expired-lease signals. This is a configured local bound, not visibility into the GitHub account's total free minutes across repositories.
-
-**NEXT TASK:** Implement versioned Watch criteria edits and bounded worker-failure handling, then run a controlled V5 browser acceptance pass and review actual account quotas before deployment.
 
 ## September 26 exact-criteria Watch checkpoint
 

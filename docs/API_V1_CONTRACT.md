@@ -5,7 +5,7 @@ Family Deals Search creation/lookup, guarded dispatch, Watch creation/list/detai
 Check Now and lifecycle, internal bounded claims and lease heartbeat, chunked
 result intake, Search/Watch finalization and paginated result reads exist in
 `cloud/worker.mjs`, but no route is deployed or wired to the browser. Dispatch
-is disabled by default; Watch editing, notifications and the failure route remain
+is disabled by default; notifications and the failure route remain
 planned. The current
 `/api/*` endpoints in `web/server.py` are local, in-memory previews.
 
@@ -26,7 +26,7 @@ errors. Timestamps are UTC ISO 8601 strings.
 | POST | `/api/v1/watches` | Save the exact criteria from a completed Search (`search_id`), including module and schema version. Set `ACTIVE` and schedule next check after 24 hours. |
 | GET | `/api/v1/watches` | List user Watches with last and next check, coverage, provider state and match state. |
 | GET | `/api/v1/watches/:id` | Watch, current results and meaningful history. |
-| PATCH | `/api/v1/watches/:id` | Pause, resume, stop or keep watching. Editing criteria with versioned history remains planned. |
+| PATCH | `/api/v1/watches/:id` | Pause, resume, stop, keep watching, or `edit_from_search` with a new completed owned `search_id`. Edits preserve previous criteria versions and refuse pending/running Watch jobs. |
 | POST | `/api/v1/watches/:id/check` | Queue an immediate check with per-Watch deduplication and capacity guard. |
 | DELETE | `/api/v1/watches/:id` | Stop/soft-delete user-facing Watch without erasing its result audit trail. |
 | GET | `/api/v1/results` | Cursor-paginated results filtered by Search/Watch. |

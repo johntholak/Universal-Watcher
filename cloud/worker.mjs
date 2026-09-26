@@ -184,8 +184,8 @@ export default {
               current_fingerprint=?,coverage_json=?,updated_at=?
               WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND final_digest=?)`)
               .bind(counted?.total || 0, normalized.outcome, stamp, next, fingerprint, coverage, stamp, job.watch_id, job.user_id, job.id, hash));
-            if (event) statements.push(env.DB.prepare(`INSERT INTO watch_runs(id,user_id,watch_id,job_id,event_type,outcome,fingerprint,summary,created_at)
-              SELECT ?,user_id,id,?,?,?,?,?,? FROM watches WHERE id=? AND user_id=?
+            if (event) statements.push(env.DB.prepare(`INSERT INTO watch_runs(id,user_id,watch_id,job_id,event_type,outcome,fingerprint,summary,criteria_version,created_at)
+              SELECT ?,user_id,id,?,?,?,?,?,criteria_version,? FROM watches WHERE id=? AND user_id=?
               AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND final_digest=?)`)
               .bind(crypto.randomUUID(), job.id, event, normalized.outcome, fingerprint, normalized.summary, stamp, job.watch_id, job.user_id, job.id, hash));
           } else return json({ error: "Job source unavailable" }, 409);
@@ -238,15 +238,19 @@ export default {
         // Revalidate the stored versioned payload instead of trusting client fields.
         validateFamilyDealsCriteria(JSON.parse(source.criteria_json));
         const next = nextWatchCheck(new Date(stamp));
-        await env.DB.prepare(`INSERT INTO watches(id,user_id,source_search_id,module,criteria_json,schema_version,status,next_check_at,created_at,updated_at)
-          VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(id, identity.user_id, input.search_id, source.module,
-          source.criteria_json, source.schema_version, "ACTIVE", next, stamp, stamp).run();
-        return json({ id, source_search_id: input.search_id, module: source.module, status: "ACTIVE", next_check_at: next }, 201);
+        await env.DB.batch([
+          env.DB.prepare(`INSERT INTO watches(id,user_id,source_search_id,module,criteria_json,schema_version,status,next_check_at,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(id, identity.user_id, input.search_id, source.module,
+            source.criteria_json, source.schema_version, "ACTIVE", next, stamp, stamp),
+          env.DB.prepare(`INSERT INTO watch_criteria_versions(watch_id,user_id,version,source_search_id,criteria_json,schema_version,created_at)
+            VALUES (?,?,1,?,?,?,?)`).bind(id, identity.user_id, input.search_id, source.criteria_json, source.schema_version, stamp),
+        ]);
+        return json({ id, source_search_id: input.search_id, module: source.module, criteria_version: 1, status: "ACTIVE", next_check_at: next }, 201);
       } catch { return json({ error: "Watch storage unavailable" }, 503); }
     }
     if (request.method === "GET" && path === "/api/v1/watches") {
       try {
-        const rows = await env.DB.prepare(`SELECT id,source_search_id,module,criteria_json,status,last_outcome,coverage_json,last_checked_at,next_check_at,created_at,updated_at
+        const rows = await env.DB.prepare(`SELECT id,source_search_id,module,criteria_json,criteria_version,status,last_outcome,coverage_json,last_checked_at,next_check_at,created_at,updated_at
           FROM watches WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 100`).bind(identity.user_id).all();
         return json({ watches: (rows.results || []).map(({ criteria_json, coverage_json, ...row }) =>
           ({ ...row, criteria: JSON.parse(criteria_json), coverage: coverage_json ? JSON.parse(coverage_json) : null })) });
@@ -256,17 +260,21 @@ export default {
     if (watchMatch) {
       const watchId = watchMatch[1];
       let watch;
-      try { watch = await env.DB.prepare(`SELECT id,user_id,source_search_id,module,criteria_json,status,last_outcome,coverage_json,last_checked_at,next_check_at,current_fingerprint,created_at,updated_at
+      try { watch = await env.DB.prepare(`SELECT id,user_id,source_search_id,module,criteria_json,criteria_version,status,last_outcome,coverage_json,last_checked_at,next_check_at,current_fingerprint,created_at,updated_at
         FROM watches WHERE id=? AND user_id=?`).bind(watchId, identity.user_id).first(); }
       catch { return json({ error: "Watch query unavailable" }, 503); }
       if (!watch) return json({ error: "Watch not found" }, 404);
       if (request.method === "GET" && !watchMatch[2]) {
         try {
-          const history = await env.DB.prepare(`SELECT event_type,outcome,fingerprint,summary,created_at
+          const history = await env.DB.prepare(`SELECT event_type,outcome,fingerprint,summary,criteria_version,created_at
             FROM watch_runs WHERE watch_id=? AND user_id=? ORDER BY created_at DESC,id DESC LIMIT 50`)
             .bind(watchId, identity.user_id).all();
+          const versions = await env.DB.prepare(`SELECT version,source_search_id,criteria_json,schema_version,created_at
+            FROM watch_criteria_versions WHERE watch_id=? AND user_id=? ORDER BY version DESC`)
+            .bind(watchId, identity.user_id).all();
           const { criteria_json, coverage_json, user_id, ...publicWatch } = watch;
-          return json({ ...publicWatch, criteria: JSON.parse(criteria_json), coverage: coverage_json ? JSON.parse(coverage_json) : null, history: history.results || [] });
+          return json({ ...publicWatch, criteria: JSON.parse(criteria_json), coverage: coverage_json ? JSON.parse(coverage_json) : null,
+            history: history.results || [], criteria_history: (versions.results || []).map(({ criteria_json, ...row }) => ({ ...row, criteria: JSON.parse(criteria_json) })) });
         } catch { return json({ error: "Watch history unavailable" }, 503); }
       }
       if (request.method === "POST" && watchMatch[2]) {
@@ -286,9 +294,37 @@ export default {
       }
       if ((request.method === "PATCH" || request.method === "DELETE") && !watchMatch[2]) {
         let action = "stop";
+        let input;
         if (request.method === "PATCH") {
-          let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+          try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
           action = input.action;
+        }
+        if (action === "edit_from_search") {
+          if (watch.status === "STOPPED" || !/^[0-9a-f-]{36}$/.test(input.search_id || "")) return json({ error: "Choose a completed Search" }, 400);
+          try {
+            const source = await env.DB.prepare("SELECT module,criteria_json,schema_version,status FROM searches WHERE id=? AND user_id=?")
+              .bind(input.search_id, identity.user_id).first();
+            if (!source) return json({ error: "Search not found" }, 404);
+            if (source.status !== "COMPLETED" || source.module !== "family-deals" || source.schema_version !== 1) return json({ error: "Search is not ready for this Watch" }, 409);
+            validateFamilyDealsCriteria(JSON.parse(source.criteria_json));
+            const stamp = now(), next = nextWatchCheck(new Date(stamp)), version = watch.criteria_version + 1;
+            await env.DB.batch([
+              env.DB.prepare(`UPDATE watches SET source_search_id=?,module=?,criteria_json=?,schema_version=?,criteria_version=?,
+                status=CASE WHEN status='PAUSED' THEN 'PAUSED' ELSE 'ACTIVE' END,
+                last_outcome=NULL,last_checked_at=NULL,current_fingerprint=NULL,coverage_json=NULL,next_check_at=?,updated_at=?
+                WHERE id=? AND user_id=? AND status<>'STOPPED' AND criteria_version=?
+                  AND NOT EXISTS (SELECT 1 FROM jobs WHERE watch_id=? AND status IN ('QUEUED','CLAIMED','RUNNING','RETRYABLE','DELAYED'))`)
+                .bind(input.search_id, source.module, source.criteria_json, source.schema_version, version,
+                  next, stamp, watchId, identity.user_id, watch.criteria_version, watchId),
+              env.DB.prepare(`INSERT OR IGNORE INTO watch_criteria_versions(watch_id,user_id,version,source_search_id,criteria_json,schema_version,created_at)
+                SELECT id,user_id,criteria_version,source_search_id,criteria_json,schema_version,? FROM watches
+                WHERE id=? AND user_id=? AND criteria_version=?`).bind(stamp, watchId, identity.user_id, version),
+            ]);
+            const updated = await env.DB.prepare("SELECT criteria_version,source_search_id,status FROM watches WHERE id=? AND user_id=?")
+              .bind(watchId, identity.user_id).first();
+            if (updated?.criteria_version !== version || updated.source_search_id !== input.search_id) return json({ error: "Finish the pending check before editing" }, 409);
+            return json({ id: watchId, criteria_version: version, source_search_id: input.search_id, status: updated.status, next_check_at: next });
+          } catch { return json({ error: "Watch edit unavailable" }, 503); }
         }
         const transitions = { pause: ["ACTIVE", "FOUND"], resume: ["PAUSED", "DELAYED"], keep_watching: ["FOUND"], stop: ["ACTIVE", "FOUND", "PAUSED", "DELAYED"] };
         if (!transitions[action]?.includes(watch.status)) return json({ error: "This Watch cannot make that transition" }, 409);

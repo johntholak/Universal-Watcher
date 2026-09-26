@@ -2,7 +2,8 @@
 
 `migrations/0001_initial.sql` defines the first D1 schema; apply
 `0002_dispatch_gate.sql` after it for the one-row dispatch reservation gate,
-then `0003_watch_jobs.sql` for Watch coverage and one-active-job enforcement.
+then `0003_watch_jobs.sql` for Watch coverage and one-active-job enforcement,
+then `0004_watch_criteria_versions.sql` for criterion-version history.
 `worker.mjs` has a
 private-beta session route, a Family Deals one-time Search queue/retrieval
 slice, separately authenticated bounded job claims and lease heartbeat, chunked
@@ -25,11 +26,14 @@ browser calls and a separate worker secret before internal claim/result calls.
 Family Deals Watches can be saved only from a completed Search; they copy its
 exact stored criteria and use a conservative fixed 24-hour check cadence. The
 API supports list/detail/history, Check Now, pause/resume/keep watching and
-soft-stop. Cron queues at most ten due Watches per tick without truncating the
+soft-stop. An edit must reference a new completed Search owned by the user;
+it is rejected while that Watch has a pending/running job. The Watch copies
+the new exact criteria, increments its version and retains previous versions
+for interpreting older runs. Cron queues at most ten due Watches per tick without truncating the
 restaurant radius; a partial unique index and due-time key prevent duplicate
 active jobs. Results and coverage are scoped to the owner. Repeated identical
 outcomes do not add redundant history; a changed outcome, candidate set or
-coverage does. Editing criteria and notifications are not connected yet.
+coverage does. Notifications are not connected yet.
 
 `family_deals_v5.py` drives the preserved V5 page through full-radius discovery,
 filtering, and the Python verifier. `run_family_deals_batch.py` claims one Family

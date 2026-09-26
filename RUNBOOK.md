@@ -42,11 +42,15 @@ The offline Watch routes accept a completed Family Deals Search ID at
 `POST /api/v1/watches` and copy that Search's exact criteria. Watch checks run
 on a fixed 24-hour cadence once deployed; Cron only queues due jobs. The
 owner can list/detail a Watch, request Check Now, pause, resume, keep watching
-or stop it. The detailed route includes meaningful history, while
+or stop it. To edit criteria, complete a new Search and PATCH with
+`{"action":"edit_from_search","search_id":"..."}`. Editing is blocked until
+the Watch has no pending/running job; old criteria versions remain visible in
+detail/history. The detailed route includes meaningful history, while
 `GET /api/v1/results?watch_id=<id>` provides its result list. Watch criteria
-editing and notifications are not implemented. Apply
-`cloud/migrations/0003_watch_jobs.sql` after `0002_dispatch_gate.sql` before
-using these routes; it adds coverage storage and a one-active-job index.
+notifications are not implemented. Apply `cloud/migrations/0003_watch_jobs.sql`
+after `0002_dispatch_gate.sql`, then `0004_watch_criteria_versions.sql` before
+using these routes; these add coverage storage, a one-active-job index and
+versioned criteria history.
 Run `node --test cloud/test_*.mjs` and
 `python -m unittest discover -s cloud -p 'test_*.py' -v` offline. No cloud
 resource or live provider is needed for these tests.

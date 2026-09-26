@@ -16,7 +16,7 @@ const request = (path, method = "GET", body, headers = {}) => new Request(base +
 
 function environment() {
   const sqlite = new DatabaseSync(":memory:");
-  for (const migration of ["0001_initial.sql", "0002_dispatch_gate.sql", "0003_watch_jobs.sql"])
+  for (const migration of ["0001_initial.sql", "0002_dispatch_gate.sql", "0003_watch_jobs.sql", "0004_watch_criteria_versions.sql"])
     sqlite.exec(readFileSync(new URL(`./migrations/${migration}`, import.meta.url), "utf8"));
   const DB = {
     prepare(sql) { return { bind(...args) { return { sql, args,
@@ -165,4 +165,40 @@ test("free-run exhaustion delays Watch and recovers without dispatching a paid r
   await restoreFreeCapacity(env, tomorrow);
   assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE watch_id=?").get(watchId).status, "QUEUED");
   assert.equal(sqlite.prepare("SELECT status FROM watches WHERE id=?").get(watchId).status, "ACTIVE");
+});
+
+test("criteria edits copy a new completed Search and version subsequent history", async (t) => {
+  const { sqlite, env } = environment(); t.after(() => sqlite.close());
+  const headers = await session(env);
+  const { watchId } = await createSearchAndWatch(env, headers);
+  const updatedCriteria = { ...criteria, radius_miles: 12, max_total_price: 90 };
+  const search = await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria: updatedCriteria }, headers), env);
+  const searchId = (await search.json()).id;
+  sqlite.prepare("UPDATE searches SET status='COMPLETED' WHERE id=?").run(searchId);
+  sqlite.prepare("UPDATE jobs SET status='COMPLETED' WHERE search_id IS NOT NULL").run();
+  assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env)).status, 202);
+  const edit = { action: "edit_from_search", search_id: searchId };
+  assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}`, "PATCH", edit, headers), env)).status, 409);
+  const internal = { Authorization: `Bearer ${env.WORKER_SECRET}` };
+  const claimPath = "/api/v1/internal/jobs/claim";
+  const first = (await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1 }, internal), env)).json()).jobs[0];
+  const coverage = { state: "complete", discovered: 1, checked: 1, unavailable: 0, unresolved: 0 };
+  assert.equal((await worker.fetch(request(`/api/v1/internal/jobs/${first.id}/complete`, "POST",
+    { claim_id: first.claim_id, outcome: "NO_MATCH", summary: "None found", coverage }, internal), env)).status, 200);
+  const response = await worker.fetch(request(`/api/v1/watches/${watchId}`, "PATCH", edit, headers), env);
+  assert.equal(response.status, 200, await response.text());
+  const detail = await (await worker.fetch(request(`/api/v1/watches/${watchId}`, "GET", null, headers), env)).json();
+  assert.equal(detail.criteria_version, 2);
+  assert.deepEqual(detail.criteria, updatedCriteria);
+  assert.deepEqual(detail.criteria_history.map((version) => version.criteria), [updatedCriteria, criteria]);
+  assert.equal(detail.history[0].criteria_version, 1);
+  assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env)).status, 202);
+  const claimed = (await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1 }, internal), env)).json()).jobs[0];
+  assert.deepEqual(claimed.criteria, updatedCriteria);
+  const completion = { claim_id: claimed.claim_id, outcome: "NO_MATCH", summary: "None found",
+    coverage };
+  assert.equal((await worker.fetch(request(`/api/v1/internal/jobs/${claimed.id}/complete`, "POST", completion, internal), env)).status, 200);
+  const after = await (await worker.fetch(request(`/api/v1/watches/${watchId}`, "GET", null, headers), env)).json();
+  assert.equal(after.history[0].criteria_version, 2);
+  assert.equal(after.history[1].criteria_version, 1);
 });
