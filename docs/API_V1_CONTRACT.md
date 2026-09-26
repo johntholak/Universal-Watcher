@@ -1,8 +1,10 @@
 # Universal Watcher `/api/v1` contract
 
-**Status:** Design and offline D1 migration only. No route is deployed or wired
-to the browser. The current `/api/*` endpoints in `web/server.py` are local,
-in-memory previews and are not this API.
+**Status:** Offline D1 migration and initial Worker slice. Session creation,
+Family Deals Search creation and Search lookup exist in `cloud/worker.mjs`, but
+no route is deployed or wired to the browser. Dispatch is explicitly
+`not_connected`, and all other routes below remain planned. The current
+`/api/*` endpoints in `web/server.py` are local, in-memory previews.
 
 ## Public requests
 

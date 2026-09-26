@@ -2,7 +2,16 @@
 
 **Status date:** September 26, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals search UI and offline API/D1 schema are built; cloud execution is not implemented
+**Current milestone:** Family Deals UI and an offline authenticated Search queue slice are built; cloud execution is not implemented
+
+## September 26 first Worker slice
+
+- Added strict Family Deals criteria validation, including exact cents, party size 4–10, cuisine and restaurant type, without an arbitrary radius or restaurant count cap.
+- Added an offline Cloudflare Worker module for private-beta signed cookie issuance, same-origin/CSRF checks, a D1-backed queued one-time Family Deals Search and user-scoped Search retrieval. Search responses explicitly report `dispatch: not_connected`.
+- No GitHub dispatch, claim, Watch scheduling, result submission, frontend wiring, deployment, or live provider call exists yet. Do not present a queued Search as an active check.
+- Node offline tests cover validation, session rejection, CSRF and queuing. The preserved V5 engine remains untouched.
+
+**NEXT TASK:** Complete secure internal job claim/lease/idempotent result routes and GitHub `workflow_dispatch`, then Cloudflare Cron, before deploying or wiring the Family Deals screen to `/api/v1`. Continue with exact-criteria Watches and result cards afterward.
 
 ## September 26 API/D1 contract checkpoint
 
@@ -10,7 +19,7 @@
 - Added an unapplied D1 migration for users, searches, Watches, leased jobs, meaningful Watch events, results/evidence, provider state and deduplicated in-app notifications, with due/user/status indexes.
 - Added SQLite migration integrity tests to the offline suite. No Cloudflare resources were created, no credentials were handled, and no remote migrations ran.
 
-**NEXT TASK:** Implement the Cloudflare Worker `/api/v1` against this schema with private-beta session and worker authentication, CSRF protection, user-scoped queries, bounded input, and honest free-capacity error handling. Keep it local and offline until those routes and tests are complete; then add dispatch and the V5 adapter in narrow checkpoints.
+The first Worker slice is recorded above; no browser or worker execution is connected yet.
 
 ## September 26 Family Deals web checkpoint
 

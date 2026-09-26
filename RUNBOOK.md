@@ -601,8 +601,12 @@ as part of Family Deals work.
 The offline production contract is `docs/API_V1_CONTRACT.md`; its unapplied D1
 schema is `cloud/migrations/0001_initial.sql`. Test it with
 `python -m unittest discover -s cloud -p "test_*.py" -v` (also included in
-`python manage.py test` under the verified Python setup). There is no deployed
-`/api/v1` handler yet. Do not substitute the local `/api/*` preview routes.
+`python manage.py test` under the verified Python setup). Run the offline Worker
+checks with `node --test cloud/test_*.mjs`. `cloud/worker.mjs` queues Family
+Deals one-time Searches behind a private-beta signed cookie and CSRF check,
+but its response explicitly says `dispatch: not_connected`. There is no
+deployed `/api/v1` handler or background execution yet. Do not substitute the
+local `/api/*` preview routes or wire this incomplete slice into the browser.
 
 ## 11. Isolated module adapter checks
 
