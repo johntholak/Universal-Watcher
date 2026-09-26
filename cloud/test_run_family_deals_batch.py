@@ -36,6 +36,11 @@ class FakePage:
                                                   "evidence": "Family meal for seven $45"}]}}
 
 
+class FailingPage(FakePage):
+    async def goto(self, _url, **_kwargs):
+        raise RuntimeError("Browser execution failed")
+
+
 class FakeAPI:
     def __init__(self):
         self.calls = []
@@ -63,6 +68,18 @@ class FamilyBatchRunnerTests(unittest.TestCase):
         self.assertTrue(api.calls[0][0].endswith("/results"))
         self.assertFalse(api.calls[0][1]["items"][0]["details"]["location_verified"])
         self.assertEqual(api.calls[1][1]["outcome"], "PARTIAL")
+
+    def test_execution_failure_requests_bounded_retry_without_false_result(self):
+        api = FakeAPI()
+        job = {"id": str(uuid.uuid4()), "claim_id": str(uuid.uuid4()),
+               "criteria": {"schema_version": 1, "location": "91304", "radius_miles": 2,
+                            "party_size": 7, "max_total_price": 50, "cuisines": [],
+                            "restaurant_type": "any", "open_tonight": True}}
+        response = asyncio.run(runner.execute_job(api, FailingPage(), "http://127.0.0.1:9999/", job))
+        self.assertEqual(response["outcome"], "ERROR")
+        self.assertEqual(len(api.calls), 1)
+        self.assertTrue(api.calls[0][0].endswith("/failure"))
+        self.assertEqual(api.calls[0][1]["category"], "execution")
 
 
 if __name__ == "__main__":

@@ -46,6 +46,16 @@ marks V5 candidates partial until an explicit deal name and applicability to
 the particular restaurant location can be proved. Zero results become
 `NO_MATCH` only after complete restaurant coverage.
 
+Execution exceptions use the authenticated `/failure` route. The Worker backs
+off a retry by 30 minutes per attempt and stops after three claims. Expired
+third leases are finalized by Cron, including a Watch history event and a
+paused Watch; provider failures are `UNAVAILABLE` without automatic retry.
+No exception text or source payload is sent to the failure route. These are
+offline-tested policies, not a live provider acceptance claim.
+Result chunks remain hidden from user reads until successful finalization;
+failure reports or expired-lease reclamation clear a job's old unfinalized
+chunks before another attempt.
+
 Dispatch is enabled only when `DISPATCH_ENABLED=true`, a Cloudflare secret
 `GITHUB_DISPATCH_TOKEN` with permission to dispatch this repository's workflow,
 and an integer `DISPATCH_DAILY_LIMIT` (1–100) are configured. Set that limit
@@ -67,7 +77,6 @@ python -m unittest discover -s cloud -p "test_*.py" -v
 node --test cloud/test_*.mjs
 ```
 
-Do not run a remote D1 migration or deploy until Watch criteria editing, bounded
-failure/retry handling, live adapter acceptance and the private beta
+Do not run a remote D1 migration or deploy until live adapter acceptance and the private beta
 auth, zero-cost account setup and quota behavior are reviewable together. The
 site and API must share an origin for the strict cookie and CSRF checks.

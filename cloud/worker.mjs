@@ -1,6 +1,6 @@
 import { validateFamilyDealsCriteria } from "./criteria.mjs";
 import { validateResultChunk, verifyFamilyMatch, validateCompletion, digest } from "./results.mjs";
-import { dispatchPending, restoreFreeCapacity } from "./dispatch.mjs";
+import { dispatchPending, expireExhaustedJobs, restoreFreeCapacity } from "./dispatch.mjs";
 import { nextWatchCheck, queueDueWatches } from "./watches.mjs";
 
 const COOKIE = "__Host-uw_session";
@@ -49,7 +49,7 @@ async function bodyObject(request, maxBytes = MAX_BODY_BYTES) {
 export default {
   async scheduled(_controller, env) {
     if (!requireConfig(env)) return;
-    try { await restoreFreeCapacity(env); await queueDueWatches(env); await dispatchPending(env); } catch { /* Next tick retries queued work. */ }
+    try { await expireExhaustedJobs(env); await restoreFreeCapacity(env); await queueDueWatches(env); await dispatchPending(env); } catch { /* Next tick retries queued work. */ }
   },
   async fetch(request, env) {
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
@@ -83,11 +83,21 @@ export default {
         try {
           const claimed = await env.DB.prepare(`UPDATE jobs SET status='CLAIMED', claim_id=?, claimed_at=?, lease_expires_at=?, attempt_number=attempt_number+1, updated_at=?
             WHERE id IN (SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
-            WHERE j.module=? AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND'))
+            WHERE j.module=? AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
+              OR (w.status='DELAYED' AND j.status IN ('RETRYABLE','CLAIMED','RUNNING')))
+              AND j.attempt_number<3
               AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?) OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
             ORDER BY j.due_at,j.id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, module, stamp, stamp, limit).all();
           const jobs = [];
           for (const row of claimed.results || []) {
+            if (row.attempt_number > 1) await env.DB.batch([
+              env.DB.prepare(`DELETE FROM result_evidence WHERE result_id IN
+                (SELECT r.id FROM results r JOIN jobs j ON j.id=r.job_id WHERE r.job_id=? AND j.claim_id=? AND j.status='CLAIMED')`)
+                .bind(row.id, row.claim_id),
+              env.DB.prepare(`DELETE FROM results WHERE job_id=? AND EXISTS
+                (SELECT 1 FROM jobs WHERE id=? AND claim_id=? AND status='CLAIMED')`)
+                .bind(row.id, row.id, row.claim_id),
+            ]);
             const source = row.search_id ? await env.DB.prepare("SELECT criteria_json,schema_version FROM searches WHERE id=? AND user_id=?").bind(row.search_id, row.user_id).first() : await env.DB.prepare("SELECT criteria_json,schema_version FROM watches WHERE id=? AND user_id=?").bind(row.watch_id, row.user_id).first();
             if (!source) throw new Error("Missing job source");
             jobs.push({ id: row.id, module: row.module, search_id: row.search_id, watch_id: row.watch_id, claim_id: row.claim_id, attempt_number: row.attempt_number, lease_expires_at: row.lease_expires_at, criteria: JSON.parse(source.criteria_json) });
@@ -193,6 +203,46 @@ export default {
           const finalized = await env.DB.prepare("SELECT final_digest FROM jobs WHERE id=? AND user_id=?").bind(job.id, job.user_id).first();
           return finalized?.final_digest === hash ? json({ finalized: true, idempotent: false }) : json({ error: "Completion raced with another claim" }, 409);
         } catch (error) { return error.status === 400 ? json({ error: error.message }, 400) : json({ error: "Finalization unavailable; retry same completion" }, 503); }
+      }
+      const failure = /^\/api\/v1\/internal\/jobs\/([0-9a-f-]{36})\/failure$/.exec(path);
+      if (request.method === "POST" && failure) {
+        let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+        if (!/^[0-9a-f-]{36}$/.test(input.claim_id || "") || !["execution", "provider"].includes(input.category)) return json({ error: "Invalid failure report" }, 400);
+        try {
+          const job = await env.DB.prepare("SELECT id,user_id,search_id,watch_id,status,claim_id,lease_expires_at,attempt_number FROM jobs WHERE id=?")
+            .bind(failure[1]).first();
+          const stamp = now();
+          if (!job || job.claim_id !== input.claim_id || !["CLAIMED", "RUNNING"].includes(job.status) || job.lease_expires_at < stamp) return json({ error: "Claim is no longer active" }, 409);
+          const retry = input.category === "execution" && job.attempt_number < 3;
+          const outcome = input.category === "provider" ? "UNAVAILABLE" : "ERROR";
+          const summary = input.category === "provider" ? "Provider unavailable; no match claim made." : "Execution stopped before verification completed.";
+          const due = new Date(Date.now() + job.attempt_number * 30 * 60 * 1000).toISOString();
+          const state = retry ? "RETRYABLE" : "FAILED";
+          const statements = [env.DB.prepare(`UPDATE jobs SET status=?,due_at=?,delay_reason=?,claim_id=NULL,lease_expires_at=NULL,updated_at=?
+            WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=?`)
+            .bind(state, due, input.category, stamp, job.id, input.claim_id, stamp)];
+          statements.push(env.DB.prepare(`DELETE FROM result_evidence WHERE result_id IN
+            (SELECT r.id FROM results r JOIN jobs j ON j.id=r.job_id WHERE r.job_id=? AND j.status=? AND j.delay_reason=?)`)
+            .bind(job.id, state, input.category));
+          statements.push(env.DB.prepare(`DELETE FROM results WHERE job_id=? AND EXISTS
+            (SELECT 1 FROM jobs WHERE id=? AND status=? AND delay_reason=?)`)
+            .bind(job.id, job.id, state, input.category));
+          if (job.search_id) statements.push(env.DB.prepare(`UPDATE searches SET status=?,last_outcome=?,updated_at=?
+            WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND status=? AND delay_reason=?)`)
+            .bind(retry ? "DELAYED" : "FAILED", outcome, stamp, job.search_id, job.user_id, job.id, state, input.category));
+          if (job.watch_id) {
+            statements.push(env.DB.prepare(`UPDATE watches SET status=CASE WHEN status IN ('PAUSED','STOPPED') THEN status ELSE ? END,
+              last_outcome=?,last_checked_at=?,updated_at=? WHERE id=? AND user_id=?
+                AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND status=? AND delay_reason=?)`)
+              .bind(retry ? "DELAYED" : "PAUSED", outcome, stamp, stamp, job.watch_id, job.user_id, job.id, state, input.category));
+            if (!retry) statements.push(env.DB.prepare(`INSERT OR IGNORE INTO watch_runs(id,user_id,watch_id,job_id,event_type,outcome,summary,criteria_version,created_at)
+              SELECT ?,user_id,id,?,'EXECUTION_FAILED',?,?,criteria_version,? FROM watches WHERE id=? AND user_id=?
+                AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND status='FAILED' AND delay_reason=?)`)
+              .bind(crypto.randomUUID(), job.id, outcome, summary, stamp, job.watch_id, job.user_id, job.id, input.category));
+          }
+          await env.DB.batch(statements);
+          return json({ retry, status: state, due_at: retry ? due : null });
+        } catch { return json({ error: "Failure recording unavailable" }, 503); }
       }
       return json({ error: "Internal route not implemented" }, 404);
     }
@@ -352,7 +402,9 @@ export default {
       let cursorClause = "";
       if (before) { cursorClause = " AND (created_at < ? OR (created_at = ? AND id < ?))"; args.push(before, before, beforeId); }
       try {
-        const rows = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results WHERE user_id=? AND ${column}=?${cursorClause} ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...args, limit + 1).all();
+        const rows = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results
+          WHERE user_id=? AND ${column}=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND j.status='COMPLETED' AND j.final_digest IS NOT NULL)
+          ${cursorClause} ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...args, limit + 1).all();
         const page = (rows.results || []).slice(0, limit);
         const last = page.at(-1);
         return json({ results: page.map(({ details_json, coverage_json, ...row }) => ({ ...row, details: details_json ? JSON.parse(details_json) : null, coverage: coverage_json ? JSON.parse(coverage_json) : null })), next_cursor: (rows.results || []).length > limit && last ? { before: last.created_at, before_id: last.id } : null });
@@ -361,7 +413,8 @@ export default {
     const resultMatch = /^\/api\/v1\/results\/([0-9a-f-]{36})$/.exec(path);
     if (request.method === "GET" && resultMatch) {
       try {
-        const row = await env.DB.prepare("SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results WHERE id=? AND user_id=?").bind(resultMatch[1], identity.user_id).first();
+        const row = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results
+          WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND j.status='COMPLETED' AND j.final_digest IS NOT NULL)`).bind(resultMatch[1], identity.user_id).first();
         if (!row) return json({ error: "Result not found" }, 404);
         const evidence = await env.DB.prepare("SELECT source,source_url,summary,captured_at FROM result_evidence WHERE result_id=? AND user_id=? ORDER BY id").bind(row.id, identity.user_id).all();
         const { details_json, coverage_json, ...publicRow } = row;

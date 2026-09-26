@@ -46,8 +46,8 @@ or stop it. To edit criteria, complete a new Search and PATCH with
 `{"action":"edit_from_search","search_id":"..."}`. Editing is blocked until
 the Watch has no pending/running job; old criteria versions remain visible in
 detail/history. The detailed route includes meaningful history, while
-`GET /api/v1/results?watch_id=<id>` provides its result list. Watch criteria
-notifications are not implemented. Apply `cloud/migrations/0003_watch_jobs.sql`
+`GET /api/v1/results?watch_id=<id>` provides its result list. Notifications
+are not implemented. Apply `cloud/migrations/0003_watch_jobs.sql`
 after `0002_dispatch_gate.sql`, then `0004_watch_criteria_versions.sql` before
 using these routes; these add coverage storage, a one-active-job index and
 versioned criteria history.
@@ -55,11 +55,14 @@ Run `node --test cloud/test_*.mjs` and
 `python -m unittest discover -s cloud -p 'test_*.py' -v` offline. No cloud
 resource or live provider is needed for these tests.
 
-Run the offline cloud checks with `python -m unittest discover -s cloud -p
-'test_*.py' -v` and `node --test cloud/test_*.mjs`. The Family Deals verifier
-coverage test is included in `python manage.py test` on a configured Python
-3.14 environment. The current bridge does not call a candidate a verified
-match when location applicability or a distinct deal name is unproven.
+The Family Deals verifier coverage test is included in `python manage.py test`
+on a configured Python 3.14 environment. The current bridge does not call a
+candidate a verified match when location applicability or a distinct deal name
+is unproven. Execution exceptions report only a generic failure category to
+the authenticated API. They retry with bounded backoff, up to three claims;
+Cron marks an expired third lease failed. A Watch then pauses with a history
+entry instead of burning runs indefinitely. Provider failure is unavailable,
+not a false no-match. There is still no live GitHub/Cloudflare acceptance.
 
 ## Recovery checkpoint — September 8, 2026
 

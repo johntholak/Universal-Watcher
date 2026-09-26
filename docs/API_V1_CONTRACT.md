@@ -5,8 +5,7 @@ Family Deals Search creation/lookup, guarded dispatch, Watch creation/list/detai
 Check Now and lifecycle, internal bounded claims and lease heartbeat, chunked
 result intake, Search/Watch finalization and paginated result reads exist in
 `cloud/worker.mjs`, but no route is deployed or wired to the browser. Dispatch
-is disabled by default; notifications and the failure route remain
-planned. The current
+is disabled by default; notifications remain planned. The current
 `/api/*` endpoints in `web/server.py` are local, in-memory previews.
 
 ## Public requests
@@ -72,7 +71,7 @@ and log no credentials or private criteria.
 | POST | `/api/v1/internal/jobs/:id/heartbeat` | Extend only the matching active claim. |
 | POST | `/api/v1/internal/jobs/:id/results` | Accept one to five compact normalized results/evidence for a matching active claim per chunk; repeat chunks safely with stable IDs and payload digests. No overall match cap. |
 | POST | `/api/v1/internal/jobs/:id/complete` | Idempotently finalize Search or Watch with outcome/coverage. Incomplete coverage cannot become `NO_MATCH`; Watch history records meaningful changes only. |
-| POST | `/api/v1/internal/jobs/:id/failure` | Record provider versus execution failure, circuit state and retry/delay without false no-match. |
+| POST | `/api/v1/internal/jobs/:id/failure` | Record `execution` versus `provider` failure. Execution gets bounded backoff (three claims); provider failure stays unavailable. Circuit state remains future work. |
 
 Cloudflare Cron is the authoritative scheduler. It queues due Watches and
 dispatches GitHub Actions with only a `work available` signal. The GitHub

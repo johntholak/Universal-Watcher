@@ -2,6 +2,32 @@
 const WORKFLOW_URL = "https://api.github.com/repos/johntholak/Universal-Watcher/actions/workflows/family-deals-worker.yml/dispatches";
 const COOLDOWN_MS = 15 * 60 * 1000;
 
+export async function expireExhaustedJobs(env, stamp = new Date().toISOString()) {
+  const expired = await env.DB.prepare(`SELECT id,user_id,search_id,watch_id FROM jobs
+    WHERE module='family-deals' AND status IN ('CLAIMED','RUNNING')
+      AND attempt_number>=3 AND lease_expires_at<? ORDER BY lease_expires_at,id LIMIT 10`).bind(stamp).all();
+  for (const job of expired.results || []) {
+    const statements = [env.DB.prepare(`UPDATE jobs SET status='FAILED',delay_reason='attempts_exhausted',
+      claim_id=NULL,lease_expires_at=NULL,updated_at=? WHERE id=? AND status IN ('CLAIMED','RUNNING')
+      AND attempt_number>=3 AND lease_expires_at<?`).bind(stamp, job.id, stamp)];
+    if (job.search_id) statements.push(env.DB.prepare(`UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?
+      WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND status='FAILED' AND delay_reason='attempts_exhausted')`)
+      .bind(stamp, job.search_id, job.user_id, job.id));
+    if (job.watch_id) {
+      statements.push(env.DB.prepare(`UPDATE watches SET status=CASE WHEN status IN ('PAUSED','STOPPED') THEN status ELSE 'PAUSED' END,
+        last_outcome='ERROR',last_checked_at=?,updated_at=? WHERE id=? AND user_id=?
+        AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND status='FAILED' AND delay_reason='attempts_exhausted')`)
+        .bind(stamp, stamp, job.watch_id, job.user_id, job.id));
+      statements.push(env.DB.prepare(`INSERT OR IGNORE INTO watch_runs(id,user_id,watch_id,job_id,event_type,outcome,summary,criteria_version,created_at)
+        SELECT ?,user_id,id,?,'EXECUTION_FAILED','ERROR','Worker stopped before completion after three attempts.',criteria_version,?
+        FROM watches WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND status='FAILED' AND delay_reason='attempts_exhausted')`)
+        .bind(crypto.randomUUID(), job.id, stamp, job.watch_id, job.user_id, job.id));
+    }
+    await env.DB.batch(statements);
+  }
+  return (expired.results || []).length;
+}
+
 export async function restoreFreeCapacity(env, at = new Date()) {
   if (env.DISPATCH_ENABLED !== "true") return;
   const stamp = at.toISOString();
@@ -45,9 +71,10 @@ export async function dispatchPending(env, at = new Date()) {
   const stamp = at.toISOString();
   const day = stamp.slice(0, 10);
   const pending = await env.DB.prepare(`SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
-    WHERE j.module='family-deals' AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?)
+    WHERE j.module='family-deals' AND j.attempt_number<3 AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?)
       OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
-      AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')) LIMIT 1`).bind(stamp, stamp).first();
+      AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
+        OR (w.status='DELAYED' AND j.status IN ('RETRYABLE','CLAIMED','RUNNING'))) LIMIT 1`).bind(stamp, stamp).first();
   if (!pending) return "idle";
 
   // Count the reservation before contacting GitHub. An ambiguous network failure

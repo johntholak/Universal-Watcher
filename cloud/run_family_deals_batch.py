@@ -89,9 +89,11 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
             snapshot = await asyncio.wait_for(run_v5_page(page, base_url, job["criteria"]), timeout=600)
             result = normalize_v5_snapshot(snapshot, job["criteria"], job["id"])
         except Exception:
-            result = {"outcome": "ERROR", "summary": "Family Deals execution failed before verification completed.",
-                      "coverage": {"state": "unavailable", "discovered": 0, "checked": 0,
-                                   "unavailable": 0, "unresolved": 0}, "results": []}
+            if lost.is_set():
+                raise RuntimeError("Job lease was lost; failure will not be submitted")
+            await asyncio.to_thread(api.post, f"/api/v1/internal/jobs/{job['id']}/failure",
+                                    {"claim_id": job["claim_id"], "category": "execution"})
+            return {"outcome": "ERROR", "candidate_count": 0}
         if lost.is_set():
             raise RuntimeError("Job lease was lost; result will not be submitted")
         path = f"/api/v1/internal/jobs/{job['id']}"

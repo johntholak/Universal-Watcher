@@ -4,12 +4,17 @@
 **Overall stage:** Foundation / consolidation  
 **Current milestone:** Family Deals UI, offline Search/Watch API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
 
+## September 26 bounded failure checkpoint
+
+- Added an authenticated execution/provider failure route and changed the GitHub runner to report execution exceptions there rather than falsely finalizing a result. Execution retries at most three claims with backoff; Cron finalizes an expired third lease. Watch exhaustion pauses the Watch with one meaningful failure event; provider failure stays `UNAVAILABLE` without automatic retry.
+- Claim and dispatch exclude exhausted jobs. Unfinalized result chunks are hidden from public reads and cleared before retry after a failure or expired lease, preventing stale candidate cards from surviving a crashed attempt. Offline tests cover stale claims, backoff exhaustion, expired leases, Watch history and provider unavailability. No live browser/provider or cloud resource was run.
+
+**NEXT TASK:** Controlled V5 headless-browser acceptance with local fixture responses, followed by account quota review and a carefully gated live provider run before any cloud deployment. Notifications and provider circuit breakers remain later work.
+
 ## September 26 Watch criteria-version checkpoint
 
 - Watch criteria can now be edited by completing a new Family Deals Search, then copying that Search's exact versioned payload. Edits are refused while the Watch has a pending/running job; previous criteria snapshots remain available, and meaningful run history records the version it checked.
 - The fourth ordered D1 migration adds criteria versions and backfills existing Watches. Offline tests verify the edit boundary and that subsequent claims run the new criteria. No provider request or cloud deployment occurred.
-
-**NEXT TASK:** Implement bounded worker-failure/retry handling and source-aware capacity safeguards, then run controlled V5 browser acceptance and verify actual account quotas before deployment.
 
 ## September 26 free-capacity state checkpoint
 
