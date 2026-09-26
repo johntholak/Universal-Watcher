@@ -13,6 +13,19 @@
 
 **NEXT TASK:** Implement the GitHub Actions batch worker and Family Deals V5 execution adapter, then immediate `workflow_dispatch` and Cloudflare Cron. Keep credentials out of payloads and the UI. Add exact-criteria Watches and history after the one-time cloud loop works. Do not deploy this partial API yet.
 
+Integration finding: V5's browser JavaScript performs Nominatim geocoding,
+Overpass full-radius discovery, deduplication, restaurant classification and
+cuisine/type filtering. Its Python `run_verification_job` receives the already
+discovered restaurant list; calling that function alone would silently skip
+the essential discovery stage. A GitHub worker must execute or faithfully port
+that upstream flow and report discovery failure as unavailable. The old V5
+browser sliders cap radius at 30 miles and budget at $100, while the new web
+criteria do not use those caps; a headless bridge must apply exact criteria
+without clamping them. V5 currently selects the best candidate per restaurant
+and does not expose a separate deal-name field, so the adapter must preserve
+evidence and avoid inventing an offer name. These are integration gaps, not
+reasons to reduce radius coverage or loosen verification.
+
 ## September 26 job lease checkpoint
 
 - Added a separate worker-secret boundary for internal calls, atomic bounded D1 job claims (up to ten), expired-lease reclamation, and heartbeat renewal tied to the current `claim_id`.

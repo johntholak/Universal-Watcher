@@ -17,6 +17,12 @@ and deduplicates notifications. Queries must always scope user-owned records by
 `user_id`. The Worker must verify a signed private-beta session before accepting
 browser calls and a separate worker secret before internal claim/result calls.
 
+V5 discovery currently lives in `modules/family-deals/index.html`, while the
+Python verifier in `server.py` expects a complete filtered restaurant list.
+The future GitHub adapter must run the full discovery and verification path;
+using the Python verifier alone would silently skip the radius scan. See the
+integration finding at the top of `PROJECT_STATUS.md`.
+
 Run the offline migration test from the repository root:
 
 ```text
