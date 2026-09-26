@@ -1,6 +1,6 @@
 import { validateFamilyDealsCriteria } from "./criteria.mjs";
 import { validateResultChunk, verifyFamilyMatch, validateCompletion, digest } from "./results.mjs";
-import { dispatchPending } from "./dispatch.mjs";
+import { dispatchPending, restoreFreeCapacity } from "./dispatch.mjs";
 import { nextWatchCheck, queueDueWatches } from "./watches.mjs";
 
 const COOKIE = "__Host-uw_session";
@@ -49,7 +49,7 @@ async function bodyObject(request, maxBytes = MAX_BODY_BYTES) {
 export default {
   async scheduled(_controller, env) {
     if (!requireConfig(env)) return;
-    try { await queueDueWatches(env); await dispatchPending(env); } catch { /* Next tick retries queued work. */ }
+    try { await restoreFreeCapacity(env); await queueDueWatches(env); await dispatchPending(env); } catch { /* Next tick retries queued work. */ }
   },
   async fetch(request, env) {
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);

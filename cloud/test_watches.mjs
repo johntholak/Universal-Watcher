@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import worker from "./worker.mjs";
+import { restoreFreeCapacity } from "./dispatch.mjs";
 
 const base = "https://example.workers.dev";
 const criteria = { schema_version: 1, location: "91304", radius_miles: 7,
@@ -141,4 +142,27 @@ test("pause blocks claims; resume and stop preserve audit trail", async (t) => {
   assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}`, "DELETE", null, headers), env)).status, 200);
   assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env)).status, 409);
   assert.equal(sqlite.prepare("SELECT status FROM watches WHERE id=?").get(watchId).status, "STOPPED");
+});
+
+test("free-run exhaustion delays Watch and recovers without dispatching a paid run", async (t) => {
+  const { sqlite, env } = environment(); t.after(() => sqlite.close());
+  const headers = await session(env);
+  const { watchId } = await createSearchAndWatch(env, headers);
+  sqlite.prepare("UPDATE jobs SET status='COMPLETED' WHERE search_id IS NOT NULL").run();
+  const today = new Date().toISOString().slice(0, 10);
+  sqlite.prepare("UPDATE dispatch_gate SET utc_day=?,runs_today=1 WHERE id=1").run(today);
+  env.DISPATCH_ENABLED = "true";
+  env.DISPATCH_DAILY_LIMIT = "1";
+  env.GITHUB_DISPATCH_TOKEN = "t".repeat(40);
+  const response = await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env);
+  assert.equal(response.status, 202);
+  assert.equal((await response.json()).dispatch, "free_capacity");
+  assert.equal(sqlite.prepare("SELECT status FROM watches WHERE id=?").get(watchId).status, "DELAYED");
+  const pending = sqlite.prepare("SELECT status,delay_reason FROM jobs WHERE watch_id=?").get(watchId);
+  assert.equal(pending.status, "DELAYED");
+  assert.equal(pending.delay_reason, "free_capacity");
+  const tomorrow = new Date(Date.now() + 48 * 60 * 60 * 1000);
+  await restoreFreeCapacity(env, tomorrow);
+  assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE watch_id=?").get(watchId).status, "QUEUED");
+  assert.equal(sqlite.prepare("SELECT status FROM watches WHERE id=?").get(watchId).status, "ACTIVE");
 });

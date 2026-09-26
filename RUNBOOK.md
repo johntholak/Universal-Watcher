@@ -32,7 +32,10 @@ dispatch requires `DISPATCH_ENABLED=true`, the Cloudflare secret
 `DISPATCH_DAILY_LIMIT` calculated conservatively from remaining free account
 capacity. The gate reserves daily runs before sending, holds a 15-minute
 cooldown, and retries pending work on Cron; it does not see usage from other
-repositories. Do not enable it or run the workflow against the
+repositories. When the configured daily allowance is exhausted, due jobs and
+their Search/Watch become `DELAYED` with `free_capacity`; Cron requeues them
+after the next UTC reset. Temporary dispatch errors remain queued and count
+conservatively against the allowance. Do not enable it or run the workflow against the
 incomplete API; its live browser path has only offline adapter tests so far.
 
 The offline Watch routes accept a completed Family Deals Search ID at

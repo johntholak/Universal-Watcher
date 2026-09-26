@@ -2,6 +2,42 @@
 const WORKFLOW_URL = "https://api.github.com/repos/johntholak/Universal-Watcher/actions/workflows/family-deals-worker.yml/dispatches";
 const COOLDOWN_MS = 15 * 60 * 1000;
 
+export async function restoreFreeCapacity(env, at = new Date()) {
+  if (env.DISPATCH_ENABLED !== "true") return;
+  const stamp = at.toISOString();
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE jobs SET status='QUEUED',delay_reason=NULL,updated_at=?
+      WHERE status='DELAYED' AND delay_reason='free_capacity' AND due_at<=?
+        AND (watch_id IS NULL OR EXISTS (SELECT 1 FROM watches w WHERE w.id=watch_id
+          AND w.status IN ('ACTIVE','FOUND','DELAYED')))`)
+      .bind(stamp, stamp),
+    env.DB.prepare(`UPDATE searches SET status='QUEUED',updated_at=? WHERE status='DELAYED'
+      AND EXISTS (SELECT 1 FROM jobs j WHERE j.search_id=searches.id AND j.status='QUEUED')`).bind(stamp),
+    env.DB.prepare(`UPDATE watches SET status='ACTIVE',updated_at=? WHERE status='DELAYED'
+      AND EXISTS (SELECT 1 FROM jobs j WHERE j.watch_id=watches.id AND j.status='QUEUED')`).bind(stamp),
+  ]);
+}
+
+async function delayForFreeCapacity(env, at) {
+  const stamp = at.toISOString();
+  const reset = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() + 1)).toISOString();
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE jobs SET status='DELAYED',due_at=?,delay_reason='free_capacity',
+        claim_id=NULL,lease_expires_at=NULL,updated_at=? WHERE module='family-deals'
+      AND ((status IN ('QUEUED','RETRYABLE') AND due_at<=?)
+        OR (status IN ('CLAIMED','RUNNING') AND lease_expires_at<?))
+      AND (watch_id IS NULL OR EXISTS (SELECT 1 FROM watches w WHERE w.id=watch_id
+        AND w.status IN ('ACTIVE','FOUND')))`)
+      .bind(reset, stamp, stamp, stamp),
+    env.DB.prepare(`UPDATE searches SET status='DELAYED',updated_at=? WHERE status='QUEUED'
+      AND EXISTS (SELECT 1 FROM jobs j WHERE j.search_id=searches.id AND j.status='DELAYED'
+        AND j.delay_reason='free_capacity')`).bind(stamp),
+    env.DB.prepare(`UPDATE watches SET status='DELAYED',updated_at=? WHERE status IN ('ACTIVE','FOUND')
+      AND EXISTS (SELECT 1 FROM jobs j WHERE j.watch_id=watches.id AND j.status='DELAYED'
+        AND j.delay_reason='free_capacity')`).bind(stamp),
+  ]);
+}
+
 export async function dispatchPending(env, at = new Date()) {
   if (env.DISPATCH_ENABLED !== "true") return "not_connected";
   const limit = Number(env.DISPATCH_DAILY_LIMIT);
@@ -21,7 +57,14 @@ export async function dispatchPending(env, at = new Date()) {
       next_allowed_at=?, updated_at=?
     WHERE id=1 AND next_allowed_at<=? AND (utc_day<>? OR runs_today<?)
     RETURNING runs_today`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, stamp, day, limit).first();
-  if (!reserved) return "deferred";
+  if (!reserved) {
+    const gate = await env.DB.prepare("SELECT utc_day,runs_today FROM dispatch_gate WHERE id=1").bind().first();
+    if (gate?.utc_day === day && gate.runs_today >= limit) {
+      await delayForFreeCapacity(env, at);
+      return "free_capacity";
+    }
+    return "deferred";
+  }
 
   try {
     const response = await fetch(WORKFLOW_URL, {

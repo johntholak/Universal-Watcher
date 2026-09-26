@@ -48,8 +48,11 @@ and an integer `DISPATCH_DAILY_LIMIT` (1–100) are configured. Set that limit
 only after calculating a conservative allowance from the account's free Actions
 balance and the 120-minute workflow timeout. The D1 gate reserves one run
 before contacting GitHub, limits signals to one per 15 minutes and retains
-ambiguous failures as reservations. Pending work stays queued for a later Cron
-tick, including reclaimable expired leases. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria from
+ambiguous failures as reservations. When the configured daily allowance is
+exhausted, due jobs and their Searches/Watches become `DELAYED` with reason
+`free_capacity`; Cron requeues them after the next UTC reset. A temporary
+dispatch failure stays queued for a later tick, including reclaimable expired
+leases. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria from
 D1 through the authenticated API. The dispatch limit is local to this Worker;
 it cannot see other repositories' use of the same account's Actions balance.
 
@@ -60,7 +63,7 @@ python -m unittest discover -s cloud -p "test_*.py" -v
 node --test cloud/test_*.mjs
 ```
 
-Do not run a remote D1 migration or deploy until Watch endpoints, complete
-free-capacity handling and live adapter acceptance are completed and the private beta
+Do not run a remote D1 migration or deploy until Watch criteria editing, bounded
+failure/retry handling, live adapter acceptance and the private beta
 auth, zero-cost account setup and quota behavior are reviewable together. The
 site and API must share an origin for the strict cookie and CSRF checks.

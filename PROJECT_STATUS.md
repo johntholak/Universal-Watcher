@@ -4,14 +4,19 @@
 **Overall stage:** Foundation / consolidation  
 **Current milestone:** Family Deals UI, offline Search/Watch API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
 
+## September 26 free-capacity state checkpoint
+
+- When the configured daily GitHub run allowance is exhausted, due Family Deals jobs are marked `DELAYED` with `free_capacity`, and their Search/Watch state is visibly delayed. Cron requeues them at the next UTC-day reset; paused/stopped Watches are not resumed by this recovery.
+- Temporary dispatch errors remain queued and retain a conservative run reservation because the remote outcome may be ambiguous. Offline tests cover Search and Watch delay/recovery, including expired-lease signals. This is a configured local bound, not visibility into the GitHub account's total free minutes across repositories.
+
+**NEXT TASK:** Implement versioned Watch criteria edits and bounded worker-failure handling, then run a controlled V5 browser acceptance pass and review actual account quotas before deployment.
+
 ## September 26 exact-criteria Watch checkpoint
 
 - A Watch can be created from a completed Family Deals Search only. It copies the exact stored versioned criteria, schedules a conservative 24-hour next check, and exposes user-scoped list/detail/history and result reads.
 - Cron queues at most ten due Watches per tick. Check Now is deduplicated per Watch; paused/stopped Watches cannot be claimed. Pause, resume, keep watching and soft-stop preserve the audit trail. Repeated identical outcomes do not spam history; outcome, candidate and coverage changes do. Dispatch now also wakes a runner for an expired lease, so crashed claims are not stranded.
 - Watch job completion preserves uncertainty: partial V5 candidates do not set `FOUND`; only a defensible verified match can. A new ordered migration adds Watch coverage and the one-active-job index. Offline SQLite and API tests pass. No provider, GitHub Actions or Cloudflare resource was invoked.
 - Criteria editing, notifications, a complete free-capacity delay/recovery state machine and live browser acceptance are still outstanding. The Watch cadence is currently fixed at 24 hours, not user-configurable.
-
-**NEXT TASK:** Finish free-capacity delay/recovery and Watch criteria-edit/history semantics, then run a controlled V5 browser acceptance pass and review account quotas before deploying any cloud resource.
 
 ## September 26 guarded dispatch checkpoint
 
