@@ -115,7 +115,7 @@ The current repository contains:
 - Family Deals V5.0 source, imported intact from the latest saved Codex handoff bundle.
 - Ticket Watcher V1.11 source bundle, including the working Ticketmaster live-watcher path and StubHub diagnostics.
 - Seat Watcher V44 reconstructed post-Codex source, built from the user's uploaded Depth/Layering baseline plus the saved August 28 Codex handoff. This is a reconstruction, not a byte-for-byte recovery of Git commit `7a19015`.
-- Placeholder module directories for Theater Discovery, Drop Watch, Job Hunter, and Event Producer Copilot.
+- Placeholder module directories for Theater Discovery and Drop Watch. Legacy Job Hunter/Event Copilot directories are historical notes only; both are separate projects.
 - Initial shared watch/result contracts and a dependency-free Universal Watcher
   web-shell preview for the future control center.
 - Isolated Family Deals and Ticket Watcher adapters that map existing module
@@ -138,3 +138,7 @@ Movies `NEXT BEST` no longer uses a 14-day search horizon. It advances one calen
 ## Work mode handoff
 
 When opening this repository in ChatGPT Work, read `WORK_START_HERE.md` after the four root project files.
+
+## Production target
+
+The approved $0 cloud architecture uses Cloudflare free site/Worker/Cron/D1 and standard GitHub Actions execution. It is documented, not deployed. The current web app is an in-memory local preview. See [production architecture](docs/PRODUCTION_ARCHITECTURE.md). The September 25 new AMC catalog key is not validated; old-key recovery is closed.

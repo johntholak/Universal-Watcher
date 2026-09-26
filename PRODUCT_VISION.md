@@ -36,31 +36,7 @@ The web application is the control plane.
 
 Not every watcher must literally run inside the browser.
 
-A likely architecture is:
-
-```text
-Universal Watcher Web App
-          |
-          v
-Universal Watcher API / Watch Manager
-          |
-          +--------------------+
-          |                    |
-          v                    v
- Shared Core Services      Module Adapters
-          |                    |
-  discovery/filtering     Seat Watcher
-  verification/ranking    Ticket Watcher
-  schedules/history       Family Deals
-  alerts/results          Drop Watch
-          |
-          v
-Server Workers and, where necessary,
-a small Universal Watcher local helper
-for browser-dependent tasks.
-```
-
-For modules such as Seat Watcher or certain ticket marketplaces, a local helper may eventually run browser automation on a user's computer while the web app remains the single interface.
+The approved V1 production architecture is cloud-first: Cloudflare free site hosting, Worker API, Cron and D1 maintain searches, Watches and scheduling; GitHub Actions runs bounded Python/browser workers through adapters around proven engines. The user's computer is not required for scheduled execution. The absolute additional infrastructure cost is $0; work delays or stops when free capacity is exhausted. See `docs/PRODUCTION_ARCHITECTURE.md`. The existing local web shell is an in-memory preview, not the production runtime.
 
 ## The reusable engine
 

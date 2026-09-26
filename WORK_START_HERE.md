@@ -5,8 +5,8 @@
 This repository is the authoritative working package for **Universal Watcher**.
 
 Universal Watcher currently exposes Movies and Family Deals only. Tickets is
-shelved/hidden with its engine preserved. Drops, Jobs, and Event Copilot are
-future scope. Read `docs/RECOVERY_CHECKPOINT.md` for the recovered state and
+shelved/hidden with its engine preserved. Drops is future scope. Job Hunter
+and Event Producer Copilot are separate projects. Read `docs/RECOVERY_CHECKPOINT.md` for the recovered state and
 `docs/VISUAL_DESIGN_BASELINE.md` for the restored original PNG target.
 
 Do not use **HUNT** as a new user-facing product/module name. Legacy internal names may remain until those files are naturally touched. Do not perform a risky rename-only rewrite.
@@ -29,17 +29,11 @@ Preserve proven module engines. Prefer narrow fixes, tests, and adapters over re
 
 ---
 
-# CURRENT PRIORITY: MOVIES
+# CURRENT PRIORITY: REPOSITORY RECONCILIATION
 
-Do not alter another module's proven engine while Movies is pending. An
-isolated adapter or contract-mapping slice may be prepared when it only
-translates existing module output and does not start live monitoring.
+The September 25 handoff first repairs the Movies launcher and records the approved $0 cloud architecture without changing engines. See `docs/PRODUCTION_ARCHITECTURE.md` and the single global NEXT TASK in `PROJECT_STATUS.md`. Family Deals is the first future cloud integration gate. Movies live integration follows only after approved catalog and seat inventory acceptance.
 
-This priority is a verification lane, not a change to the product scope. The
-Universal Watcher core and web-shell work may continue when it is module-
-neutral and does not disturb the protected Movies engine. The end state still
-prioritizes Movies and Family Deals behind one control center. Tickets stays
-shelved; theater discovery and other modules remain later work.
+## Historical Movies verification context
 
 The current Movies implementation is the reconstructed AMC Seat Watcher V44.7 inside:
 
@@ -158,24 +152,7 @@ V44.5 tracks asynchronous response parsing through a bounded capture window, acc
 
 # NEXT TASK
 
-Follow the global NEXT TASK and live-test V44.7 on the Mac to verify that it:
-
-1. make AMC future date/showtime discovery reliable
-2. restore reliable seat-inventory capture
-3. distinguish inventory-unavailable from no-matching-seats
-4. preserve working Mac scrolling and Activity logging
-5. preserve movie/theater/format/time/seat filters
-6. validate the structured decoder/map guard while preserving grouping/ranking
-7. add focused offline regression coverage
-8. produce a clear live diagnostic log for the same Odyssey acceptance case
-
-Do not redesign the protected desktop UI during Movies verification. The
-approved web UX baselines govern separate shell implementation.
-Do not alter another module's proven engine as part of Movies verification.
-Module-neutral platform work and isolated adapter mappings may continue while
-the Movies gate is pending. Do not perform broad architecture cleanup.
-
----
+Follow the single global NEXT TASK in `PROJECT_STATUS.md`. Historical Movies diagnostics below remain reference material; do not resume blocked provider attempts as part of reconciliation.
 
 # ACCEPTANCE TEST
 
@@ -199,27 +176,6 @@ The live run should prove:
 
 ---
 
-# PRODUCT DIRECTION AFTER MOVIES IS VERIFIED
+# PRODUCTION DIRECTION
 
-The repository and private Git remote are now stable. A dependency-free
-Universal Watcher web-shell preview has also been started in `web/`; it is
-only a local draft/navigation/results surface and does not count Movies as
-verified. Its Matches & evidence area stays empty until a module adapter
-publishes a normalized result with evidence.
-Keep the Movies API/Mac acceptance work as the next live verification step;
-module-neutral platform work can continue in parallel while that gate is
-pending. The next platform integration step is wiring proven module engines
-through adapters, after Movies is trustworthy.
-
-After Movies is trustworthy:
-
-1. Freeze a master Git baseline.
-2. Configure one private Git remote.
-3. Use clone/pull/push as the cross-computer source of truth.
-4. Integrate proven modules through adapters rather than rewriting engines.
-5. Continue roadmap:
-   - Drop Watch
-   - Automated Job Hunter
-   - Event Producer Copilot last
-
-The overall product name is **Universal Watcher**.
+Cloudflare Cron/D1 schedules persistent Watches; GitHub Actions workers execute preserved engines through adapters. Family Deals is the first production acceptance gate. Movies follows when its catalog and seat routes are legitimately validated. Tickets stays shelved, Drops is later, and Job Hunter and Event Producer Copilot are separate projects. See `docs/PRODUCTION_ARCHITECTURE.md`.

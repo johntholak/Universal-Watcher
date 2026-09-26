@@ -1,8 +1,15 @@
 # PROJECT_STATUS.md — Universal Watcher
 
-**Status date:** September 8, 2026
+**Status date:** September 25, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Approved Home and Movies web presentation implemented; Family Deals is the next web screen, with live integration still gated on Movies acceptance
+**Current milestone:** Repository reconciliation checkpoint; cloud production architecture is documented but not implemented
+
+## September 25 reconciliation checkpoint
+
+- `run_v44.command` now launches `seat_watcher_premium.py`; all four Movies launch scripts are covered by an offline integrity regression. Engines are unchanged.
+- Cloudflare free site/Worker/Cron/D1 and standard GitHub Actions form the approved future runtime. The local web preview remains in-memory; no cloud execution or persistence is deployed. See `docs/PRODUCTION_ARCHITECTURE.md`.
+- New AMC catalog key obtained September 25 but not validated. Old-key recovery is closed. Catalog authorization does not imply seat inventory authorization. No live provider request was made for this checkpoint.
+- The September 8 controlled CityWalk map comparison supports only the stated CityWalk case, not Burbank or general reliability.
 
 ## September 8 Home and Movies web checkpoint
 
@@ -23,11 +30,7 @@
 - Offline verification: **108 tests passed** (core 6, web 12, adapters 12,
   Family Deals 19, Tickets 12, Movies 47), plus repository structure checks.
 
-**NEXT TASK:** Implement the approved Family Deals web search and deal-first
-results presentation in the shared visual system, preserving location, full
-radius, party size, total budget, cuisine multi-select, and all four restaurant
-type choices. Keep execution offline until the existing engine's live benchmark
-and adapter gate are ready; then complete the shared Watches presentation.
+**NEXT TASK:** After this reconciliation checkpoint is clean and pushed, implement the approved Family Deals web search and deal-first results as the first cloud architecture proof, preserving full-radius coverage and the V5 engine. See `docs/PRODUCTION_ARCHITECTURE.md`. Do not begin until the checkpoint report is complete.
 
 ## September 8 recovery checkpoint
 

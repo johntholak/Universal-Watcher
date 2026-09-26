@@ -2,6 +2,14 @@
 
 This file answers one question: **How do I safely pick this project up on any computer?**
 
+## Production target (not deployed)
+
+The approved V1 uses free Cloudflare site hosting, Worker API, Cron and D1 for persistent state and scheduling, with standard GitHub Actions runners executing adapter-wrapped engines. Additional infrastructure cost must remain $0. The user's Mac must not be needed for scheduled Watches. This repository still runs a local in-memory web preview; see `docs/PRODUCTION_ARCHITECTURE.md` for the design and capacity behavior.
+
+The new AMC catalog/vendor key was obtained September 25, 2026 but has not been validated. Old-key recovery is closed. Keep development credentials in ignored `modules/seat-watcher/.env` and production credentials in GitHub Actions secret `AMC_VENDOR_KEY`; do not print or commit them. One controlled catalog authentication request is the later live gate. No provider call is part of repository reconciliation.
+
+The local `modules/seat-watcher/run_v44.command` launches `seat_watcher_premium.py` directly. The other Movies launchers use the same entrypoint.
+
 ## Recovery checkpoint — September 8, 2026
 
 Read `docs/RECOVERY_CHECKPOINT.md` after the four root docs, then the UX/design
@@ -54,8 +62,7 @@ Configure only the modules you need:
 | `modules/seat-watcher/.env` | `AMC_VENDOR_KEY` | Optional approved AMC catalog access; blank uses browser discovery |
 | `modules/ticket-watcher/.env` | `TICKETMASTER_API_KEY` | Live Ticketmaster event discovery; not needed for demo |
 
-Retrieve keys from your password manager or securely from your existing
-machine. Git deliberately does not transfer them. There is no root `.env`:
+Configure a newly issued key securely when needed; do not search for the old AMC key. Git deliberately does not transfer credentials. There is no root `.env`:
 the existing engines read their module-local files. Environment variables
 take precedence. Blank templates contain no usable credentials.
 

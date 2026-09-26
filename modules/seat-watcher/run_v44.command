@@ -21,7 +21,7 @@ if [ ! -x "$PYTHON" ]; then
   exit 1
 fi
 
-"$PYTHON" run_movies_compat.py
+"$PYTHON" seat_watcher_premium.py
 STATUS=$?
 
 if [ "$STATUS" -ne 0 ]; then
