@@ -20,7 +20,7 @@ function environment() {
             },
             async all() {
               assert.match(sql, /UPDATE jobs SET status='CLAIMED'/);
-              const selected = [...jobs.entries()].filter(([, job]) => job.status === "QUEUED").slice(0, args[6]);
+              const selected = [...jobs.entries()].filter(([, job]) => job.status === "QUEUED").slice(0, args[7]);
               return { results: selected.map(([id, job]) => { job.status = "CLAIMED"; job.claim_id = args[0]; job.lease_expires_at = args[2]; return { id, user_id: "private-beta", search_id: job.search_id, watch_id: null, module: "family-deals", claim_id: args[0], attempt_number: 1, lease_expires_at: args[2] }; }) };
             },
             sql, args,
@@ -92,13 +92,13 @@ test("internal worker claim is authenticated, bounded and can renew its lease", 
   const path = "/api/v1/internal/jobs/claim";
   assert.equal((await worker.fetch(request(path, "POST", { limit: 10 }), env)).status, 401);
   const headers = { Authorization: `Bearer ${env.WORKER_SECRET}` };
-  assert.equal((await worker.fetch(request(path, "POST", { limit: 11 }, headers), env)).status, 400);
-  const claimed = await worker.fetch(request(path, "POST", { limit: 10 }, headers), env);
+  assert.equal((await worker.fetch(request(path, "POST", { limit: 11, module: "family-deals" }, headers), env)).status, 400);
+  const claimed = await worker.fetch(request(path, "POST", { limit: 10, module: "family-deals" }, headers), env);
   assert.equal(claimed.status, 200);
   const { jobs } = await claimed.json();
   assert.equal(jobs.length, 1);
   assert.deepEqual(jobs[0].criteria, criteria);
-  const second = await worker.fetch(request(path, "POST", { limit: 10 }, headers), env);
+  const second = await worker.fetch(request(path, "POST", { limit: 10, module: "family-deals" }, headers), env);
   assert.equal(second.status, 200);
   assert.deepEqual((await second.json()).jobs, []);
   const stale = await worker.fetch(request(`/api/v1/internal/jobs/${jobs[0].id}/heartbeat`, "POST", { claim_id: crypto.randomUUID() }, headers), env);

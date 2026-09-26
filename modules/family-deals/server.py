@@ -782,6 +782,21 @@ def set_job(job_id: str, **updates: Any) -> None:
             JOBS[job_id].update(updates)
 
 
+def restaurant_coverage(prepared: list[dict[str, Any]], source_results: dict[str, dict[str, Any]]) -> dict[str, int]:
+    """Count restaurants, not unique websites, for truthful radius coverage."""
+    checked = unavailable = unresolved = 0
+    for restaurant in prepared:
+        source = restaurant.get("resolvedWebsite") or ""
+        if not source:
+            unresolved += 1
+        elif (source_results.get(source) or {}).get("status") == "checked":
+            checked += 1
+        else:
+            unavailable += 1
+    return {"restaurants_checked": checked, "restaurants_unavailable": unavailable,
+            "restaurants_unresolved": unresolved}
+
+
 def run_verification_job(job_id: str, payload: dict[str, Any]) -> None:
     started_at = time.time()
     restaurants = payload.get("restaurants") or []
@@ -967,6 +982,7 @@ def run_verification_job(job_id: str, payload: dict[str, Any]) -> None:
         job_id,
         status="done",
         processed=total,
+        **restaurant_coverage(prepared, source_results),
         resolved=resolved_count,
         unresolved=unresolved_count,
         sources_total=len(sources),

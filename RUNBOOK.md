@@ -10,6 +10,30 @@ The new AMC catalog/vendor key was obtained September 25, 2026 but has not been 
 
 The local `modules/seat-watcher/run_v44.command` launches `seat_watcher_premium.py` directly. The other Movies launchers use the same entrypoint.
 
+## Family Deals cloud runner (not connected or deployed)
+
+`.github/workflows/family-deals-worker.yml` is a manual `workflow_dispatch`
+entry point. Its Python 3.14 runner installs pinned requirements and Chromium,
+claims at most ten Family Deals jobs one at a time, renews each lease during V5
+discovery/verification and result upload, then exits. The V5 page is served on
+an ephemeral loopback port inside the runner. A claimed job contains the exact
+stored criteria; the dispatch payload contains none.
+
+Before this workflow can be used, the Worker API and D1 migration must be
+deployed together with the remaining dispatch, Cron, Watch, private-beta and
+capacity handling. Configure repository Actions secrets `UW_API_BASE` as the
+HTTPS Worker origin and `UW_WORKER_SECRET` as the same 32-character-or-longer
+secret configured on the Worker. Do not put these in workflow inputs, logs, or
+committed files. Search currently reports `dispatch: not_connected`, so creating
+a Search does not launch the workflow. Do not run the workflow against the
+incomplete API; its live browser path has only offline adapter tests so far.
+
+Run the offline cloud checks with `python -m unittest discover -s cloud -p
+'test_*.py' -v` and `node --test cloud/test_*.mjs`. The Family Deals verifier
+coverage test is included in `python manage.py test` on a configured Python
+3.14 environment. The current bridge does not call a candidate a verified
+match when location applicability or a distinct deal name is unproven.
+
 ## Recovery checkpoint — September 8, 2026
 
 Read `docs/RECOVERY_CHECKPOINT.md` after the four root docs, then the UX/design

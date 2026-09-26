@@ -71,11 +71,13 @@ export default {
         let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
         const limit = input.limit ?? 10;
         if (!Number.isInteger(limit) || limit < 1 || limit > 10) return json({ error: "Batch limit must be 1 through 10" }, 400);
+        const module = input.module;
+        if (module !== "family-deals") return json({ error: "Unsupported worker module" }, 400);
         const stamp = now(), expires = new Date(Date.now() + 5 * 60 * 1000).toISOString(), claimId = crypto.randomUUID();
         try {
           const claimed = await env.DB.prepare(`UPDATE jobs SET status='CLAIMED', claim_id=?, claimed_at=?, lease_expires_at=?, attempt_number=attempt_number+1, updated_at=?
-            WHERE id IN (SELECT id FROM jobs WHERE ((status IN ('QUEUED','RETRYABLE') AND due_at<=?) OR (status IN ('CLAIMED','RUNNING') AND lease_expires_at<?))
-            ORDER BY due_at,id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, stamp, stamp, limit).all();
+            WHERE id IN (SELECT id FROM jobs WHERE module=? AND ((status IN ('QUEUED','RETRYABLE') AND due_at<=?) OR (status IN ('CLAIMED','RUNNING') AND lease_expires_at<?))
+            ORDER BY due_at,id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, module, stamp, stamp, limit).all();
           const jobs = [];
           for (const row of claimed.results || []) {
             const source = row.search_id ? await env.DB.prepare("SELECT criteria_json,schema_version FROM searches WHERE id=? AND user_id=?").bind(row.search_id, row.user_id).first() : await env.DB.prepare("SELECT criteria_json,schema_version FROM watches WHERE id=? AND user_id=?").bind(row.watch_id, row.user_id).first();

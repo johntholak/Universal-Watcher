@@ -2,7 +2,16 @@
 
 **Status date:** September 26, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals UI and an offline one-time Search API slice are built; cloud execution is not implemented
+**Current milestone:** Family Deals UI, offline one-time Search API, and an unconnected GitHub batch runner are built; cloud execution is not deployed
+
+## September 26 V5 batch runner checkpoint
+
+- Added a manual-only GitHub Actions workflow and bounded Python runner. It claims only Family Deals jobs, one at a time (up to ten per invocation), maintains the lease, runs V5 in headless Chromium, sends five-result chunks, and finalizes each job. Workflow dispatch carries no criteria or credentials.
+- The bridge invokes the preserved V5 page for geocoding, complete-radius Overpass discovery, deduplication, restaurant filters and official-source verification. It expands the old slider bounds to preserve exact radius and budget. The verifier now reports restaurant-level checked, unavailable and unresolved counts even when restaurants share a source.
+- V5 candidates are labeled `PARTIAL` because a chain-wide official source does not prove applicability at the specific location and V5 does not expose a separate deal name. Missing coverage or an unmappable candidate cannot become `NO_MATCH`.
+- Offline bridge/runner and coverage tests pass. The loopback server health route was exercised; headless Chromium execution against live sources, GitHub Actions execution and Cloudflare integration remain unverified. No live provider request or deployment occurred.
+
+**NEXT TASK:** Connect the one-time Search queue to bounded GitHub `workflow_dispatch` with capacity and failure handling, then implement Cloudflare Cron and exact-criteria Watches/history. Review the zero-cost account setup and run controlled V5 browser acceptance before deployment.
 
 ## September 26 result intake checkpoint
 
@@ -11,16 +20,14 @@
 - Added idempotent one-time Search completion, truthful coverage checks, and user-scoped paginated result/detail reads. A partial scan cannot finalize as `NO_MATCH`.
 - Tested against in-memory SQLite with 12 results across three chunks, duplicate delivery, conflicting payload, false negative rejection and pagination. No engine, provider, GitHub Actions or Cloudflare resource was invoked.
 
-**NEXT TASK:** Implement the GitHub Actions batch worker and Family Deals V5 execution adapter, then immediate `workflow_dispatch` and Cloudflare Cron. Keep credentials out of payloads and the UI. Add exact-criteria Watches and history after the one-time cloud loop works. Do not deploy this partial API yet.
-
 Integration finding: V5's browser JavaScript performs Nominatim geocoding,
 Overpass full-radius discovery, deduplication, restaurant classification and
 cuisine/type filtering. Its Python `run_verification_job` receives the already
 discovered restaurant list; calling that function alone would silently skip
-the essential discovery stage. A GitHub worker must execute or faithfully port
-that upstream flow and report discovery failure as unavailable. The old V5
+the essential discovery stage. The new GitHub runner executes that upstream
+flow and reports discovery failure as unavailable. The old V5
 browser sliders cap radius at 30 miles and budget at $100, while the new web
-criteria do not use those caps; a headless bridge must apply exact criteria
+criteria do not use those caps; the headless bridge applies exact criteria
 without clamping them. V5 currently selects the best candidate per restaurant
 and does not expose a separate deal-name field, so the adapter must preserve
 evidence and avoid inventing an offer name. These are integration gaps, not
