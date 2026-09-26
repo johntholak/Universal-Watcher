@@ -2,15 +2,22 @@
 
 **Status date:** September 26, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals UI, offline Search API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
+**Current milestone:** Family Deals UI, offline Search/Watch API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
+
+## September 26 exact-criteria Watch checkpoint
+
+- A Watch can be created from a completed Family Deals Search only. It copies the exact stored versioned criteria, schedules a conservative 24-hour next check, and exposes user-scoped list/detail/history and result reads.
+- Cron queues at most ten due Watches per tick. Check Now is deduplicated per Watch; paused/stopped Watches cannot be claimed. Pause, resume, keep watching and soft-stop preserve the audit trail. Repeated identical outcomes do not spam history; outcome, candidate and coverage changes do. Dispatch now also wakes a runner for an expired lease, so crashed claims are not stranded.
+- Watch job completion preserves uncertainty: partial V5 candidates do not set `FOUND`; only a defensible verified match can. A new ordered migration adds Watch coverage and the one-active-job index. Offline SQLite and API tests pass. No provider, GitHub Actions or Cloudflare resource was invoked.
+- Criteria editing, notifications, a complete free-capacity delay/recovery state machine and live browser acceptance are still outstanding. The Watch cadence is currently fixed at 24 hours, not user-configurable.
+
+**NEXT TASK:** Finish free-capacity delay/recovery and Watch criteria-edit/history semantics, then run a controlled V5 browser acceptance pass and review account quotas before deploying any cloud resource.
 
 ## September 26 guarded dispatch checkpoint
 
 - Added an opt-in GitHub workflow signal after queued Search creation and on a Cloudflare scheduled tick. A one-row D1 gate reserves a daily run before the network call, limits dispatch to one per 15 minutes, and keeps ambiguous failures charged against the configured allowance. The payload contains only the branch ref, never criteria.
 - `DISPATCH_ENABLED` defaults off; an explicit daily run limit and a GitHub dispatch token are required. The optional Cron template has a D1 placeholder. This bound cannot account for Actions minutes consumed by other repositories, so free-account capacity and failure policy still need review before activation.
 - Offline tests exercise the dispatch payload, cooldown, daily cap, disabled state, failure reservation and schema. No GitHub workflow was triggered or Cloudflare resource deployed.
-
-**NEXT TASK:** Implement exact-criteria Family Deals Watches and history, then finish free-capacity behavior and a controlled V5 browser acceptance pass before any deployment.
 
 ## September 26 V5 batch runner checkpoint
 

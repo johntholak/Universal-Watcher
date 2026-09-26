@@ -52,3 +52,14 @@ test("disabled dispatch never contacts GitHub; failed dispatch stays queued with
   assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id='j'").get().status, "QUEUED");
   assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 1);
 });
+
+test("an expired claimed lease is signaled for recovery", async (t) => {
+  const { sqlite, env } = environment(); t.after(() => sqlite.close());
+  sqlite.prepare("UPDATE jobs SET status='CLAIMED',lease_expires_at=? WHERE id='j'").run("2026-09-26T00:30:00.000Z");
+  const oldFetch = globalThis.fetch;
+  let signals = 0;
+  globalThis.fetch = async () => { signals++; return { status: 204 }; };
+  t.after(() => { globalThis.fetch = oldFetch; });
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "signaled");
+  assert.equal(signals, 1);
+});

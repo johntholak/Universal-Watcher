@@ -1,11 +1,12 @@
 # Universal Watcher `/api/v1` contract
 
 **Status:** Offline D1 migration and partial Worker API. Session creation,
-Family Deals Search creation/lookup, internal bounded claims and lease
-heartbeat, chunked result intake, finalization, and paginated result reads
-exist in `cloud/worker.mjs`, but
-no route is deployed or wired to the browser. Dispatch is explicitly
-`not_connected`, and all other routes below remain planned. The current
+Family Deals Search creation/lookup, guarded dispatch, Watch creation/list/detail,
+Check Now and lifecycle, internal bounded claims and lease heartbeat, chunked
+result intake, Search/Watch finalization and paginated result reads exist in
+`cloud/worker.mjs`, but no route is deployed or wired to the browser. Dispatch
+is disabled by default; Watch editing, notifications and the failure route remain
+planned. The current
 `/api/*` endpoints in `web/server.py` are local, in-memory previews.
 
 ## Public requests
@@ -22,10 +23,10 @@ errors. Timestamps are UTC ISO 8601 strings.
 | --- | --- | --- |
 | POST | `/api/v1/searches` | Validate module/criteria, atomically create Search plus queued Job, signal immediate dispatch. Return `202` with Search ID and `QUEUED` state. Dispatch failure leaves retriable queued work. |
 | GET | `/api/v1/searches/:id` | Return state, coverage, last outcome, and result links. |
-| POST | `/api/v1/watches` | Save the exact criteria from a Search, including module and schema version. Set `ACTIVE` and schedule next check. |
+| POST | `/api/v1/watches` | Save the exact criteria from a completed Search (`search_id`), including module and schema version. Set `ACTIVE` and schedule next check after 24 hours. |
 | GET | `/api/v1/watches` | List user Watches with last and next check, coverage, provider state and match state. |
 | GET | `/api/v1/watches/:id` | Watch, current results and meaningful history. |
-| PATCH | `/api/v1/watches/:id` | Pause, resume, stop, keep watching or edit exact module criteria; edits use module validation and versioning. |
+| PATCH | `/api/v1/watches/:id` | Pause, resume, stop or keep watching. Editing criteria with versioned history remains planned. |
 | POST | `/api/v1/watches/:id/check` | Queue an immediate check with per-Watch deduplication and capacity guard. |
 | DELETE | `/api/v1/watches/:id` | Stop/soft-delete user-facing Watch without erasing its result audit trail. |
 | GET | `/api/v1/results` | Cursor-paginated results filtered by Search/Watch. |
@@ -70,12 +71,12 @@ and log no credentials or private criteria.
 | POST | `/api/v1/internal/jobs/claim` | Atomically claim a bounded due batch; return criteria, `claim_id`, attempt number, lease expiry. Reclaim expired leases. |
 | POST | `/api/v1/internal/jobs/:id/heartbeat` | Extend only the matching active claim. |
 | POST | `/api/v1/internal/jobs/:id/results` | Accept one to five compact normalized results/evidence for a matching active claim per chunk; repeat chunks safely with stable IDs and payload digests. No overall match cap. |
-| POST | `/api/v1/internal/jobs/:id/complete` | Idempotently finalize the one-time Search with outcome/coverage. Incomplete coverage cannot become `NO_MATCH`. Watch finalization/history remains future work. |
+| POST | `/api/v1/internal/jobs/:id/complete` | Idempotently finalize Search or Watch with outcome/coverage. Incomplete coverage cannot become `NO_MATCH`; Watch history records meaningful changes only. |
 | POST | `/api/v1/internal/jobs/:id/failure` | Record provider versus execution failure, circuit state and retry/delay without false no-match. |
 
 Cloudflare Cron is the authoritative scheduler. It queues due Watches and
 dispatches GitHub Actions with only a `work available` signal. The GitHub
-worker claims a batch and groups compatible work. No criteria or secrets go in
+worker claims a bounded batch one job at a time. No criteria or secrets go in
 the workflow dispatch payload. Free capacity exhaustion delays work until
 reset; no paid fallback is permitted.
 

@@ -19,7 +19,7 @@ discovery/verification and result upload, then exits. The V5 page is served on
 an ephemeral loopback port inside the runner. A claimed job contains the exact
 stored criteria; the dispatch payload contains none.
 
-Before this workflow can be used, the Worker API and both ordered D1 migrations
+Before this workflow can be used, the Worker API and all three ordered D1 migrations
 must be deployed together with the remaining Watch, private-beta and capacity
 handling. `cloud/wrangler.example.toml` records the proposed 15-minute Cron
 but is not a deployed configuration. Configure repository Actions secrets
@@ -34,6 +34,19 @@ capacity. The gate reserves daily runs before sending, holds a 15-minute
 cooldown, and retries pending work on Cron; it does not see usage from other
 repositories. Do not enable it or run the workflow against the
 incomplete API; its live browser path has only offline adapter tests so far.
+
+The offline Watch routes accept a completed Family Deals Search ID at
+`POST /api/v1/watches` and copy that Search's exact criteria. Watch checks run
+on a fixed 24-hour cadence once deployed; Cron only queues due jobs. The
+owner can list/detail a Watch, request Check Now, pause, resume, keep watching
+or stop it. The detailed route includes meaningful history, while
+`GET /api/v1/results?watch_id=<id>` provides its result list. Watch criteria
+editing and notifications are not implemented. Apply
+`cloud/migrations/0003_watch_jobs.sql` after `0002_dispatch_gate.sql` before
+using these routes; it adds coverage storage and a one-active-job index.
+Run `node --test cloud/test_*.mjs` and
+`python -m unittest discover -s cloud -p 'test_*.py' -v` offline. No cloud
+resource or live provider is needed for these tests.
 
 Run the offline cloud checks with `python -m unittest discover -s cloud -p
 'test_*.py' -v` and `node --test cloud/test_*.mjs`. The Family Deals verifier

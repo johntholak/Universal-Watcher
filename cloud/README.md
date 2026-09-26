@@ -1,7 +1,8 @@
 # Cloud API boundary
 
 `migrations/0001_initial.sql` defines the first D1 schema; apply
-`0002_dispatch_gate.sql` after it for the one-row dispatch reservation gate.
+`0002_dispatch_gate.sql` after it for the one-row dispatch reservation gate,
+then `0003_watch_jobs.sql` for Watch coverage and one-active-job enforcement.
 `worker.mjs` has a
 private-beta session route, a Family Deals one-time Search queue/retrieval
 slice, separately authenticated bounded job claims and lease heartbeat, chunked
@@ -21,6 +22,15 @@ and deduplicates notifications. Queries must always scope user-owned records by
 `user_id`. The Worker must verify a signed private-beta session before accepting
 browser calls and a separate worker secret before internal claim/result calls.
 
+Family Deals Watches can be saved only from a completed Search; they copy its
+exact stored criteria and use a conservative fixed 24-hour check cadence. The
+API supports list/detail/history, Check Now, pause/resume/keep watching and
+soft-stop. Cron queues at most ten due Watches per tick without truncating the
+restaurant radius; a partial unique index and due-time key prevent duplicate
+active jobs. Results and coverage are scoped to the owner. Repeated identical
+outcomes do not add redundant history; a changed outcome, candidate set or
+coverage does. Editing criteria and notifications are not connected yet.
+
 `family_deals_v5.py` drives the preserved V5 page through full-radius discovery,
 filtering, and the Python verifier. `run_family_deals_batch.py` claims one Family
 Deals job at a time, renews its lease, uploads results in chunks of five, and
@@ -39,7 +49,7 @@ only after calculating a conservative allowance from the account's free Actions
 balance and the 120-minute workflow timeout. The D1 gate reserves one run
 before contacting GitHub, limits signals to one per 15 minutes and retains
 ambiguous failures as reservations. Pending work stays queued for a later Cron
-tick. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria from
+tick, including reclaimable expired leases. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria from
 D1 through the authenticated API. The dispatch limit is local to this Worker;
 it cannot see other repositories' use of the same account's Actions balance.
 

@@ -8,7 +8,10 @@ export async function dispatchPending(env, at = new Date()) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || typeof env.GITHUB_DISPATCH_TOKEN !== "string" || env.GITHUB_DISPATCH_TOKEN.length < 20) return "not_configured";
   const stamp = at.toISOString();
   const day = stamp.slice(0, 10);
-  const pending = await env.DB.prepare("SELECT id FROM jobs WHERE module='family-deals' AND status IN ('QUEUED','RETRYABLE') AND due_at<=? LIMIT 1").bind(stamp).first();
+  const pending = await env.DB.prepare(`SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
+    WHERE j.module='family-deals' AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?)
+      OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
+      AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')) LIMIT 1`).bind(stamp, stamp).first();
   if (!pending) return "idle";
 
   // Count the reservation before contacting GitHub. An ambiguous network failure

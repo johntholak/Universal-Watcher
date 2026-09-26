@@ -1,6 +1,7 @@
 import { validateFamilyDealsCriteria } from "./criteria.mjs";
 import { validateResultChunk, verifyFamilyMatch, validateCompletion, digest } from "./results.mjs";
 import { dispatchPending } from "./dispatch.mjs";
+import { nextWatchCheck, queueDueWatches } from "./watches.mjs";
 
 const COOKIE = "__Host-uw_session";
 const MAX_BODY_BYTES = 4096;
@@ -48,7 +49,7 @@ async function bodyObject(request, maxBytes = MAX_BODY_BYTES) {
 export default {
   async scheduled(_controller, env) {
     if (!requireConfig(env)) return;
-    try { await dispatchPending(env); } catch { /* Next tick retries queued work. */ }
+    try { await queueDueWatches(env); await dispatchPending(env); } catch { /* Next tick retries queued work. */ }
   },
   async fetch(request, env) {
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
@@ -81,8 +82,10 @@ export default {
         const stamp = now(), expires = new Date(Date.now() + 5 * 60 * 1000).toISOString(), claimId = crypto.randomUUID();
         try {
           const claimed = await env.DB.prepare(`UPDATE jobs SET status='CLAIMED', claim_id=?, claimed_at=?, lease_expires_at=?, attempt_number=attempt_number+1, updated_at=?
-            WHERE id IN (SELECT id FROM jobs WHERE module=? AND ((status IN ('QUEUED','RETRYABLE') AND due_at<=?) OR (status IN ('CLAIMED','RUNNING') AND lease_expires_at<?))
-            ORDER BY due_at,id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, module, stamp, stamp, limit).all();
+            WHERE id IN (SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
+            WHERE j.module=? AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND'))
+              AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?) OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
+            ORDER BY j.due_at,j.id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, module, stamp, stamp, limit).all();
           const jobs = [];
           for (const row of claimed.results || []) {
             const source = row.search_id ? await env.DB.prepare("SELECT criteria_json,schema_version FROM searches WHERE id=? AND user_id=?").bind(row.search_id, row.user_id).first() : await env.DB.prepare("SELECT criteria_json,schema_version FROM watches WHERE id=? AND user_id=?").bind(row.watch_id, row.user_id).first();
@@ -143,8 +146,8 @@ export default {
       if (request.method === "POST" && complete) {
         let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
         try {
-          const job = await env.DB.prepare("SELECT id,user_id,search_id,status,claim_id,lease_expires_at,final_digest FROM jobs WHERE id=?").bind(complete[1]).first();
-          if (!job || !job.search_id || job.claim_id !== input.claim_id) return json({ error: "Claim unavailable" }, 409);
+          const job = await env.DB.prepare("SELECT id,user_id,search_id,watch_id,status,claim_id,lease_expires_at,final_digest FROM jobs WHERE id=?").bind(complete[1]).first();
+          if (!job || job.claim_id !== input.claim_id) return json({ error: "Claim unavailable" }, 409);
           const counted = await env.DB.prepare("SELECT count(*) AS total FROM results WHERE job_id=? AND user_id=? AND outcome='MATCH' AND verification='VERIFIED'").bind(job.id, job.user_id).first();
           const normalized = validateCompletion(input, counted?.total || 0);
           const hash = await digest(normalized);
@@ -152,14 +155,41 @@ export default {
           const stamp = now();
           if (!["CLAIMED", "RUNNING"].includes(job.status) || job.lease_expires_at < stamp) return json({ error: "Claim is no longer active" }, 409);
           const jobState = normalized.outcome === "ERROR" ? "FAILED" : "COMPLETED";
-          const searchState = normalized.outcome === "ERROR" ? "FAILED" : "COMPLETED";
-          await env.DB.batch([
+          const statements = [
             env.DB.prepare(`UPDATE jobs SET status=?,final_digest=?,lease_expires_at=NULL,updated_at=?
               WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=?`).bind(jobState, hash, stamp, job.id, normalized.claim_id, stamp),
-            env.DB.prepare(`UPDATE searches SET status=?,last_outcome=?,coverage_json=?,updated_at=?,completed_at=?
+          ];
+          if (job.search_id) {
+            const searchState = normalized.outcome === "ERROR" ? "FAILED" : "COMPLETED";
+            statements.push(env.DB.prepare(`UPDATE searches SET status=?,last_outcome=?,coverage_json=?,updated_at=?,completed_at=?
               WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND final_digest=?)`)
-              .bind(searchState, normalized.outcome, JSON.stringify(normalized.coverage), stamp, stamp, job.search_id, job.user_id, job.id, hash),
-          ]);
+              .bind(searchState, normalized.outcome, JSON.stringify(normalized.coverage), stamp, stamp, job.search_id, job.user_id, job.id, hash));
+          } else if (job.watch_id) {
+            const watch = await env.DB.prepare("SELECT status,last_outcome,current_fingerprint,coverage_json FROM watches WHERE id=? AND user_id=?")
+              .bind(job.watch_id, job.user_id).first();
+            if (!watch) return json({ error: "Watch unavailable" }, 409);
+            const records = await env.DB.prepare("SELECT fingerprint FROM results WHERE job_id=? AND user_id=? ORDER BY fingerprint,id")
+              .bind(job.id, job.user_id).all();
+            const fingerprint = records.results?.length ? await digest(records.results.map((row) => row.fingerprint)) : null;
+            const coverage = JSON.stringify(normalized.coverage);
+            const event = watch.last_outcome == null ? "INITIAL_CHECK" :
+              watch.last_outcome !== normalized.outcome ? "OUTCOME_CHANGED" :
+              watch.current_fingerprint !== fingerprint ? "RESULTS_CHANGED" :
+              watch.coverage_json !== coverage ? "COVERAGE_CHANGED" : null;
+            const next = nextWatchCheck(new Date(stamp));
+            statements.push(env.DB.prepare(`UPDATE watches SET status=CASE
+                WHEN status IN ('PAUSED','STOPPED') THEN status
+                WHEN ? > 0 THEN 'FOUND' ELSE 'ACTIVE' END,
+              last_outcome=?,last_checked_at=?,next_check_at=CASE WHEN status IN ('PAUSED','STOPPED') THEN next_check_at ELSE ? END,
+              current_fingerprint=?,coverage_json=?,updated_at=?
+              WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND final_digest=?)`)
+              .bind(counted?.total || 0, normalized.outcome, stamp, next, fingerprint, coverage, stamp, job.watch_id, job.user_id, job.id, hash));
+            if (event) statements.push(env.DB.prepare(`INSERT INTO watch_runs(id,user_id,watch_id,job_id,event_type,outcome,fingerprint,summary,created_at)
+              SELECT ?,user_id,id,?,?,?,?,?,? FROM watches WHERE id=? AND user_id=?
+              AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND final_digest=?)`)
+              .bind(crypto.randomUUID(), job.id, event, normalized.outcome, fingerprint, normalized.summary, stamp, job.watch_id, job.user_id, job.id, hash));
+          } else return json({ error: "Job source unavailable" }, 409);
+          await env.DB.batch(statements);
           const finalized = await env.DB.prepare("SELECT final_digest FROM jobs WHERE id=? AND user_id=?").bind(job.id, job.user_id).first();
           return finalized?.final_digest === hash ? json({ finalized: true, idempotent: false }) : json({ error: "Completion raced with another claim" }, 409);
         } catch (error) { return error.status === 400 ? json({ error: error.message }, 400) : json({ error: "Finalization unavailable; retry same completion" }, 503); }
@@ -194,6 +224,87 @@ export default {
       catch { return json({ error: "Storage temporarily unavailable" }, 503); }
       if (!row) return json({ error: "Search not found" }, 404);
       return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
+    }
+    if (request.method === "POST" && path === "/api/v1/watches") {
+      let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+      if (!/^[0-9a-f-]{36}$/.test(input.search_id || "")) return json({ error: "Choose a Search to keep watching" }, 400);
+      const stamp = now(), id = crypto.randomUUID();
+      try {
+        const source = await env.DB.prepare("SELECT module,criteria_json,schema_version,status FROM searches WHERE id=? AND user_id=?")
+          .bind(input.search_id, identity.user_id).first();
+        if (!source) return json({ error: "Search not found" }, 404);
+        if (source.module !== "family-deals" || source.schema_version !== 1) return json({ error: "Watch module is not available" }, 400);
+        if (source.status !== "COMPLETED") return json({ error: "Wait for this Search to finish before saving a Watch" }, 409);
+        // Revalidate the stored versioned payload instead of trusting client fields.
+        validateFamilyDealsCriteria(JSON.parse(source.criteria_json));
+        const next = nextWatchCheck(new Date(stamp));
+        await env.DB.prepare(`INSERT INTO watches(id,user_id,source_search_id,module,criteria_json,schema_version,status,next_check_at,created_at,updated_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(id, identity.user_id, input.search_id, source.module,
+          source.criteria_json, source.schema_version, "ACTIVE", next, stamp, stamp).run();
+        return json({ id, source_search_id: input.search_id, module: source.module, status: "ACTIVE", next_check_at: next }, 201);
+      } catch { return json({ error: "Watch storage unavailable" }, 503); }
+    }
+    if (request.method === "GET" && path === "/api/v1/watches") {
+      try {
+        const rows = await env.DB.prepare(`SELECT id,source_search_id,module,criteria_json,status,last_outcome,coverage_json,last_checked_at,next_check_at,created_at,updated_at
+          FROM watches WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 100`).bind(identity.user_id).all();
+        return json({ watches: (rows.results || []).map(({ criteria_json, coverage_json, ...row }) =>
+          ({ ...row, criteria: JSON.parse(criteria_json), coverage: coverage_json ? JSON.parse(coverage_json) : null })) });
+      } catch { return json({ error: "Watch query unavailable" }, 503); }
+    }
+    const watchMatch = /^\/api\/v1\/watches\/([0-9a-f-]{36})(\/check)?$/.exec(path);
+    if (watchMatch) {
+      const watchId = watchMatch[1];
+      let watch;
+      try { watch = await env.DB.prepare(`SELECT id,user_id,source_search_id,module,criteria_json,status,last_outcome,coverage_json,last_checked_at,next_check_at,current_fingerprint,created_at,updated_at
+        FROM watches WHERE id=? AND user_id=?`).bind(watchId, identity.user_id).first(); }
+      catch { return json({ error: "Watch query unavailable" }, 503); }
+      if (!watch) return json({ error: "Watch not found" }, 404);
+      if (request.method === "GET" && !watchMatch[2]) {
+        try {
+          const history = await env.DB.prepare(`SELECT event_type,outcome,fingerprint,summary,created_at
+            FROM watch_runs WHERE watch_id=? AND user_id=? ORDER BY created_at DESC,id DESC LIMIT 50`)
+            .bind(watchId, identity.user_id).all();
+          const { criteria_json, coverage_json, user_id, ...publicWatch } = watch;
+          return json({ ...publicWatch, criteria: JSON.parse(criteria_json), coverage: coverage_json ? JSON.parse(coverage_json) : null, history: history.results || [] });
+        } catch { return json({ error: "Watch history unavailable" }, 503); }
+      }
+      if (request.method === "POST" && watchMatch[2]) {
+        if (!["ACTIVE", "FOUND"].includes(watch.status)) return json({ error: "Resume this Watch before checking" }, 409);
+        const stamp = now(), jobId = crypto.randomUUID();
+        try {
+          await env.DB.prepare(`INSERT OR IGNORE INTO jobs(id,user_id,watch_id,module,status,due_at,idempotency_key,created_at,updated_at)
+            SELECT ?,user_id,id,module,'QUEUED',?,?,?,? FROM watches
+            WHERE id=? AND user_id=? AND status IN ('ACTIVE','FOUND')
+              AND NOT EXISTS (SELECT 1 FROM jobs WHERE watch_id=? AND status IN ('QUEUED','CLAIMED','RUNNING','RETRYABLE','DELAYED'))`)
+            .bind(jobId, stamp, `watch:${watchId}:manual:${jobId}`, stamp, stamp, watchId, identity.user_id, watchId).run();
+          const inserted = await env.DB.prepare("SELECT id FROM jobs WHERE id=? AND user_id=?").bind(jobId, identity.user_id).first();
+          if (!inserted) return json({ error: "A check is already queued or this Watch is not active" }, 409);
+          let dispatch; try { dispatch = await dispatchPending(env); } catch { dispatch = "deferred"; }
+          return json({ job_id: jobId, status: "QUEUED", dispatch }, 202);
+        } catch { return json({ error: "Watch check unavailable" }, 503); }
+      }
+      if ((request.method === "PATCH" || request.method === "DELETE") && !watchMatch[2]) {
+        let action = "stop";
+        if (request.method === "PATCH") {
+          let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+          action = input.action;
+        }
+        const transitions = { pause: ["ACTIVE", "FOUND"], resume: ["PAUSED", "DELAYED"], keep_watching: ["FOUND"], stop: ["ACTIVE", "FOUND", "PAUSED", "DELAYED"] };
+        if (!transitions[action]?.includes(watch.status)) return json({ error: "This Watch cannot make that transition" }, 409);
+        const status = action === "pause" ? "PAUSED" : action === "stop" ? "STOPPED" : "ACTIVE";
+        const stamp = now();
+        try {
+          const next = action === "resume" ? stamp :
+            action === "keep_watching" ? nextWatchCheck(new Date(stamp)) : watch.next_check_at;
+          const changed = await env.DB.prepare(`UPDATE watches SET status=?,next_check_at=?,updated_at=? WHERE id=? AND user_id=? AND status=? RETURNING id`)
+            .bind(status, next, stamp, watchId, identity.user_id, watch.status).first();
+          if (!changed) return json({ error: "Watch changed; refresh and try again" }, 409);
+          if (status === "STOPPED") await env.DB.prepare(`UPDATE jobs SET status='FAILED',delay_reason='watch_stopped',updated_at=?
+            WHERE watch_id=? AND user_id=? AND status IN ('QUEUED','RETRYABLE','DELAYED')`).bind(stamp, watchId, identity.user_id).run();
+          return json({ id: watchId, status, next_check_at: next });
+        } catch { return json({ error: "Watch update unavailable" }, 503); }
+      }
     }
     if (request.method === "GET" && path === "/api/v1/results") {
       const searchId = url.searchParams.get("search_id"), watchId = url.searchParams.get("watch_id");
