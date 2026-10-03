@@ -111,6 +111,15 @@ class TMDBMovieAdapter:
                 source="TMDB watch providers powered by JustWatch",
             )
 
+    @staticmethod
+    def _us_certification(release_dates: dict) -> str | None:
+        results = release_dates.get("results", []) if isinstance(release_dates, dict) else []
+        us = next((entry for entry in results if entry.get("iso_3166_1") == "US"), None)
+        if not us:
+            return None
+        certifications = [(entry.get("certification") or "").strip().upper() for entry in (us.get("release_dates", []) or []) if (entry.get("certification") or "").strip()]
+        return certifications[0] if certifications else None
+
     def _normalize(self, item: dict, checked_at: str) -> MovieCandidate | None:
         movie_id = item.get("id")
         title = (item.get("title") or item.get("original_title") or "").strip()
@@ -148,6 +157,12 @@ class TMDBMovieAdapter:
         release_date = (item.get("release_date") or "").strip() or None
         year = int(release_date[:4]) if release_date and release_date[:4].isdigit() else None
         genres = tuple(GENRE_NAMES[g] for g in item.get("genre_ids", []) if g in GENRE_NAMES)
+        details = self._get(f"/movie/{int(movie_id)}", {"language": self.config.language, "append_to_response": "release_dates"})
+        runtime = details.get("runtime")
+        runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
+        age_rating = self._us_certification(details.get("release_dates", {}))
+        if not genres:
+            genres = tuple(g.get("name", "").strip() for g in details.get("genres", []) if g.get("name"))
 
         return MovieCandidate(
             title=title,
@@ -164,6 +179,6 @@ class TMDBMovieAdapter:
             offers=tuple(offers),
             available_from=None,
             genres=genres,
-            runtime_minutes=None,
-            age_rating=None,
+            runtime_minutes=runtime_minutes,
+            age_rating=age_rating,
         )
