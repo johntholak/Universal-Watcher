@@ -48,7 +48,7 @@ def test_pipeline_combines_successful_sources():
 
 def test_pipeline_preserves_provider_failure_as_unavailable():
     result = run_movie_gm_pipeline([GoodProvider(), FailedProvider(), PartialProvider()])
-    assert result.providers_checked == ("GoodProvider",)
+    assert result.providers_checked == ("GoodProvider", "PartialProvider")
     assert ("BrokenProvider", "UNAVAILABLE: RuntimeError") in result.providers_unavailable
     assert ("PartialProvider", "source blocked") in result.providers_unavailable
     assert result.total_candidates == 2
