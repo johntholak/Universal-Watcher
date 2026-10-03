@@ -157,7 +157,12 @@ class TMDBMovieAdapter:
         release_date = (item.get("release_date") or "").strip() or None
         year = int(release_date[:4]) if release_date and release_date[:4].isdigit() else None
         genres = tuple(GENRE_NAMES[g] for g in item.get("genre_ids", []) if g in GENRE_NAMES)
-        details = self._get(f"/movie/{int(movie_id)}", {"language": self.config.language, "append_to_response": "release_dates"})
+        # Detail enrichment is best-effort. A missing detail response must not
+        # turn an otherwise verified availability result into provider UNAVAILABLE.
+        try:
+            details = self._get(f"/movie/{int(movie_id)}", {"language": self.config.language, "append_to_response": "release_dates"})
+        except Exception:
+            details = {}
         runtime = details.get("runtime")
         runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
         age_rating = self._us_certification(details.get("release_dates", {}))
