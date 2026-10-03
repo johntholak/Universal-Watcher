@@ -31,8 +31,7 @@ Tickets engine/contracts remain preserved and hidden.
 - responsive layout with keyboard focus states
 - no shelved or future-module placeholder cards
 
-The shell uses plain HTML, CSS, and JavaScript so it can be opened without a
-framework or dependency install. Existing module engines remain unchanged.
+The shell uses plain HTML, CSS, and JavaScript so it can be opened without a framework or dependency install. Movie GM feedback is stored in `data/movie_gm.sqlite3`; the matching production D1 schema is `cloud/migrations/0005_movie_gm_feedback.sql`.
 
 `server.py` adds a small in-memory preview API. It accepts draft watch
 definitions and lifecycle transitions through the shared `core.contracts`
