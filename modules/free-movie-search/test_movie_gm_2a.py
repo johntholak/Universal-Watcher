@@ -65,6 +65,26 @@ def test_watch_history_normalizes_titles():
     assert feedback_signal("THE GOONIES", history) == 100.0
 
 
+def test_watched_history_suppresses_matching_title():
+    history = (WatchRecord("the goonies", rating="loved"),)
+    assert rank_movies([movie("The Goonies")], watch_history=history) == []
+    assert len(rank_movies([movie("The Goonies")], watch_history=history, suppress_watched=False)) == 1
+
+
+def test_taste_profile_is_used_by_ranker():
+    candidate = movie("Adventure Example")
+    candidate = MovieCandidate(
+        candidate.title, candidate.year, candidate.ratings, candidate.offers,
+        genres=("Adventure",), runtime_minutes=105,
+    )
+    results = rank_movies(
+        [candidate],
+        taste_profile=TasteProfile(preferred_genres=("Adventure",)),
+    )
+    assert results[0].personal_fit_score > 50
+    assert any("Taste fit:" in reason for reason in results[0].reasons)
+
+
 def test_taste_profile_explains_match():
     score, reasons = score_taste(
         genres=("Adventure", "Comedy"),
