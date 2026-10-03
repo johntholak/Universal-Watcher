@@ -20,6 +20,8 @@ class RuntimeConfig:
     include_tmdb: bool = True
     include_omdb: bool = True
     rating_enrichment_limit: int = 25
+    tmdb_token: str | None = None
+    omdb_api_key: str | None = None
 
 
 class _UnavailableAdapter:
@@ -35,7 +37,7 @@ def build_movie_adapters(config: RuntimeConfig | None = None):
     config = config or RuntimeConfig()
     adapters = []
     if config.include_tmdb:
-        token = os.getenv("TMDB_READ_ACCESS_TOKEN", "").strip()
+        token = (config.tmdb_token or os.getenv("TMDB_READ_ACCESS_TOKEN", "")).strip()
         if token:
             adapters.append(TMDBMovieAdapter(TMDBConfig(token=token)))
         else:
@@ -47,7 +49,7 @@ def build_movie_rating_enrichers(config: RuntimeConfig | None = None):
     config = config or RuntimeConfig()
     if not config.include_omdb:
         return ()
-    key = os.getenv("OMDB_API_KEY", "").strip()
+    key = (config.omdb_api_key or os.getenv("OMDB_API_KEY", "")).strip()
     if not key:
         return ()
     return (OMDbRatingAdapter(OMDbConfig(api_key=key)),)
