@@ -1,15 +1,25 @@
 # PROJECT_STATUS.md — Universal Watcher
 
-**Status date:** September 26, 2026
+**Status date:** October 3, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals UI, offline Search/Watch API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
+**Current milestone:** Movie GM decision engine and provider integration boundary are built; live free-movie provider adapters are not yet connected
+
+## October 3 Movie GM checkpoint
+
+- Added the Movie GM recommendation orchestrator with Everyone, Kids, Tonight, and Hidden Gems modes.
+- Added structured recommendation breakdowns, household disagreement, watched-title suppression, runtime filtering, upcoming separation, and human-readable decision reasons.
+- Added `movie_gm_pipeline.py` as the provider integration boundary. It accepts provider adapters, preserves provider failures as `UNAVAILABLE`, deduplicates normalized candidates, and hands the combined evidence to Movie GM.
+- Added deterministic tests for the orchestrator and provider boundary.
+- No live provider adapter has been added or contacted by this checkpoint. The new pipeline is intentionally an integration seam, not a claim of live movie-streaming coverage.
+
+**NEXT TASK:** Connect the first real legal streaming provider/source adapter to `MovieSourceAdapter`, using verified offer provenance and current availability evidence, then run the Movie GM pipeline against that live normalized data. Do not invent or hard-code live catalog results.
 
 ## September 26 browser-fixture gate
 
 - Added a Node VM regression that executes the exact JavaScript injected by the V5 bridge with mocked page controls. It verifies an unclamped radius/budget and coordinate parsing without any provider request.
 - Added `cloud/test_v5_browser_fixture.py` to exercise the real V5 page with local verifier responses and intercepted Overpass data; all non-loopback requests are aborted. It is skipped when Chromium is absent. A local attempt to install the pinned Playwright Chromium headless shell failed because the downloaded archive was truncated, so no browser acceptance run is claimed.
 
-**NEXT TASK:** Run `python -m unittest cloud.test_v5_browser_fixture -v` on a suitable Chromium runner and fix any fixture failures; then review actual free account quotas and perform one controlled live provider acceptance before considering cloud deployment. Notifications and provider circuit breakers remain later work.
+Historical next task from September 26 browser-fixture checkpoint: run `python -m unittest cloud.test_v5_browser_fixture -v` on a suitable Chromium runner; the active global next task is the October 3 Movie GM provider adapter integration above.
 
 ## September 26 bounded failure checkpoint
 
