@@ -6,6 +6,7 @@ from http.client import HTTPConnection
 
 from server import DraftWatchStore, make_handler, serialize_result
 from modules.free_movie_search.movie_gm_profile import WatchRecord
+from modules.free_movie_search.movie_gm_decision import learn_taste_from_history
 from http.server import ThreadingHTTPServer
 from core.contracts import Evidence, WatchResult
 from tempfile import TemporaryDirectory
@@ -27,7 +28,7 @@ class PreviewServerTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=2)
-        cls.store._movie_store.close()
+        cls.store.close_movie_stores()
         cls.tempdir.cleanup()
 
     def request(self, method, path, body=None):
@@ -115,13 +116,30 @@ class PreviewServerTests(unittest.TestCase):
     def test_movie_feedback_survives_store_reopen_and_learns_preferences(self):
         self.store.add_movie_feedback(WatchRecord(title_key="Spider-Man", rating="loved"), ("Action", "Adventure"), "Spider-Man")
         self.store.add_movie_feedback(WatchRecord(title_key="Bad Horror", rating="disliked"), ("Horror",), "Bad Horror")
-        self.store._movie_store.close()
+        self.store.close_movie_stores()
         reopened = DraftWatchStore(Path(self.tempdir.name) / "movie_gm.sqlite3")
         self.store = reopened
         self.assertEqual([record.title_key for record in reopened.movie_history()], ["spider-man"])
         learned = learn_taste_from_history(reopened.movie_feedback())
         self.assertIn("action", learned.preferred_genres)
         self.assertIn("horror", learned.disliked_genres)
+
+    def test_movie_household_profile_api_persists(self):
+        status, payload = self.request("POST", "/api/movies/viewers", {
+            "viewer_id": "kid", "display_name": "Kid", "weight": 2,
+            "preferred_genres": ["Animation"], "disliked_genres": ["Horror"],
+            "preferred_keywords": ["animals"], "disliked_keywords": ["gore"],
+            "preferred_runtime_min": 80, "preferred_runtime_max": 120
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["viewer"]["display_name"], "Kid")
+        status, payload = self.request("GET", "/api/movies/viewers")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["viewers"][0]["preferred_genres"], ["Animation"])
+        status, payload = self.request("DELETE", "/api/movies/viewers/kid")
+        self.assertEqual(status, 200)
+        status, payload = self.request("GET", "/api/movies/viewers")
+        self.assertEqual(payload["viewers"], [])
 
     def test_result_serialization_preserves_evidence_and_truthful_outcome(self):
         result = WatchResult(
