@@ -1,0 +1,33 @@
+name: Movie GM CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  movie-gm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Compile Movie GM Worker and engine
+        run: |
+          python -m py_compile cloud/movie_gm_worker.py
+          python -m py_compile modules/free-movie-search/movie_gm_runtime.py
+          python -m py_compile modules/free-movie-search/movie_gm_decision.py
+      - name: Run Movie GM tests
+        run: |
+          python -m unittest modules.free-movie-search.test_movie_gm_2a modules.free-movie-search.test_movie_gm_pipeline modules.free-movie-search.test_movie_gm_recommender modules.free-movie-search.test_movie_gm_runtime modules.free-movie-search.test_omdb_rating_adapter web.test_movie_gm_household
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Validate Worker JavaScript
+        run: node --check cloud/worker.mjs
