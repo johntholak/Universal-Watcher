@@ -34,8 +34,17 @@
         <header class="page-header"><span class="page-icon movie-glyph">▦</span><div><h1 id="movies-title">Movies</h1><p>Find showtimes and the best seats, or keep watching until they appear.</p></div><button class="button button-quiet how-button" type="button" data-help>ⓘ &nbsp; How It Works</button></header>
         <div class="offline-banner" role="status"><span>◷</span><div><strong>Preview mode — search controls are safe to explore</strong><small>AMC is temporarily blocking normal requests. This page will not contact AMC or start the Movies engine.</small></div></div><section class="movie-gm-panel" aria-labelledby="movie-gm-title">
   <div class="movie-gm-heading"><div><p class="eyebrow">MOVIE GM</p><h2 id="movie-gm-title">Find something to watch</h2><p>Search current legal streaming offers, apply household fit, and separate confirmed upcoming releases.</p></div><div class="movie-gm-modes" role="group" aria-label="Movie search mode"><button type="button" class="gm-mode is-active" data-gm-mode="everyone">Everyone</button><button type="button" class="gm-mode" data-gm-mode="kids">Kids</button><button type="button" class="gm-mode" data-gm-mode="tonight">Tonight</button><button type="button" class="gm-mode" data-gm-mode="hidden_gems">Hidden Gems</button></div></div>
-  <form id="movie-gm-form" class="movie-gm-search"><label class="field icon-field"><span>⌕</span><input id="movie-gm-query" type="search" placeholder="Optional title or keyword" aria-label="Movie search"></label><button class="button button-primary" type="submit">⌕ &nbsp; Run the movie search</button></form>
-  <div id="movie-gm-status" class="movie-gm-status" role="status" aria-live="polite">Ready. Run the movie search to check the configured sources.</div>
+  <form id="movie-gm-form" class="movie-gm-search">
+    <button class="button button-primary gm-pick-button" type="submit">✦ &nbsp; Find Me Something Good</button>
+    <details class="gm-specific-search">
+      <summary>Looking for something specific?</summary>
+      <div class="gm-specific-row">
+        <label class="field icon-field"><span>⌕</span><input id="movie-gm-query" type="search" placeholder="Movie title, actor, genre, or keyword" aria-label="Specific movie search"></label>
+        <button class="button button-outline" type="submit">Search</button>
+      </div>
+    </details>
+  </form>
+  <div id="movie-gm-status" class="movie-gm-status" role="status" aria-live="polite">Ready. Let the Movie GM find something for you.</div>
   <section id="movie-gm-results" class="movie-gm-results" hidden aria-live="polite"></section>
 </section>
         <form id="movie-search-form" class="movie-workspace">
