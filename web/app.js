@@ -41,7 +41,13 @@
         const data = await response.json();
         movieApi.csrf = data.csrf_token || "";
       } else if (response.status === 401) {
-        showAuthDialog();
+        const demoResponse = await fetch("/api/v1/session?mode=demo", { credentials: "same-origin", cache: "no-store" });
+        if (demoResponse.ok) {
+          const data = await demoResponse.json();
+          movieApi.csrf = data.csrf_token || "";
+        } else {
+          showAuthDialog();
+        }
       }
       movieApi.ready = true;
     } catch (_error) {
