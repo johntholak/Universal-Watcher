@@ -1,28 +1,18 @@
-"""Deterministic core for Universal Watcher's free movie search.
+"""Deterministic ranking core for Universal Watcher's Movie GM.
 
-Provider adapters should feed normalized MovieCandidate records into this module.
+Provider adapters feed normalized MovieCandidate records into this module.
 No network access belongs here.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, timedelta
 from math import log10
 from typing import Iterable, Sequence
 
-
-# Household services the caller already pays for. Offers on these services
-# can be treated as zero incremental cost by the search engine.
 DEFAULT_INCLUDED_SUBSCRIPTIONS: tuple[str, ...] = (
-    "Prime Video",
-    "Max",
-    "Apple TV+",
-    "Hulu",
-    "Peacock",
-    "YouTube TV",
+    "Prime Video", "Max", "Apple TV+", "Hulu", "Peacock", "YouTube TV",
 )
-
-# Services the caller does not currently own but wants surfaced as options.
-# These are never treated as actually accessible without an explicit override.
 DEFAULT_OPTIONAL_SERVICES: tuple[str, ...] = ("Netflix",)
 
 
@@ -43,6 +33,7 @@ class FreeOffer:
     checked_at: str = ""
     source: str = ""
     verified: bool = False
+    availability_confidence: str = "unknown"
 
 
 @dataclass(frozen=True)
@@ -51,17 +42,12 @@ class MovieCandidate:
     year: int | None
     ratings: RatingEvidence
     offers: tuple[FreeOffer, ...]
-    # Streaming availability date. None means currently available or unknown.
-    available_from: str | None = None
-    # Streaming availability date. None means currently available or unknown.
     available_from: str | None = None
     genres: tuple[str, ...] = ()
     runtime_minutes: int | None = None
     age_rating: str | None = None
     personal_fit: float = 0.0
     taste_reasons: tuple[str, ...] = ()
-    # Explicit per-child fit supplied by the normalization/content-review layer.
-    # This keeps developmental judgments out of the generic quality score.
     age_fit_by_age: tuple[tuple[int, float], ...] = ()
     kids_eligible: bool | None = None
     pg13_kid_friendly: bool | None = None
@@ -75,6 +61,7 @@ class RankedMovie:
     personal_fit_score: float
     combined_score: float
     confidence: float
+    availability_confidence: float
     reasons: tuple[str, ...] = ()
 
 
@@ -83,18 +70,12 @@ def _clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
 
 
 def _bayesian_imdb(
-    rating: float | None,
-    votes: int | None,
-    prior: float = 6.5,
-    prior_votes: int = 5000,
+    rating: float | None, votes: int | None, prior: float = 6.5, prior_votes: int = 5000,
 ) -> float | None:
     if rating is None:
         return None
-    votes = max(0, votes or 0)
-    return (
-        (votes / (votes + prior_votes)) * rating
-        + (prior_votes / (votes + prior_votes)) * prior
-    )
+    v = max(0, votes or 0)
+    return (v / (v + prior_votes)) * rating + (prior_votes / (v + prior_votes)) * prior
 
 
 def _rating_volume(votes: int | None) -> float:
@@ -103,34 +84,59 @@ def _rating_volume(votes: int | None) -> float:
     return _clamp((log10(max(votes, 1)) / 6.0) * 100.0)
 
 
+def _offer_confidence(offer: FreeOffer) -> float:
+    if not offer.verified:
+        return 0.0
+    return {
+        "direct": 100.0,
+        "recent": 95.0,
+        "multi_source": 92.0,
+        "indirect": 65.0,
+        "stale": 40.0,
+        "unknown": 50.0,
+    }.get(offer.availability_confidence, 50.0)
+
+
+def _offer_accessible(
+    offer: FreeOffer,
+    *,
+    included_subscriptions: Sequence[str],
+    include_optional_services: Sequence[str],
+    include_optional_as_free: bool,
+) -> bool:
+    if not offer.verified:
+        return False
+    access = offer.access.casefold()
+    provider = offer.provider.casefold()
+    included = {p.casefold() for p in included_subscriptions}
+    optional = {p.casefold() for p in include_optional_services}
+    if access in {"free", "free_ads"}:
+        return True
+    if access in {"subscription", "included_subscription", "paid_subscription"}:
+        return provider in included or (include_optional_as_free and provider in optional)
+    return False
+
+
 def quality_score(ratings: RatingEvidence) -> tuple[float, float]:
     components: list[tuple[float, float]] = []
-
     imdb = _bayesian_imdb(ratings.imdb, ratings.imdb_votes)
     if imdb is not None:
         components.append((imdb * 10.0, 0.48))
-
     if ratings.rotten_tomatoes_critics is not None:
         components.append((_clamp(ratings.rotten_tomatoes_critics), 0.18))
-
     if ratings.rotten_tomatoes_audience is not None:
         components.append((_clamp(ratings.rotten_tomatoes_audience), 0.22))
-
     if ratings.metacritic is not None:
         components.append((_clamp(ratings.metacritic), 0.12))
-
     if not components:
         return 0.0, 0.0
-
-    total_weight = sum(weight for _, weight in components)
-    score = sum(value * weight for value, weight in components) / total_weight
-    volume = _rating_volume(ratings.imdb_votes)
-    confidence = min(100.0, (len(components) / 4.0) * 60.0 + volume * 0.40)
+    total = sum(weight for _, weight in components)
+    score = sum(value * weight for value, weight in components) / total
+    confidence = min(100.0, (len(components) / 4.0) * 60.0 + _rating_volume(ratings.imdb_votes) * 0.40)
     return _clamp(score), _clamp(confidence)
 
 
 def _age_fit_score(movie: MovieCandidate, age: int) -> float:
-    """Return explicit fit for one child age, without inventing missing evidence."""
     for candidate_age, score in movie.age_fit_by_age:
         if candidate_age == age:
             return _clamp(score)
@@ -139,25 +145,16 @@ def _age_fit_score(movie: MovieCandidate, age: int) -> float:
 
 def _kids_gate(movie: MovieCandidate, allow_pg13: bool) -> tuple[bool, str | None]:
     rating = (movie.age_rating or "").upper().strip()
-
-    if movie.kids_eligible is False:
+    if movie.kids_eligible is False or rating in {"R", "NC-17"}:
         return False, None
-
-    if rating in {"R", "NC-17"}:
-        return False, None
-
     if movie.kids_eligible is None:
         return False, None
-
     if rating == "PG-13":
         if not allow_pg13 or movie.pg13_kid_friendly is not True:
             return False, None
         return True, movie.pg13_reason or "PG-13 approved as kid-friendly"
-
     if rating in {"G", "PG", "TV-G", "TV-PG"}:
         return True, None
-
-    # Unrated or unknown classifications require explicit kid eligibility.
     return movie.kids_eligible is True, None
 
 
@@ -174,75 +171,57 @@ def rank_movies(
     child_ages: Sequence[int] = (),
     allow_pg13: bool = True,
     age_fit_weight: float = 0.45,
+    included_subscriptions: Sequence[str] = DEFAULT_INCLUDED_SUBSCRIPTIONS,
+    include_optional_services: Sequence[str] = DEFAULT_OPTIONAL_SERVICES,
+    include_optional_as_free: bool = False,
+    availability_weight: float = 0.10,
 ) -> list[RankedMovie]:
     allowed = {g.casefold() for g in allowed_genres}
     excluded = {g.casefold() for g in excluded_genres}
     preferred = {p.casefold() for p in preferred_providers}
-
     results: list[RankedMovie] = []
 
     for movie in movies:
-        accessible_offers = [
-            offer for offer in movie.offers
+        accessible = [
+            o for o in movie.offers
             if _offer_accessible(
-                offer,
+                o,
                 included_subscriptions=included_subscriptions,
                 include_optional_services=include_optional_services,
                 include_optional_as_free=include_optional_as_free,
             )
         ]
-        if not accessible_offers:
+        if not accessible:
             continue
-
-        if minimum_imdb is not None:
-            if movie.ratings.imdb is None or movie.ratings.imdb < minimum_imdb:
-                continue
-
-        if minimum_votes is not None:
-            if (movie.ratings.imdb_votes or 0) < minimum_votes:
-                continue
-
+        if minimum_imdb is not None and (movie.ratings.imdb is None or movie.ratings.imdb < minimum_imdb):
+            continue
+        if minimum_votes is not None and (movie.ratings.imdb_votes or 0) < minimum_votes:
+            continue
         genres = {g.casefold() for g in movie.genres}
-        if allowed and not (genres & allowed):
+        if allowed and not genres.intersection(allowed):
             continue
-        if excluded and genres & excluded:
+        if excluded and genres.intersection(excluded):
             continue
 
-        pg13_note: str | None = None
+        pg13_note = None
         if kids_mode:
             passed, pg13_note = _kids_gate(movie, allow_pg13)
             if not passed:
                 continue
 
-        quality, confidence = quality_score(movie.ratings)
-
-        provider_bonus = 0.0
-        if preferred and any(
-            offer.provider.casefold() in preferred for offer in accessible_offers
-        ):
-            provider_bonus = 5.0
-
+        quality, quality_confidence = quality_score(movie.ratings)
+        availability = max(_offer_confidence(o) for o in accessible)
+        provider_bonus = 5.0 if preferred and any(o.provider.casefold() in preferred for o in accessible) else 0.0
         personal = _clamp(movie.personal_fit + provider_bonus)
-
         reasons = list(movie.taste_reasons)
 
         if kids_mode and child_ages:
-            child_scores = [
-                (age, _age_fit_score(movie, age))
-                for age in child_ages
-            ]
-            combined_age_fit = sum(score for _, score in child_scores) / len(child_scores)
-            # Penalize a large age mismatch instead of hiding it inside one family score.
-            spread = max(score for _, score in child_scores) - min(
-                score for _, score in child_scores
-            )
-            age_component = _clamp(combined_age_fit - spread * 0.20)
-            personal = _clamp(
-                personal * (1.0 - age_fit_weight)
-                + age_component * age_fit_weight
-            )
-            for age, score in child_scores:
-                reasons.append(f"Age {age} fit: {score:.0f}/100")
+            scores = [(age, _age_fit_score(movie, age)) for age in child_ages]
+            average = sum(score for _, score in scores) / len(scores)
+            spread = max(score for _, score in scores) - min(score for _, score in scores)
+            age_component = _clamp(average - spread * 0.20)
+            personal = _clamp(personal * (1.0 - age_fit_weight) + age_component * age_fit_weight)
+            reasons.extend(f"Age {age} fit: {score:.0f}/100" for age, score in scores)
             reasons.append(f"Mixed-age fit: {age_component:.0f}/100")
             if pg13_note:
                 reasons.append(f"PG-13 approved for kids: {pg13_note}")
@@ -250,92 +229,44 @@ def rank_movies(
         combined = _clamp(
             quality * (1.0 - personal_fit_weight)
             + personal * personal_fit_weight
+            + availability * availability_weight
+            - 100.0 * availability_weight
         )
-
         if movie.ratings.imdb_votes:
-            reasons.append(
-                f"IMDb evidence: {movie.ratings.imdb:.1f}/10 "
-                f"from {movie.ratings.imdb_votes:,} votes"
-            )
-        providers = sorted({offer.provider for offer in verified_free})
-        reasons.append("Free on " + ", ".join(providers))
+            reasons.append(f"IMDb evidence: {movie.ratings.imdb:.1f}/10 from {movie.ratings.imdb_votes:,} votes")
+        providers = sorted({o.provider for o in accessible})
+        reasons.append("Accessible on " + ", ".join(providers))
+        reasons.append(f"Availability confidence: {availability:.0f}/100")
 
-        results.append(
-            RankedMovie(
-                movie=movie,
-                quality_score=round(quality, 2),
-                personal_fit_score=round(personal, 2),
-                combined_score=round(combined, 2),
-                confidence=round(confidence, 2),
-                reasons=tuple(reasons),
-            )
-        )
+        results.append(RankedMovie(
+            movie=movie,
+            quality_score=round(quality, 2),
+            personal_fit_score=round(personal, 2),
+            combined_score=round(combined, 2),
+            confidence=round(quality_confidence, 2),
+            availability_confidence=round(availability, 2),
+            reasons=tuple(reasons),
+        ))
 
     return sorted(
         results,
-        key=lambda result: (
-            result.combined_score,
-            result.quality_score,
-            result.confidence,
-            result.movie.title.casefold(),
-        ),
+        key=lambda r: (r.combined_score, r.quality_score, r.availability_confidence, r.movie.title.casefold()),
         reverse=True,
     )
 
 
 def split_current_and_upcoming(
-    ranked: Sequence[RankedMovie],
-    *,
-    as_of: str,
-    days: int = 30,
+    ranked: Sequence[RankedMovie], *, as_of: str, days: int = 30,
 ) -> tuple[list[RankedMovie], list[RankedMovie]]:
-    """Split ranked results into currently available and upcoming releases.
-
-    Dates are ISO-8601 YYYY-MM-DD strings. Unknown dates stay in the current
-    bucket only when the candidate already has a verified accessible offer.
-    The provider layer should supply future availability dates for upcoming
-    titles. This function does not invent them.
-    """
-    from datetime import date, timedelta
-
     start = date.fromisoformat(as_of)
     end = start + timedelta(days=days)
     current: list[RankedMovie] = []
     upcoming: list[RankedMovie] = []
-
     for result in ranked:
-        available_from = result.movie.available_from
-        if available_from:
-            release_date = date.fromisoformat(available_from)
+        if result.movie.available_from:
+            release_date = date.fromisoformat(result.movie.available_from)
             if start < release_date <= end:
                 upcoming.append(result)
                 continue
         current.append(result)
-
-    return current, upcoming
-
-
-def split_current_and_upcoming(
-    ranked: Sequence[RankedMovie],
-    *,
-    as_of: str,
-    days: int = 30,
-) -> tuple[list[RankedMovie], list[RankedMovie]]:
-    """Split ranked results into currently available and upcoming releases."""
-    from datetime import date, timedelta
-
-    start = date.fromisoformat(as_of)
-    end = start + timedelta(days=days)
-    current: list[RankedMovie] = []
-    upcoming: list[RankedMovie] = []
-
-    for result in ranked:
-        available_from = result.movie.available_from
-        if available_from:
-            release_date = date.fromisoformat(available_from)
-            if start < release_date <= end:
-                upcoming.append(result)
-                continue
-        current.append(result)
-
     return current, upcoming
