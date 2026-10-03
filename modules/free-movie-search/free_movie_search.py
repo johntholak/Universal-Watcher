@@ -25,6 +25,8 @@ class RatingEvidence:
     rotten_tomatoes_critics: float | None = None
     rotten_tomatoes_audience: float | None = None
     metacritic: float | None = None
+    tmdb: float | None = None
+    tmdb_votes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -130,11 +132,14 @@ def quality_score(ratings: RatingEvidence) -> tuple[float, float]:
         components.append((_clamp(ratings.rotten_tomatoes_audience), 0.22))
     if ratings.metacritic is not None:
         components.append((_clamp(ratings.metacritic), 0.12))
+    if ratings.tmdb is not None:
+        components.append((_clamp(ratings.tmdb * 10.0), 0.12))
     if not components:
         return 0.0, 0.0
     total = sum(weight for _, weight in components)
     score = sum(value * weight for value, weight in components) / total
-    confidence = min(100.0, (len(components) / 4.0) * 60.0 + _rating_volume(ratings.imdb_votes) * 0.40)
+    volume = max(_rating_volume(ratings.imdb_votes), _rating_volume(ratings.tmdb_votes))
+    confidence = min(100.0, (len(components) / 5.0) * 60.0 + volume * 0.40)
     return _clamp(score), _clamp(confidence)
 
 
