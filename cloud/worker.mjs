@@ -80,7 +80,10 @@ export default {
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
     const url = new URL(request.url);
     const path = url.pathname;
-    if (!path.startsWith("/api/v1/")) return json({ error: "Not found" }, 404);
+    if (!path.startsWith("/api/v1/")) {
+      if (request.method === "GET" && env.ASSETS) return env.ASSETS.fetch(request);
+      return json({ error: "Not found" }, 404);
+    }
     if (request.method === "GET" && path === "/api/v1/system/status") return json({ state: "preview", execution: "not_connected" });
 
     if (request.method === "POST" && path === "/api/v1/session") {
