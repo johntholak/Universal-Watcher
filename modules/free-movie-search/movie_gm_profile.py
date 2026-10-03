@@ -26,6 +26,9 @@ class WatchRecord:
     viewers: tuple[str, ...] = ()
     notes: str = ""
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "title_key", normalize_title(self.title_key))
+
 
 VALID_FEEDBACK = frozenset({"loved", "liked", "fine", "disliked"})
 
