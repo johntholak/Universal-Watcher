@@ -4,6 +4,73 @@
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
+  const movieApi = { production: false, csrf: "", ready: false };
+
+  function movieApiPath(path) {
+    return movieApi.production ? `/api/v1${path}` : path;
+  }
+
+  async function movieApiFetch(path, options = {}) {
+    const requestOptions = { credentials: "same-origin", cache: "no-store", ...options };
+    const headers = new Headers(requestOptions.headers || {});
+    if (movieApi.production && requestOptions.method && requestOptions.method !== "GET") {
+      headers.set("X-CSRF-Token", movieApi.csrf);
+    }
+    requestOptions.headers = headers;
+    const response = await fetch(movieApiPath(path), requestOptions);
+    if (response.status === 401 && movieApi.production) showAuthDialog();
+    return response;
+  }
+
+  function showAuthDialog() {
+    const dialog = byId("auth-dialog");
+    if (dialog && !dialog.open) dialog.showModal();
+  }
+
+  async function bootstrapMovieApi() {
+    try {
+      const response = await fetch("/api/v1/session", { credentials: "same-origin", cache: "no-store" });
+      if (response.status === 404) {
+        movieApi.ready = true;
+        return;
+      }
+      movieApi.production = true;
+      if (response.ok) {
+        const data = await response.json();
+        movieApi.csrf = data.csrf_token || "";
+      } else if (response.status === 401) {
+        showAuthDialog();
+      }
+      movieApi.ready = true;
+    } catch (_error) {
+      movieApi.ready = true;
+    }
+  }
+
+  async function loginMovieApi(event) {
+    event.preventDefault();
+    const status = byId("auth-status");
+    const secret = byId("access-secret").value;
+    status.textContent = "Checking access...";
+    try {
+      const response = await fetch("/api/v1/session", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_secret: secret })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Access denied");
+      movieApi.production = true;
+      movieApi.csrf = data.csrf_token || "";
+      status.textContent = "";
+      byId("access-secret").value = "";
+      byId("auth-dialog").close();
+      hydrateMovieGMSettings();
+    } catch (error) {
+      status.textContent = error.message || "Access denied";
+    }
+  }
 
   function selectView(view) {
     const target = document.querySelector(`[data-page="${view}"]`) || document.querySelector('[data-page="home"]');
@@ -148,8 +215,8 @@
   async function hydrateMovieGMSettings() {
     try {
       const [viewerResponse, learningResponse] = await Promise.all([
-        fetch("/api/movies/viewers", { cache: "no-store" }),
-        fetch("/api/movies/feedback", { cache: "no-store" })
+        movieApiFetch("/api/movies/viewers"),
+        movieApiFetch("/api/movies/feedback")
       ]);
       if (viewerResponse.ok) {
         const data = await viewerResponse.json();
@@ -180,7 +247,7 @@
       preferred_runtime_max: byId("gm-viewer-runtime-max").value || null
     };
     try {
-      const response = await fetch("/api/movies/viewers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const response = await movieApiFetch("/api/movies/viewers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not save household profile");
       await hydrateMovieGMSettings();
@@ -193,7 +260,7 @@
 
   async function deleteMovieGMViewer(viewerId) {
     try {
-      const response = await fetch(`/api/movies/viewers/${encodeURIComponent(viewerId)}`, { method: "DELETE" });
+      const response = await movieApiFetch(`/api/movies/viewers/${encodeURIComponent(viewerId)}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Could not delete household profile");
       await hydrateMovieGMSettings();
       showToast("Household profile removed.");
@@ -231,7 +298,7 @@
     panel.hidden = true;
     const params = new URLSearchParams({ mode: movieGMMode }); if (query) params.set("query", query);
     try {
-      const response = await fetch(`/api/movies/search?${params.toString()}`, { cache: "no-store" });
+      const response = await movieApiFetch(`/api/movies/search?${params.toString()}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Movie search failed");
       renderMovieGM(data);
@@ -264,16 +331,17 @@
     const feedback = event.target.closest("[data-movie-feedback]");
     if (feedback) {
       const payload = { title: feedback.dataset.title, rating: feedback.dataset.movieFeedback, genres: (feedback.dataset.genres || "").split("|").filter(Boolean) };
-      fetch("/api/movies/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+      movieApiFetch("/api/movies/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
         .then((response) => { if (!response.ok) throw new Error("Could not save feedback"); return response.json(); })
         .then(() => showToast("Got it. Movie GM will use that feedback next time."))
         .catch(() => showToast("Feedback could not be saved in this preview."));
     }
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
   });
+  byId("auth-form").addEventListener("submit", loginMovieApi);
   byId("movie-gm-form").addEventListener("submit", (event) => { event.preventDefault(); runMovieGM(); });
   byId("gm-viewer-form").addEventListener("submit", saveMovieGMViewer);
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); showDealPreview(); });
-  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); hydrateMovieGMSettings();
+  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); bootstrapMovieApi().then(hydrateMovieGMSettings);
 })();
