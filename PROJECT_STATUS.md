@@ -10,9 +10,13 @@
 - Added structured recommendation breakdowns, household disagreement, watched-title suppression, runtime filtering, upcoming separation, and human-readable decision reasons.
 - Added `movie_gm_pipeline.py` as the provider integration boundary. It accepts provider adapters, preserves provider failures as `UNAVAILABLE`, deduplicates normalized candidates, and hands the combined evidence to Movie GM.
 - Added deterministic tests for the orchestrator and provider boundary.
-- No live provider adapter has been added or contacted by this checkpoint. The new pipeline is intentionally an integration seam, not a claim of live movie-streaming coverage.
+- Added the first real external source adapter, `tmdb_movie_adapter.py`, using the official TMDB API's US watch-provider data powered by JustWatch.
+- The adapter maps free/ad-supported and subscription offers into the existing normalized offer contract, excludes rental/purchase-only offers, records provenance and checked timestamps, and preserves provider failures as `UNAVAILABLE`.
+- TMDB vote average/count are represented as TMDB evidence rather than being mislabeled as IMDb data.
+- The adapter requires `TMDB_READ_ACCESS_TOKEN`; no credential is stored in the repository. TMDB/JustWatch attribution requirements are documented for the eventual UI.
+- Offline adapter tests are included. No live request has been made because no runtime credential was supplied to this build session.
 
-**NEXT TASK:** Connect the first real legal streaming provider/source adapter to `MovieSourceAdapter`, using verified offer provenance and current availability evidence, then run the Movie GM pipeline against that live normalized data. Do not invent or hard-code live catalog results.
+**NEXT TASK:** Run the adapter with a securely configured TMDB token, inspect the real US provider payload, then connect the live normalized results to the Movie GM pipeline. After that, add a second independent availability source/provider path so one source failure cannot define the catalog.
 
 ## September 26 browser-fixture gate
 
