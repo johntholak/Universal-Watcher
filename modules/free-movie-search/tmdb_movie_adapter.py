@@ -63,7 +63,9 @@ class TMDBMovieAdapter:
         checked_at = as_of or datetime.now(timezone.utc).isoformat()
         movies: list[MovieCandidate] = []
         try:
-            for page in range(1, total_pages_limit := 500 + 1):
+            page = 1
+            total_pages = 1
+            while page <= total_pages:
                 if query.strip():
                     payload = self._get("/search/movie", {
                         "query": query.strip(),
@@ -91,8 +93,7 @@ class TMDBMovieAdapter:
                         movies.append(candidate)
 
                 total_pages = int(payload.get("total_pages", page) or page)
-                if page >= total_pages or page >= total_pages_limit:
-                    break
+                page += 1
 
             return ProviderBatch(
                 provider=self.provider,
