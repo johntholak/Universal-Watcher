@@ -42,3 +42,11 @@
 .gm-viewer button+button{margin-left:4px}
 .gm-viewer-empty{margin:9px 0 0;color:#7088ad;font-size:9px;line-height:1.4}
 @media(max-width:520px){.gm-household-settings summary{display:grid}.gm-viewer-grid{grid-template-columns:1fr}.gm-viewer-grid .gm-span-2{grid-column:auto}.gm-viewer{align-items:flex-start}.gm-viewer>div:last-child{flex:0 0 auto}}
+
+.auth-dialog{border:1px solid #304a73;border-radius:10px;background:#08162b;color:#eef2ff;max-width:380px;width:calc(100% - 32px);padding:0;box-shadow:0 24px 80px rgba(0,0,0,.55)}
+.auth-dialog::backdrop{background:rgba(3,9,20,.78)}
+.auth-dialog form{display:grid;gap:12px;padding:20px}
+.auth-dialog h2{margin:0;font-size:20px}.auth-dialog p:not(.eyebrow){color:#8fa5c9;font-size:10px;line-height:1.5;margin:0}
+.auth-dialog .field{display:grid;gap:6px;color:#aebddd;font-size:9px;font-weight:700}
+.auth-dialog input{padding:10px;color:#eef2ff;background:#0d1e37;border:1px solid #304b73;border-radius:6px}
+.auth-status{min-height:14px!important;color:#e8a9a9!important}
