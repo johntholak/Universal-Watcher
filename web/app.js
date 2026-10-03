@@ -4,13 +4,14 @@
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
-  const movieApi = { production: false, csrf: "", ready: false };
+  const movieApi = { production: false, csrf: "", ready: false, bootstrapPromise: null };
 
   function movieApiPath(path) {
     return movieApi.production ? `/api/v1${path}` : path;
   }
 
   async function movieApiFetch(path, options = {}) {
+    if (movieApi.bootstrapPromise) await movieApi.bootstrapPromise;
     const requestOptions = { credentials: "same-origin", cache: "no-store", ...options };
     const headers = new Headers(requestOptions.headers || {});
     if (movieApi.production && requestOptions.method && requestOptions.method !== "GET") {
@@ -351,5 +352,5 @@
   byId("gm-viewer-form").addEventListener("submit", saveMovieGMViewer);
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); showDealPreview(); });
-  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); bootstrapMovieApi().then(hydrateMovieGMSettings); const initialView = new URLSearchParams(window.location.search).get("view"); if (initialView) selectView(initialView);
+  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); movieApi.bootstrapPromise = bootstrapMovieApi(); movieApi.bootstrapPromise.then(hydrateMovieGMSettings); const initialView = new URLSearchParams(window.location.search).get("view"); if (initialView) selectView(initialView);
 })();
