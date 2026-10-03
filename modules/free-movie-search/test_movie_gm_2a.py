@@ -93,3 +93,37 @@ def test_taste_profile_explains_match():
     )
     assert score > 50
     assert any("Preferred genre" in reason for reason in reasons)
+
+
+def test_household_fit_calculates_viewer_scores_and_disagreement():
+    from modules.free_movie_search.movie_gm_decision import ViewerProfile, household_fit
+    result = household_fit(
+        title="Adventure Example", genres=("Adventure",), runtime_minutes=105,
+        viewers=(
+            ViewerProfile("viewer-a", TasteProfile(preferred_genres=("Adventure",))),
+            ViewerProfile("viewer-b", TasteProfile(disliked_genres=("Adventure",))),
+        ),
+    )
+    assert result.disagreement > 0
+    assert len(result.viewer_scores) == 2
+
+
+def test_breakdown_is_structured_and_explainable():
+    from modules.free_movie_search.movie_gm_decision import breakdown
+    result = breakdown(quality=90, taste=80, household=70, availability=100)
+    assert result.final > 70
+    assert len(result.reasons) == 4
+
+
+def test_feedback_learning_uses_explicit_feedback_only():
+    from modules.free_movie_search.movie_gm_decision import learn_taste_from_history
+    history = (
+        (WatchRecord("a", rating="loved"), ("Adventure", "Comedy"), "Space Adventure"),
+        (WatchRecord("b", rating="liked"), ("Adventure",), "Funny Adventure"),
+        (WatchRecord("c", rating="fine"), ("Horror",), "Horror Movie"),
+        (WatchRecord("d", rating="disliked"), ("Horror",), "Scary Horror"),
+    )
+    learned = learn_taste_from_history(history)
+    assert "adventure" in learned.preferred_genres
+    assert "horror" in learned.disliked_genres
+    assert learned.evidence_count == 3
