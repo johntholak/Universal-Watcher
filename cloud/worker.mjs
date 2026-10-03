@@ -46,6 +46,31 @@ async function bodyObject(request, maxBytes = MAX_BODY_BYTES) {
   return object;
 }
 
+function movieViewerPayload(input) {
+  const viewerId = typeof input.viewer_id === "string" ? input.viewer_id.trim() : "";
+  const displayName = typeof input.display_name === "string" ? input.display_name.trim() : "";
+  if (!viewerId || viewerId.length > 80 || !displayName || displayName.length > 120) throw new Error("Viewer requires an ID and display name");
+  const weight = Number(input.weight ?? 1);
+  if (!Number.isFinite(weight) || weight < 0 || weight > 10) throw new Error("Viewer weight must be between 0 and 10");
+  const list = (value, max, label) => {
+    if (value == null) return [];
+    if (!Array.isArray(value) || value.length > max) throw new Error(label + " must be a list");
+    const values = [...new Set(value.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean))];
+    if (values.some((item) => item.length > 80)) throw new Error(label + " contains an item that is too long");
+    return values;
+  };
+  const preferredGenres = list(input.preferred_genres, 20, "Preferred genres");
+  const dislikedGenres = list(input.disliked_genres, 20, "Disliked genres");
+  const preferredKeywords = list(input.preferred_keywords, 20, "Preferred keywords");
+  const dislikedKeywords = list(input.disliked_keywords, 20, "Disliked keywords");
+  const runtimeMin = input.preferred_runtime_min == null || input.preferred_runtime_min === "" ? null : Number(input.preferred_runtime_min);
+  const runtimeMax = input.preferred_runtime_max == null || input.preferred_runtime_max === "" ? null : Number(input.preferred_runtime_max);
+  if ((runtimeMin != null && (!Number.isInteger(runtimeMin) || runtimeMin < 1 || runtimeMin > 600)) ||
+      (runtimeMax != null && (!Number.isInteger(runtimeMax) || runtimeMax < 1 || runtimeMax > 600))) throw new Error("Preferred runtime must be between 1 and 600 minutes");
+  if (runtimeMin != null && runtimeMax != null && runtimeMin > runtimeMax) throw new Error("Preferred runtime minimum cannot exceed maximum");
+  return { viewerId, displayName, weight, preferredGenres, dislikedGenres, preferredKeywords, dislikedKeywords, runtimeMin, runtimeMax };
+}
+
 export default {
   async scheduled(_controller, env) {
     if (!requireConfig(env)) return;
@@ -251,6 +276,57 @@ export default {
     if (!identity) return json({ error: "Authentication required" }, 401);
     if (request.method === "GET" && path === "/api/v1/session") return json({ authenticated: true, csrf_token: await csrf(env, identity.token) });
     if (request.method !== "GET" && (!sameOrigin(request) || !equal(request.headers.get("X-CSRF-Token") || "", await csrf(env, identity.token)))) return json({ error: "Invalid request token or origin" }, 403);
+
+    if (path === "/api/v1/movies/viewers") {
+      if (request.method === "GET") {
+        try {
+          const rows = await env.DB.prepare(`SELECT viewer_id,display_name,weight,preferred_genres_json,disliked_genres_json,preferred_keywords_json,disliked_keywords_json,preferred_runtime_min,preferred_runtime_max,created_at,updated_at
+            FROM movie_viewers WHERE user_id=? ORDER BY created_at,viewer_id`).bind(identity.user_id).all();
+          return json({ viewers: (rows.results || []).map((row) => ({
+            viewer_id: row.viewer_id, display_name: row.display_name, weight: Number(row.weight),
+            preferred_genres: JSON.parse(row.preferred_genres_json || "[]"),
+            disliked_genres: JSON.parse(row.disliked_genres_json || "[]"),
+            preferred_keywords: JSON.parse(row.preferred_keywords_json || "[]"),
+            disliked_keywords: JSON.parse(row.disliked_keywords_json || "[]"),
+            preferred_runtime_min: row.preferred_runtime_min, preferred_runtime_max: row.preferred_runtime_max,
+            created_at: row.created_at, updated_at: row.updated_at
+          })) });
+        } catch { return json({ error: "Movie GM household profiles unavailable" }, 503); }
+      }
+      if (request.method === "POST" || request.method === "PUT") {
+        let input; try { input = await bodyObject(request); } catch (error) { return json({ error: error.message || "Invalid request" }, 400); }
+        let viewer; try { viewer = movieViewerPayload(input); } catch (error) { return json({ error: error.message }, 400); }
+        const stamp = now();
+        try {
+          const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM movie_viewers WHERE user_id=?").bind(identity.user_id).first();
+          const exists = await env.DB.prepare("SELECT viewer_id FROM movie_viewers WHERE user_id=? AND viewer_id=?").bind(identity.user_id, viewer.viewerId).first();
+          if (!exists && Number(count?.total || 0) >= 8) return json({ error: "Movie GM supports up to 8 household profiles" }, 400);
+          await env.DB.prepare(`INSERT INTO movie_viewers
+            (viewer_id,user_id,display_name,weight,preferred_genres_json,disliked_genres_json,preferred_keywords_json,disliked_keywords_json,preferred_runtime_min,preferred_runtime_max,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(user_id,viewer_id) DO UPDATE SET display_name=excluded.display_name,weight=excluded.weight,
+              preferred_genres_json=excluded.preferred_genres_json,disliked_genres_json=excluded.disliked_genres_json,
+              preferred_keywords_json=excluded.preferred_keywords_json,disliked_keywords_json=excluded.disliked_keywords_json,
+              preferred_runtime_min=excluded.preferred_runtime_min,preferred_runtime_max=excluded.preferred_runtime_max,updated_at=excluded.updated_at`)
+            .bind(viewer.viewerId, identity.user_id, viewer.displayName, viewer.weight,
+              JSON.stringify(viewer.preferredGenres), JSON.stringify(viewer.dislikedGenres),
+              JSON.stringify(viewer.preferredKeywords), JSON.stringify(viewer.dislikedKeywords),
+              viewer.runtimeMin, viewer.runtimeMax, exists?.created_at || stamp, stamp).run();
+          return json({ saved: true, viewer: { viewer_id: viewer.viewerId, display_name: viewer.displayName, weight: viewer.weight,
+            preferred_genres: viewer.preferredGenres, disliked_genres: viewer.dislikedGenres,
+            preferred_keywords: viewer.preferredKeywords, disliked_keywords: viewer.dislikedKeywords,
+            preferred_runtime_min: viewer.runtimeMin, preferred_runtime_max: viewer.runtimeMax } }, exists ? 200 : 201);
+        } catch { return json({ error: "Movie GM household profile storage unavailable" }, 503); }
+      }
+    }
+    const viewerMatch = /^\/api\/v1\/movies\/viewers\/([^/]+)$/.exec(path);
+    if (viewerMatch && request.method === "DELETE") {
+      try {
+        const viewerId = decodeURIComponent(viewerMatch[1]);
+        const result = await env.DB.prepare("DELETE FROM movie_viewers WHERE user_id=? AND viewer_id=?").bind(identity.user_id, viewerId).run();
+        return result.meta?.changes ? json({ deleted: true }) : json({ error: "Viewer not found" }, 404);
+      } catch { return json({ error: "Movie GM household profile deletion unavailable" }, 503); }
+    }
 
     if (path === "/api/v1/movies/feedback") {
       if (request.method === "GET") {
