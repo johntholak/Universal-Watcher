@@ -76,3 +76,20 @@ Kids Mode is a hard suitability gate followed by age-specific ranking.
 ## Stable implementation rule
 
 Provider adapters discover and normalize evidence. Movie GM decides using that normalized evidence. The ranking core must not make network calls, guess missing data, or turn an unverified offer into a confirmed result.
+
+
+## Live availability source adapter
+
+`tmdb_movie_adapter.py` implements the first real external source adapter.
+
+- Uses the official TMDB API with `TMDB_READ_ACCESS_TOKEN`.
+- Uses the US watch-provider data returned by TMDB, which is powered by JustWatch.
+- Traverses the complete result pagination returned by TMDB rather than applying an arbitrary top-N catalog cap.
+- Converts ad-supported/free offers and subscription offers into normalized `FreeOffer` records.
+- Rental and purchase-only offers are deliberately excluded from accessible offers.
+- Records provider name, source, checked timestamp, verification state, and availability confidence.
+- Maps TMDB vote average/count into separate TMDB quality evidence. It does not pretend TMDB scores are IMDb scores.
+- Missing credentials fail closed.
+- Provider/API failures remain `UNAVAILABLE`.
+
+TMDB requires an API credential. The repository must never contain the token. TMDB's developer documentation states that the API is free for non-commercial use subject to its terms and attribution requirements; the watch-provider endpoint is powered by JustWatch and requires JustWatch attribution. The product must therefore retain the required attribution in its eventual UI/About surface.
