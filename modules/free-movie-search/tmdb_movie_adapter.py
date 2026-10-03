@@ -158,6 +158,8 @@ class TMDBMovieAdapter:
                 rotten_tomatoes_critics=None,
                 rotten_tomatoes_audience=None,
                 metacritic=None,
+                tmdb=item.get("vote_average"),
+                tmdb_votes=item.get("vote_count"),
             ),
             offers=tuple(offers),
             available_from=None,
