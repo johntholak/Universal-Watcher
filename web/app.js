@@ -351,5 +351,5 @@
   byId("gm-viewer-form").addEventListener("submit", saveMovieGMViewer);
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); showDealPreview(); });
-  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); bootstrapMovieApi().then(hydrateMovieGMSettings);
+  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); bootstrapMovieApi().then(hydrateMovieGMSettings); const initialView = new URLSearchParams(window.location.search).get("view"); if (initialView) selectView(initialView);
 })();
