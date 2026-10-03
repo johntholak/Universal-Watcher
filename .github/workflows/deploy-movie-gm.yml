@@ -75,6 +75,14 @@ jobs:
       - name: Apply remote D1 migrations
         run: npx --yes wrangler@4 d1 migrations apply "${UW_D1_DATABASE_NAME}" --remote --config cloud/wrangler.toml
 
+      - name: Prepare Movie GM Python package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf cloud/free_movie_search
+          cp -R modules/free-movie-search cloud/free_movie_search
+          touch cloud/free_movie_search/__init__.py
+
       - name: Deploy Movie GM Python Worker
         run: npx --yes wrangler@4 deploy --config movie-gm-wrangler.toml
 
