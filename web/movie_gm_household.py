@@ -65,6 +65,26 @@ class HouseholdProfileStore:
               preferred_runtime_max=excluded.preferred_runtime_max,updated_at=excluded.updated_at""", values)
             self._db.commit()
 
+    def viewer_rows(self) -> tuple[dict, ...]:
+        with self._lock:
+            rows = self._db.execute("SELECT * FROM movie_viewers ORDER BY created_at,viewer_id").fetchall()
+        return tuple({
+            "viewer_id": row["viewer_id"], "display_name": row["display_name"], "weight": float(row["weight"]),
+            "preferred_genres": list(json.loads(row["preferred_genres_json"])),
+            "disliked_genres": list(json.loads(row["disliked_genres_json"])),
+            "preferred_keywords": list(json.loads(row["preferred_keywords_json"])),
+            "disliked_keywords": list(json.loads(row["disliked_keywords_json"])),
+            "preferred_runtime_min": row["preferred_runtime_min"],
+            "preferred_runtime_max": row["preferred_runtime_max"],
+            "created_at": row["created_at"], "updated_at": row["updated_at"],
+        } for row in rows)
+
+    def delete(self, viewer_id: str) -> bool:
+        with self._lock:
+            cursor = self._db.execute("DELETE FROM movie_viewers WHERE viewer_id=?", (viewer_id.strip(),))
+            self._db.commit()
+            return cursor.rowcount > 0
+
     def viewers(self) -> tuple[ViewerProfile, ...]:
         with self._lock:
             rows = self._db.execute("SELECT * FROM movie_viewers ORDER BY created_at,viewer_id").fetchall()
