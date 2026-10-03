@@ -8,6 +8,8 @@ SCHEMA = (Path(__file__).parent / "migrations" / "0001_initial.sql").read_text(e
 DISPATCH = (Path(__file__).parent / "migrations" / "0002_dispatch_gate.sql").read_text(encoding="utf-8")
 WATCHES = (Path(__file__).parent / "migrations" / "0003_watch_jobs.sql").read_text(encoding="utf-8")
 VERSIONS = (Path(__file__).parent / "migrations" / "0004_watch_criteria_versions.sql").read_text(encoding="utf-8")
+MOVIE_FEEDBACK = (Path(__file__).parent / "migrations" / "0005_movie_gm_feedback.sql").read_text(encoding="utf-8")
+MOVIE_HOUSEHOLD = (Path(__file__).parent / "migrations" / "0006_movie_gm_household.sql").read_text(encoding="utf-8")
 
 
 class D1SchemaTests(unittest.TestCase):
@@ -17,6 +19,8 @@ class D1SchemaTests(unittest.TestCase):
         self.db.executescript(DISPATCH)
         self.db.executescript(WATCHES)
         self.db.executescript(VERSIONS)
+        self.db.executescript(MOVIE_FEEDBACK)
+        self.db.executescript(MOVIE_HOUSEHOLD)
         self.db.execute("INSERT INTO users(id,created_at) VALUES (?,?)", ("u1", "2026-09-26T00:00:00Z"))
 
     def tearDown(self):
@@ -29,6 +33,16 @@ class D1SchemaTests(unittest.TestCase):
         self.assertTrue({"watches_due", "watch_one_active_job", "jobs_due", "results_user_created", "notifications_unread"} <= indexes)
         self.assertEqual(self.db.execute("SELECT runs_today FROM dispatch_gate WHERE id=1").fetchone()[0], 0)
         self.assertIn("watch_criteria_versions", names)
+
+    def test_movie_gm_tables_are_user_scoped(self):
+        names = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        self.assertTrue({"movie_feedback", "movie_viewers"} <= names)
+        self.db.execute("INSERT INTO movie_viewers(user_id,viewer_id,display_name,created_at,updated_at) VALUES (?,?,?,?,?)",
+                        ("u1", "kid", "Kid", "2026-10-03", "2026-10-03"))
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("INSERT INTO movie_viewers(user_id,viewer_id,display_name,created_at,updated_at) VALUES (?,?,?,?,?)",
+                            ("missing-user", "kid", "Kid", "2026-10-03", "2026-10-03"))
+        self.assertEqual(self.db.execute("SELECT display_name FROM movie_viewers WHERE user_id='u1'").fetchone()[0], "Kid")
 
     def test_versioned_search_criteria_and_one_time_job(self):
         now = "2026-09-26T00:00:00Z"
