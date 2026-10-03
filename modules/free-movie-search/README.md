@@ -10,8 +10,11 @@ Discover -> Normalize -> Filter -> Verify -> Rank -> Act
 
 ## V1 rules
 
-- Free means a current legal streaming offer with no rental, purchase, or subscription payment required.
+- Free means no additional payment is required from the caller for the search result.
 - Ad-supported free offers qualify.
+- The default household access profile includes Prime Video, Max (HBO), Apple TV+, Hulu, and Peacock. A verified subscription offer on one of these services is treated as accessible/free for ranking because the household already pays for it.
+- Netflix is included as an optional service so results can show Netflix availability, but it is not treated as accessible by default because the household does not currently have Netflix.
+- The access profile is configurable rather than hard-coded to one household.
 - Library-card services such as Kanopy/Hoopla may be represented as a separate access class and are not silently treated as universally free.
 - A provider failure is UNAVAILABLE, never NO_MATCH.
 - Missing rating evidence is labeled unknown rather than guessed.
@@ -47,6 +50,8 @@ kids_movie_rules.py contains the deterministic content-evidence-to-age-fit rules
 - runtime range
 - age rating / family suitability
 - preferred providers
+- household included subscription services
+- optional services to surface without treating them as accessible
 - excluded providers
 - personal taste weights
 - kids mode
