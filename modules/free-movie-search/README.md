@@ -22,6 +22,9 @@ Discover -> Normalize -> Filter -> Verify -> Rank -> Act
 - Objective quality and personal fit remain separate fields so the UI can explain why a movie ranked where it did.
 - Availability must include source/provenance and checked timestamp.
 - No arbitrary top-N discovery cap. UI pagination may be separate from search coverage.
+- Search results may include a separate Upcoming section for titles with a verified streaming release date within the next 30 days.
+- Upcoming titles are not treated as currently watchable. Their release date, provider, and access class must be shown separately.
+- Unknown or unverified future dates are not presented as confirmed upcoming availability.
 
 ## Kids Movie Mode
 
@@ -47,6 +50,7 @@ kids_movie_rules.py contains the deterministic content-evidence-to-age-fit rules
 - minimum IMDb rating
 - minimum rating votes
 - release-year range
+- upcoming release window (default 30 days)
 - runtime range
 - age rating / family suitability
 - preferred providers
