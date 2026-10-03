@@ -26,6 +26,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from core.contracts import Evidence, WatchDefinition, WatchResult
 from modules.free_movie_search.movie_gm_runtime import run_live_movie_gm
+from modules.free_movie_search.movie_gm_profile import WatchRecord, TasteProfile
+from modules.free_movie_search.movie_gm_decision import learn_taste_from_history
 
 SUPPORTED_MODULES = (
     {"id": "movies", "name": "Movies", "description": "Seat availability and showtimes"},
@@ -39,6 +41,7 @@ class DraftWatchStore:
         self._lock = threading.Lock()
         self._watches: list[WatchDefinition] = []
         self._results: list[WatchResult] = []
+        self._movie_feedback: list[tuple[WatchRecord, tuple[str, ...], str]] = []
 
     def add(self, watch: WatchDefinition) -> WatchDefinition:
         with self._lock:
@@ -67,6 +70,14 @@ class DraftWatchStore:
     def results(self) -> list[WatchResult]:
         with self._lock:
             return list(self._results)
+
+    def add_movie_feedback(self, record: WatchRecord, genres: tuple[str, ...], title: str) -> None:
+        with self._lock:
+            self._movie_feedback.append((record, genres, title))
+
+    def movie_feedback(self) -> list[tuple[WatchRecord, tuple[str, ...], str]]:
+        with self._lock:
+            return list(self._movie_feedback)
 
 
 def serialize_watch(watch: WatchDefinition) -> dict[str, Any]:
@@ -225,22 +236,56 @@ def make_handler(store: DraftWatchStore):
                     self._send_error_json("Unsupported Movie GM mode", HTTPStatus.BAD_REQUEST)
                     return
                 try:
+                    feedback = store.movie_feedback()
+                    learned = learn_taste_from_history(feedback)
+                    taste_profile = TasteProfile(
+                        preferred_genres=learned.preferred_genres,
+                        disliked_genres=learned.disliked_genres,
+                        preferred_keywords=learned.preferred_keywords,
+                        disliked_keywords=learned.disliked_keywords,
+                    )
                     result = run_live_movie_gm(
                         query=query,
                         mode=requested_mode,
                         child_ages=(6, 9) if requested_mode == "kids" else (),
+                        taste_profile=taste_profile if learned.evidence_count else None,
+                        watch_history=tuple(record for record, _, _ in feedback),
                     )
                     self._send_json(serialize_movie_search(result))
                 except Exception as exc:
                     self._send_error_json(f"Movie search failed: {exc.__class__.__name__}", HTTPStatus.INTERNAL_SERVER_ERROR)
             elif path == "/api/watches":
                 self._send_json([serialize_watch(watch) for watch in store.all()])
+            elif path == "/api/movies/feedback":
+                feedback = store.movie_feedback()
+                learned = learn_taste_from_history(feedback)
+                self._send_json({
+                    "evidence_count": learned.evidence_count,
+                    "preferred_genres": list(learned.preferred_genres),
+                    "disliked_genres": list(learned.disliked_genres),
+                    "preferred_keywords": list(learned.preferred_keywords),
+                    "disliked_keywords": list(learned.disliked_keywords),
+                })
             elif path == "/api/results":
                 self._send_json([serialize_result(result) for result in store.results()])
             else:
                 self._serve_static(path)
 
         def do_POST(self) -> None:
+            if urlparse(self.path).path == "/api/movies/feedback":
+                payload = self._read_json()
+                if payload is None:
+                    self._send_error_json("Request body must be a JSON object under 16 KB", HTTPStatus.BAD_REQUEST)
+                    return
+                rating = str(payload.get("rating") or "").casefold().strip()
+                title = str(payload.get("title") or "").strip()
+                genres = tuple(str(item).strip() for item in (payload.get("genres") or []) if str(item).strip())
+                if rating not in {"loved", "liked", "fine", "disliked"} or not title:
+                    self._send_error_json("Movie feedback requires a title and valid rating", HTTPStatus.BAD_REQUEST)
+                    return
+                store.add_movie_feedback(WatchRecord(title_key=title, rating=rating), genres, title)
+                self._send_json({"saved": True, "rating": rating, "title": title})
+                return
             if urlparse(self.path).path != "/api/watches":
                 self._send_error_json("Not found", HTTPStatus.NOT_FOUND)
                 return
