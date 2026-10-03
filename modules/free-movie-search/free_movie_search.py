@@ -17,6 +17,8 @@ DEFAULT_INCLUDED_SUBSCRIPTIONS: tuple[str, ...] = (
 )
 DEFAULT_OPTIONAL_SERVICES: tuple[str, ...] = ("Netflix",)
 
+PROVIDER_ALIASES = {"amazon prime video": "prime video", "prime video": "prime video", "apple tv": "apple tv+", "apple tv plus": "apple tv+", "apple tv+": "apple tv+"}
+
 
 @dataclass(frozen=True)
 class RatingEvidence:
@@ -111,9 +113,9 @@ def _offer_accessible(
     if not offer.verified:
         return False
     access = offer.access.casefold()
-    provider = offer.provider.casefold()
-    included = {p.casefold() for p in included_subscriptions}
-    optional = {p.casefold() for p in include_optional_services}
+    provider = PROVIDER_ALIASES.get(offer.provider.casefold(), offer.provider.casefold())
+    included = {PROVIDER_ALIASES.get(p.casefold(), p.casefold()) for p in included_subscriptions}
+    optional = {PROVIDER_ALIASES.get(p.casefold(), p.casefold()) for p in include_optional_services}
     if access in {"free", "free_ads"}:
         return True
     if access in {"subscription", "included_subscription", "paid_subscription"}:
@@ -188,7 +190,7 @@ def rank_movies(
 ) -> list[RankedMovie]:
     allowed = {g.casefold() for g in allowed_genres}
     excluded = {g.casefold() for g in excluded_genres}
-    preferred = {p.casefold() for p in preferred_providers}
+    preferred = {PROVIDER_ALIASES.get(p.casefold(), p.casefold()) for p in preferred_providers}
     results: list[RankedMovie] = []
 
     for movie in movies:
@@ -224,7 +226,7 @@ def rank_movies(
 
         quality, quality_confidence = quality_score(movie.ratings)
         availability = max(_offer_confidence(o) for o in accessible)
-        provider_bonus = 5.0 if preferred and any(o.provider.casefold() in preferred for o in accessible) else 0.0
+        provider_bonus = 5.0 if preferred and any(PROVIDER_ALIASES.get(o.provider.casefold(), o.provider.casefold()) in preferred for o in accessible) else 0.0
 
         personal = _clamp(movie.personal_fit + provider_bonus)
         reasons = list(movie.taste_reasons)
