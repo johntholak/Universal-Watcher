@@ -6,6 +6,16 @@
   <link rel="stylesheet" href="styles.css"><script src="app.js" defer></script>
 </head>
 <body>
+  <dialog id="auth-dialog" class="auth-dialog">
+    <form id="auth-form" method="dialog">
+      <p class="eyebrow">PRIVATE BETA</p>
+      <h2>Unlock Universal Watcher</h2>
+      <p>Enter the access secret for this private deployment. It stays in the secure session and is never saved in the page.</p>
+      <label class="field">Access secret<input id="access-secret" type="password" autocomplete="current-password" required></label>
+      <button class="button button-primary" type="submit">Continue</button>
+      <p id="auth-status" class="auth-status" role="status"></p>
+    </form>
+  </dialog>
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <header class="topbar">
     <button class="brand" type="button" data-view="home" aria-label="Universal Watcher home"><span class="eye-mark" aria-hidden="true"><span></span></span><span><strong>UNIVERSAL WATCHER</strong><small>Find it once. Or let us keep watching.</small></span></button>
