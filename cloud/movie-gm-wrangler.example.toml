@@ -1,7 +1,7 @@
 name = "universal-watcher-movie-gm"
 main = "movie_gm_worker.py"
 compatibility_date = "2026-10-02"
-compatibility_flags = ["python_workers"]
+compatibility_flags = ["python_workers", "disable_python_external_sdk"]
 
 [[d1_databases]]
 binding = "DB"
