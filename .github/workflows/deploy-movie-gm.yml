@@ -65,10 +65,10 @@ jobs:
           py_template = Path("cloud/movie-gm-wrangler.example.toml").read_text()
           py_config = (
               py_template
+              .replace('main = "movie_gm_worker.py"', 'main = "cloud/movie_gm_worker.py"')
               .replace('database_name = "universal-watcher"', f'database_name = "{database_name}"')
               .replace('database_id = "REPLACE_WITH_D1_DATABASE_ID"', f'database_id = "{database_id}"')
           )
-          py_config += '\n[vars]\n\n'
           py_config = py_config.replace(
               'database_id = "' + database_id + '"',
               'database_id = "' + database_id + '"\nmigrations_dir = "cloud/migrations"'
