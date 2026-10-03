@@ -2,6 +2,9 @@ name: Deploy Movie GM production
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - movie-gm-deploy
 
 permissions:
   contents: read
