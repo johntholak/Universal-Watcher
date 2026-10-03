@@ -277,6 +277,25 @@ export default {
     if (request.method === "GET" && path === "/api/v1/session") return json({ authenticated: true, csrf_token: await csrf(env, identity.token) });
     if (request.method !== "GET" && (!sameOrigin(request) || !equal(request.headers.get("X-CSRF-Token") || "", await csrf(env, identity.token)))) return json({ error: "Invalid request token or origin" }, 403);
 
+    if (path === "/api/v1/movies/search" && request.method === "GET") {
+      if (!env.MOVIE_GM) return json({ error: "Movie GM service is not connected" }, 503);
+      const mode = url.searchParams.get("mode") || "everyone";
+      const query = (url.searchParams.get("query") || "").trim();
+      if (!["everyone", "kids", "tonight", "hidden_gems"].includes(mode)) return json({ error: "Unsupported Movie GM mode" }, 400);
+      if (query.length > 200) return json({ error: "Query is too long" }, 400);
+      try {
+        const downstream = await env.MOVIE_GM.fetch(new Request("https://movie-gm.internal/internal/movie-gm/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: identity.user_id, mode, query }),
+        }));
+        const payload = await downstream.json();
+        return json(payload, downstream.status);
+      } catch {
+        return json({ error: "Movie GM service is temporarily unavailable" }, 503);
+      }
+    }
+
     if (path === "/api/v1/movies/viewers") {
       if (request.method === "GET") {
         try {
@@ -533,6 +552,7 @@ export default {
         return json({ ...publicRow, details: details_json ? JSON.parse(details_json) : null, coverage: coverage_json ? JSON.parse(coverage_json) : null, evidence: evidence.results || [] });
       } catch { return json({ error: "Result query unavailable" }, 503); }
     }
+    if (env.ASSETS) return env.ASSETS.fetch(request);
     return json({ error: "Route not implemented" }, 404);
   },
 };
