@@ -6,7 +6,7 @@ from modules.free_movie_search.movie_gm_runtime import RuntimeConfig, build_movi
 
 def test_runtime_factory_fails_closed_without_tmdb_token(monkeypatch):
     monkeypatch.delenv("TMDB_READ_ACCESS_TOKEN", raising=False)
-    assert build_movie_adapters() == ()
+    adapters = build_movie_adapters()\n    assert len(adapters) == 1\n    assert adapters[0].provider == "TMDB/JustWatch"\n
 
 
 def test_runtime_factory_builds_tmdb_when_token_exists(monkeypatch):
