@@ -209,12 +209,15 @@ def make_handler(store: DraftWatchStore):
             if path == "/api/modules":
                 self._send_json(list(SUPPORTED_MODULES))
             elif path == "/api/movies/search":
-                requested_mode = parse_qs(urlparse(self.path).query).get("mode", ["everyone"])[-1].casefold()
+                params = parse_qs(urlparse(self.path).query)
+                requested_mode = params.get("mode", ["everyone"])[-1].casefold()
+                query = params.get("query", [""])[-1].strip()
                 if requested_mode not in {"everyone", "kids", "tonight", "hidden_gems"}:
                     self._send_error_json("Unsupported Movie GM mode", HTTPStatus.BAD_REQUEST)
                     return
                 try:
                     result = run_live_movie_gm(
+                        query=query,
                         mode=requested_mode,
                         child_ages=(6, 9) if requested_mode == "kids" else (),
                     )
