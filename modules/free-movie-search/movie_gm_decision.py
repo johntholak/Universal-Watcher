@@ -88,29 +88,46 @@ def breakdown(*, quality: float, taste: float, household: float, availability: f
 
 
 def learn_taste_from_history(history: Iterable[tuple[WatchRecord, Sequence[str], str]]) -> LearnedTaste:
-    """Learn only from explicit loved, liked, or disliked feedback."""
-    preferred_genres: dict[str, int] = {}
-    disliked_genres: dict[str, int] = {}
-    preferred_keywords: dict[str, int] = {}
-    disliked_keywords: dict[str, int] = {}
+    """Learn explicit taste signals with stronger feedback weighted above neutral feedback.
+
+    Genre evidence is weighted by feedback strength. Title keywords are extracted
+    only from meaningful words so common title glue words do not become preferences.
+    """
+    preferred_genres: dict[str, float] = {}
+    disliked_genres: dict[str, float] = {}
+    preferred_keywords: dict[str, float] = {}
+    disliked_keywords: dict[str, float] = {}
     evidence = 0
+    strengths = {"loved": 3.0, "liked": 2.0, "disliked": 3.0}
+    stopwords = {
+        "about", "after", "again", "among", "before", "being", "between",
+        "black", "could", "every", "first", "from", "have", "into", "just",
+        "little", "movie", "night", "once", "over", "that", "their", "there",
+        "these", "thing", "this", "those", "under", "very", "were", "what",
+        "when", "where", "which", "while", "with", "would", "your",
+    }
 
     for record, genres, title in history:
         rating = record.rating.casefold().strip()
-        if rating not in {"loved", "liked", "disliked"}:
+        strength = strengths.get(rating)
+        if strength is None:
             continue
         evidence += 1
-        target = disliked_genres if rating == "disliked" else preferred_genres
+        genre_target = disliked_genres if rating == "disliked" else preferred_genres
         for genre in genres:
-            key = genre.casefold().strip()
+            key = " ".join(str(genre).casefold().split())
             if key:
-                target[key] = target.get(key, 0) + 1
-        words = [w for w in normalize_title(title).split() if len(w) >= 5]
-        keyword_target = disliked_keywords if rating == "disliked" else preferred_keywords
-        for word in words[:5]:
-            keyword_target[word] = keyword_target.get(word, 0) + 1
+                genre_target[key] = genre_target.get(key, 0.0) + strength
 
-    def top(mapping: dict[str, int]) -> tuple[str, ...]:
+        words = [
+            word for word in normalize_title(title).split()
+            if len(word) >= 5 and word not in stopwords and word.isalpha()
+        ]
+        keyword_target = disliked_keywords if rating == "disliked" else preferred_keywords
+        for word in words[:6]:
+            keyword_target[word] = keyword_target.get(word, 0.0) + strength
+
+    def top(mapping: dict[str, float]) -> tuple[str, ...]:
         return tuple(k for k, _ in sorted(mapping.items(), key=lambda item: (-item[1], item[0]))[:8])
 
     return LearnedTaste(
