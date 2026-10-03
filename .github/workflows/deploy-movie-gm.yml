@@ -69,10 +69,9 @@ jobs:
               .replace('database_name = "universal-watcher"', f'database_name = "{database_name}"')
               .replace('database_id = "REPLACE_WITH_D1_DATABASE_ID"', f'database_id = "{database_id}"')
           )
-          py_config = py_config.replace(
-              'database_id = "' + database_id + '"',
-              'database_id = "' + database_id + '"\nmigrations_dir = "cloud/migrations"'
-          )
+          c1 = 'database_id = "' + database_id + '"'
+          c2 = c1 + '\nmigrations_dir = "cloud/migrations"'
+          py_config = py_config.replace(c1, c2)
           Path("movie-gm-wrangler.toml").write_text(py_config)
           PY
 
