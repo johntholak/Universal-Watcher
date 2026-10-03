@@ -81,7 +81,7 @@ class TMDBMovieAdapter:
                         "language": self.config.language,
                         "region": self.config.region,
                         "watch_region": self.config.region,
-                        "with_watch_monetization_types": "free,ads,flatrate",
+                        "with_watch_monetization_types": "free|ads|flatrate",
                         "sort_by": "popularity.desc",
                         "page": page,
                     })
