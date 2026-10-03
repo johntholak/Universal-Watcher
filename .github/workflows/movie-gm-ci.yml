@@ -25,7 +25,8 @@ jobs:
           python -m py_compile modules/free-movie-search/movie_gm_decision.py
       - name: Run Movie GM tests
         run: |
-          python -m unittest modules.free-movie-search.test_movie_gm_2a modules.free-movie-search.test_movie_gm_pipeline modules.free-movie-search.test_movie_gm_recommender modules.free-movie-search.test_movie_gm_runtime modules.free-movie-search.test_omdb_rating_adapter web.test_movie_gm_household
+          python -m unittest discover -s modules/free-movie-search -p "test_*.py" -v
+          python -m unittest web.test_movie_gm_household -v
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
