@@ -117,11 +117,11 @@ class PreviewServerTests(unittest.TestCase):
         self.store.add_movie_feedback(WatchRecord(title_key="Bad Horror", rating="disliked"), ("Horror",), "Bad Horror")
         self.store._movie_store.close()
         reopened = DraftWatchStore(Path(self.tempdir.name) / "movie_gm.sqlite3")
+        self.store = reopened
         self.assertEqual([record.title_key for record in reopened.movie_history()], ["spider-man"])
         learned = learn_taste_from_history(reopened.movie_feedback())
         self.assertIn("action", learned.preferred_genres)
         self.assertIn("horror", learned.disliked_genres)
-        reopened._movie_store.close()
 
     def test_result_serialization_preserves_evidence_and_truthful_outcome(self):
         result = WatchResult(
