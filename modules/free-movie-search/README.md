@@ -12,7 +12,7 @@ Discover -> Normalize -> Filter -> Verify -> Rank -> Act
 
 - Free means no additional payment is required from the caller for the search result.
 - Ad-supported free offers qualify.
-- The default household access profile includes Prime Video, Max (HBO), Apple TV+, Hulu, and Peacock. A verified subscription offer on one of these services is treated as accessible/free for ranking because the household already pays for it.
+- The default household access profile includes Prime Video, Max (HBO), Apple TV+, Hulu, Peacock, and YouTube TV. A verified subscription offer on one of these services is treated as accessible/free for ranking because the household already pays for it.
 - Netflix is included as an optional service so results can show Netflix availability, but it is not treated as accessible by default because the household does not currently have Netflix.
 - The access profile is configurable rather than hard-coded to one household.
 - Library-card services such as Kanopy/Hoopla may be represented as a separate access class and are not silently treated as universally free.
