@@ -5,9 +5,9 @@ from urllib.parse import urlparse, parse_qs
 
 from workers import Response, WorkerEntrypoint
 
-from modules.free_movie_search.movie_gm_decision import ViewerProfile, learn_taste_from_history
-from modules.free_movie_search.movie_gm_profile import TasteProfile, WatchRecord
-from modules.free_movie_search.movie_gm_runtime import RuntimeConfig, run_live_movie_gm
+from free_movie_search.movie_gm_decision import ViewerProfile, learn_taste_from_history
+from free_movie_search.movie_gm_profile import TasteProfile, WatchRecord
+from free_movie_search.movie_gm_runtime import RuntimeConfig, run_live_movie_gm
 
 
 MAX_BODY_BYTES = 16_384
