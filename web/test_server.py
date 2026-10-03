@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from http.client import HTTPConnection
 
 from server import DraftWatchStore, make_handler, serialize_result
+from movie_gm_profile import WatchRecord
 from http.server import ThreadingHTTPServer
 from core.contracts import Evidence, WatchResult
 from tempfile import TemporaryDirectory
