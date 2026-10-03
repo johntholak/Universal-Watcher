@@ -7,12 +7,15 @@ from http.client import HTTPConnection
 from server import DraftWatchStore, make_handler, serialize_result
 from http.server import ThreadingHTTPServer
 from core.contracts import Evidence, WatchResult
+from tempfile import TemporaryDirectory
+from pathlib import Path
 
 
 class PreviewServerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.store = DraftWatchStore()
+        cls.tempdir = TemporaryDirectory()
+        cls.store = DraftWatchStore(Path(cls.tempdir.name) / "movie_gm.sqlite3")
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(cls.store))
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -23,6 +26,8 @@ class PreviewServerTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=2)
+        cls.store._movie_store.close()
+        cls.tempdir.cleanup()
 
     def request(self, method, path, body=None):
         connection = HTTPConnection("127.0.0.1", self.port, timeout=3)
@@ -104,6 +109,18 @@ class PreviewServerTests(unittest.TestCase):
         status, results = self.request("GET", "/api/results")
         self.assertEqual(status, 200)
         self.assertEqual(results, [])
+
+
+    def test_movie_feedback_survives_store_reopen_and_learns_preferences(self):
+        self.store.add_movie_feedback(WatchRecord(title_key="Spider-Man", rating="loved"), ("Action", "Adventure"), "Spider-Man")
+        self.store.add_movie_feedback(WatchRecord(title_key="Bad Horror", rating="disliked"), ("Horror",), "Bad Horror")
+        self.store._movie_store.close()
+        reopened = DraftWatchStore(Path(self.tempdir.name) / "movie_gm.sqlite3")
+        self.assertEqual([record.title_key for record in reopened.movie_history()], ["spider-man"])
+        learned = learn_taste_from_history(reopened.movie_feedback())
+        self.assertIn("action", learned.preferred_genres)
+        self.assertIn("horror", learned.disliked_genres)
+        reopened._movie_store.close()
 
     def test_result_serialization_preserves_evidence_and_truthful_outcome(self):
         result = WatchResult(
