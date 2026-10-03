@@ -252,6 +252,42 @@ export default {
     if (request.method === "GET" && path === "/api/v1/session") return json({ authenticated: true, csrf_token: await csrf(env, identity.token) });
     if (request.method !== "GET" && (!sameOrigin(request) || !equal(request.headers.get("X-CSRF-Token") || "", await csrf(env, identity.token)))) return json({ error: "Invalid request token or origin" }, 403);
 
+    if (path === "/api/v1/movies/feedback") {
+      if (request.method === "GET") {
+        try {
+          const rows = await env.DB.prepare("SELECT title,rating,watched,genres_json,created_at FROM movie_feedback WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 200").bind(identity.user_id).all();
+          const preferred = new Map(), disliked = new Map();
+          for (const row of rows.results || []) {
+            if (!["loved", "liked", "disliked"].includes(row.rating)) continue;
+            const target = row.rating === "disliked" ? disliked : preferred;
+            for (const genre of JSON.parse(row.genres_json || "[]")) target.set(genre, (target.get(genre) || 0) + 1);
+          }
+          const top = (map) => [...map.entries()].sort((a,b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0,8).map(([genre]) => genre);
+          const evidence = (rows.results || []).filter((row) => row.rating !== "fine").length;
+          return json({
+            evidence_count: evidence,
+            preferred_genres: top(preferred),
+            disliked_genres: top(disliked),
+            feedback: rows.results || []
+          });
+        } catch { return json({ error: "Movie GM feedback unavailable" }, 503); }
+      }
+      if (request.method === "POST") {
+        let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+        const title = typeof input.title === "string" ? input.title.trim() : "";
+        const rating = typeof input.rating === "string" ? input.rating.casefold?.() || input.rating.toLowerCase() : "";
+        const genres = Array.isArray(input.genres) ? [...new Set(input.genres.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean))].slice(0,20) : [];
+        if (!title || title.length > 300 || !["loved","liked","fine","disliked"].includes(rating)) return json({ error: "Movie feedback requires a title and valid rating" }, 400);
+        if (JSON.stringify(genres).length > 2048) return json({ error: "Movie feedback genres are too large" }, 400);
+        const stamp = now();
+        try {
+          await env.DB.prepare("INSERT INTO movie_feedback(id,user_id,title_key,title,rating,watched,genres_json,created_at) VALUES (?,?,?,?,?,?,?,?)")
+            .bind(crypto.randomUUID(), identity.user_id, title.toLowerCase().replace(/\s+/g," ").trim(), title, rating, rating === "disliked" ? 0 : 1, JSON.stringify(genres), stamp).run();
+          return json({ saved: true, rating, title });
+        } catch { return json({ error: "Movie GM feedback storage unavailable" }, 503); }
+      }
+    }
+
     if (request.method === "POST" && path === "/api/v1/searches") {
       let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
       if (input.module !== "family-deals") return json({ error: "Module search is not available yet" }, 400);
