@@ -28,6 +28,7 @@ from core.contracts import Evidence, WatchDefinition, WatchResult
 from modules.free_movie_search.movie_gm_runtime import run_live_movie_gm
 from modules.free_movie_search.movie_gm_profile import WatchRecord, TasteProfile
 from modules.free_movie_search.movie_gm_decision import learn_taste_from_history
+from movie_gm_store import MovieGMStore
 
 SUPPORTED_MODULES = (
     {"id": "movies", "name": "Movies", "description": "Seat availability and showtimes"},
@@ -37,11 +38,11 @@ SUPPORTED_MODULE_IDS = {module["id"] for module in SUPPORTED_MODULES}
 
 
 class DraftWatchStore:
-    def __init__(self) -> None:
+    def __init__(self, movie_db_path: str | Path | None = None) -> None:
         self._lock = threading.Lock()
+        self._movie_store = MovieGMStore(movie_db_path or REPO_ROOT / "data" / "movie_gm.sqlite3")
         self._watches: list[WatchDefinition] = []
         self._results: list[WatchResult] = []
-        self._movie_feedback: list[tuple[WatchRecord, tuple[str, ...], str]] = []
 
     def add(self, watch: WatchDefinition) -> WatchDefinition:
         with self._lock:
@@ -72,12 +73,13 @@ class DraftWatchStore:
             return list(self._results)
 
     def add_movie_feedback(self, record: WatchRecord, genres: tuple[str, ...], title: str) -> None:
-        with self._lock:
-            self._movie_feedback.append((record, genres, title))
+        self._movie_store.add_feedback(title=title, rating=record.rating, genres=genres)
 
-    def movie_feedback(self) -> list[tuple[WatchRecord, tuple[str, ...], str]]:
-        with self._lock:
-            return list(self._movie_feedback)
+    def movie_feedback(self) -> tuple[tuple[WatchRecord, tuple[str, ...], str], ...]:
+        return self._movie_store.learning_rows()
+
+    def movie_history(self) -> tuple[WatchRecord, ...]:
+        return self._movie_store.history()
 
 
 def serialize_watch(watch: WatchDefinition) -> dict[str, Any]:
@@ -249,7 +251,7 @@ def make_handler(store: DraftWatchStore):
                         mode=requested_mode,
                         child_ages=(6, 9) if requested_mode == "kids" else (),
                         taste_profile=taste_profile if learned.evidence_count else None,
-                        watch_history=tuple(record for record, _, _ in feedback),
+                        watch_history=store.movie_history(),
                     )
                     self._send_json(serialize_movie_search(result))
                 except Exception as exc:
@@ -343,7 +345,7 @@ def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
     store = DraftWatchStore()
     server = ThreadingHTTPServer((host, port), make_handler(store))
     print(f"Universal Watcher shell preview: http://{host}:{server.server_port}/")
-    print("Drafts and preview results are held in memory only. Press Ctrl+C to stop.")
+    print("Drafts/results are held in memory; Movie GM feedback persists in data/movie_gm.sqlite3. Press Ctrl+C to stop.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
