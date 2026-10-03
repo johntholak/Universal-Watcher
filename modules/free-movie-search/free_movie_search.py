@@ -18,6 +18,7 @@ DEFAULT_INCLUDED_SUBSCRIPTIONS: tuple[str, ...] = (
     "Apple TV+",
     "Hulu",
     "Peacock",
+    "YouTube TV",
 )
 
 # Services the caller does not currently own but wants surfaced as options.
