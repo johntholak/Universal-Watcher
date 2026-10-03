@@ -10,6 +10,8 @@ from datetime import date, timedelta
 from math import log10
 from typing import Iterable, Sequence
 
+from .movie_gm_profile import TasteProfile, WatchRecord, is_watched, score_taste
+
 DEFAULT_INCLUDED_SUBSCRIPTIONS: tuple[str, ...] = (
     "Prime Video", "Max", "Apple TV+", "Hulu", "Peacock", "YouTube TV",
 )
@@ -46,7 +48,7 @@ class MovieCandidate:
     genres: tuple[str, ...] = ()
     runtime_minutes: int | None = None
     age_rating: str | None = None
-    personal_fit: float = 0.0
+    personal_fit: float = 50.0
     taste_reasons: tuple[str, ...] = ()
     age_fit_by_age: tuple[tuple[int, float], ...] = ()
     kids_eligible: bool | None = None
@@ -175,6 +177,9 @@ def rank_movies(
     include_optional_services: Sequence[str] = DEFAULT_OPTIONAL_SERVICES,
     include_optional_as_free: bool = False,
     availability_weight: float = 0.10,
+    taste_profile: TasteProfile | None = None,
+    watch_history: Sequence[WatchRecord] = (),
+    suppress_watched: bool = True,
 ) -> list[RankedMovie]:
     allowed = {g.casefold() for g in allowed_genres}
     excluded = {g.casefold() for g in excluded_genres}
@@ -182,6 +187,9 @@ def rank_movies(
     results: list[RankedMovie] = []
 
     for movie in movies:
+        if suppress_watched and is_watched(movie.title, watch_history):
+            continue
+
         accessible = [
             o for o in movie.offers
             if _offer_accessible(
@@ -212,8 +220,20 @@ def rank_movies(
         quality, quality_confidence = quality_score(movie.ratings)
         availability = max(_offer_confidence(o) for o in accessible)
         provider_bonus = 5.0 if preferred and any(o.provider.casefold() in preferred for o in accessible) else 0.0
+
         personal = _clamp(movie.personal_fit + provider_bonus)
         reasons = list(movie.taste_reasons)
+
+        if taste_profile is not None:
+            taste_score, taste_reasons = score_taste(
+                genres=movie.genres,
+                title=movie.title,
+                profile=taste_profile,
+                runtime_minutes=movie.runtime_minutes,
+            )
+            personal = _clamp((personal + taste_score) / 2.0)
+            reasons.extend(taste_reasons)
+            reasons.append(f"Taste fit: {taste_score:.0f}/100")
 
         if kids_mode and child_ages:
             scores = [(age, _age_fit_score(movie, age)) for age in child_ages]
@@ -237,6 +257,8 @@ def rank_movies(
         providers = sorted({o.provider for o in accessible})
         reasons.append("Accessible on " + ", ".join(providers))
         reasons.append(f"Availability confidence: {availability:.0f}/100")
+        if suppress_watched and watch_history:
+            reasons.append("Watched-history suppression is active")
 
         results.append(RankedMovie(
             movie=movie,
