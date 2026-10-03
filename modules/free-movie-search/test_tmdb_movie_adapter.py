@@ -23,6 +23,13 @@ class FakeTMDB(TMDBMovieAdapter):
                     "genre_ids": [12, 35],
                 }],
             }
+        if path == "/movie/10":
+            assert params["append_to_response"] == "release_dates"
+            return {
+                "runtime": 112,
+                "genres": [{"id": 12, "name": "Adventure"}, {"id": 35, "name": "Comedy"}],
+                "release_dates": {"results": [{"iso_3166_1": "US", "release_dates": [{"certification": "PG"}]}]},
+            }
         if path == "/movie/10/watch/providers":
             return {
                 "results": {
@@ -43,6 +50,8 @@ def test_adapter_normalizes_free_and_subscription_offers():
     assert len(result.movies) == 1
     movie = result.movies[0]
     assert movie.title == "Free Adventure"
+    assert movie.runtime_minutes == 112
+    assert movie.age_rating == "PG"
     assert movie.genres == ("Adventure", "Comedy")
     assert {offer.provider for offer in movie.offers} == {"Tubi", "Prime Video"}
     assert {offer.access for offer in movie.offers} == {"free_ads", "subscription"}
@@ -76,3 +85,11 @@ def test_missing_token_fails_closed():
         assert "TMDB_READ_ACCESS_TOKEN" in str(exc)
     else:
         raise AssertionError("missing token must fail closed")
+
+
+def test_discovery_requests_free_ads_or_subscription_offers():
+    fake = FakeTMDB()
+    fake.discover()
+    discover_calls = [params for path, params in fake.calls if path == "/discover/movie"]
+    assert discover_calls
+    assert discover_calls[0]["with_watch_monetization_types"] == "free|ads|flatrate"
