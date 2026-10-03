@@ -25,6 +25,13 @@ class ProviderBatch:
     source: str = ""
 
 
+class MovieEvidenceEnricher(Protocol):
+    provider: str
+
+    def enrich(self, movie: MovieCandidate) -> MovieCandidate:
+        """Add independent evidence without changing availability offers."""
+
+
 class MovieSourceAdapter(Protocol):
     provider: str
 
@@ -68,6 +75,8 @@ def run_movie_gm_pipeline(
     minimum_votes: int | None = None,
     hidden_gem_max_votes: int = 50000,
     hidden_gem_min_quality: float = 68.0,
+    rating_enrichers: Sequence[MovieEvidenceEnricher] = (),
+    rating_enrichment_limit: int = 25,
 ) -> MoviePipelineResult:
     """Run all supplied provider adapters, then hand normalized evidence to GM.
 
@@ -93,6 +102,44 @@ def run_movie_gm_pipeline(
         candidates.extend(batch.movies)
 
     unique = _dedupe_movies(candidates)
+
+    # Discovery remains uncapped. Free external rating APIs can have daily
+    # quotas, so enrichment is a separate, explicit evidence budget. We select
+    # candidates using the existing deterministic GM ordering, enrich that set,
+    # then run the final recommendation pass with the added evidence.
+    if rating_enrichers and unique and rating_enrichment_limit > 0:
+        preview = recommend_movies(
+            unique,
+            mode=mode,
+            as_of=as_of,
+            taste_profile=taste_profile,
+            viewers=viewers,
+            watch_history=watch_history,
+            child_ages=child_ages,
+            allow_pg13=allow_pg13,
+            runtime_max=runtime_max,
+            minimum_imdb=minimum_imdb,
+            minimum_votes=minimum_votes,
+            hidden_gem_max_votes=hidden_gem_max_votes,
+            hidden_gem_min_quality=hidden_gem_min_quality,
+        )
+        selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year) for item in preview.recommendations[:rating_enrichment_limit]}
+        enriched = []
+        for movie in unique:
+            key = (movie.title.casefold(), movie.year)
+            if key in selected_titles:
+                current = movie
+                for enricher in rating_enrichers:
+                    try:
+                        current = enricher.enrich(current)
+                    except Exception as exc:
+                        unavailable.append((getattr(enricher, "provider", enricher.__class__.__name__), f"UNAVAILABLE: {exc.__class__.__name__}"))
+                        break
+                enriched.append(current)
+            else:
+                enriched.append(movie)
+        unique = tuple(enriched)
+
     recommendation = recommend_movies(
         unique,
         mode=mode,
