@@ -100,10 +100,47 @@
   async function hydrate() {
     try { const [watchResponse, resultResponse] = await Promise.all([fetch("/api/watches", { cache: "no-store" }), fetch("/api/results", { cache: "no-store" })]); if (watchResponse.ok) { const watches = await watchResponse.json(); if (Array.isArray(watches)) state.watches = watches.filter((watch) => Object.hasOwn(moduleLabels, watch.module)); } if (resultResponse.ok) { const results = await resultResponse.json(); if (Array.isArray(results)) state.results = results.filter((result) => Object.hasOwn(moduleLabels, result.module)); } renderWatches(); renderResults(); } catch (_error) { /* Static preview remains useful without the API. */ }
   }
+  let movieGMMode = "everyone";
+  function formatRuntime(minutes) {
+    if (!Number.isFinite(minutes)) return "Runtime unknown";
+    const hours = Math.floor(minutes / 60); const mins = minutes % 60;
+    return hours ? (mins ? `${hours}h ${mins}m` : `${hours}h`) : `${mins}m`;
+  }
+  function renderMovieGM(data) {
+    const panel = byId("movie-gm-results");
+    const unavailable = (data.providers_unavailable || []).map((item) => `<div class="gm-source-warning"><strong>${escapeHtml(item.provider)}</strong><span>Unavailable: ${escapeHtml(item.reason)}</span></div>`).join("");
+    const cards = (data.recommendations || []).map((item) => {
+      const providers = (item.offers || []).map((offer) => `<a href="${escapeHtml(offer.watch_url || "#")}" target="_blank" rel="noopener noreferrer">${escapeHtml(offer.provider)}</a>`).join(", ") || "No accessible offer";
+      const why = (item.why || []).slice(0, 4).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("");
+      return `<article class="gm-card"><header><div><h3>${escapeHtml(item.title)}</h3><span>${escapeHtml(item.year || "Year unknown")} · ${escapeHtml(formatRuntime(item.runtime_minutes))} · ${escapeHtml(item.age_rating || "Rating unknown")}</span></div><strong class="gm-score">${Number(item.combined_score).toFixed(1)}</strong></header><div class="gm-meta"><span>Quality ${Number(item.quality_score).toFixed(1)}</span><span>Household ${Number(item.household_score).toFixed(1)}</span><span>Availability ${escapeHtml(item.availability_confidence)}</span></div><p class="gm-providers"><strong>Available via:</strong> ${providers}</p><details><summary>Why this result?</summary><ul>${why || "<li>No additional explanation available.</li>"}</ul></details></article>`;
+    }).join("");
+    const upcoming = (data.upcoming || []).map((item) => `<article class="gm-upcoming"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.year || "Year unknown")} · ${escapeHtml(formatRuntime(item.runtime_minutes))} · ${escapeHtml(item.age_rating || "Rating unknown")}</span><small>${escapeHtml((item.why || [])[0] || "Confirmed upcoming offer")}</small></article>`).join("");
+    panel.hidden = false;
+    panel.innerHTML = `<div class="gm-summary"><strong>${data.recommendations?.length || 0} recommendations</strong><span>${data.total_candidates || 0} candidates checked</span><span>Sources checked: ${escapeHtml((data.providers_checked || []).join(", ") || "none")}</span></div>${unavailable}${cards ? `<div class="gm-card-grid">${cards}</div>` : `<div class="gm-empty"><strong>No qualifying movies were returned.</strong><span>This is not treated as a provider failure. Check the source status above.</span></div>`}${upcoming ? `<div class="gm-upcoming-section"><p class="eyebrow">NEXT 30 DAYS</p><h3>Coming soon</h3><div class="gm-upcoming-list">${upcoming}</div></div>` : ""}`;
+  }
+  async function runMovieGM() {
+    const status = byId("movie-gm-status"); const panel = byId("movie-gm-results");
+    const query = byId("movie-gm-query").value.trim();
+    status.textContent = movieGMMode === "kids" ? "Checking streaming offers and applying the kids safety gate..." : "Searching current streaming offers, ratings, and household fit...";
+    panel.hidden = true;
+    const params = new URLSearchParams({ mode: movieGMMode }); if (query) params.set("query", query);
+    try {
+      const response = await fetch(`/api/movies/search?${params.toString()}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Movie search failed");
+      renderMovieGM(data);
+      status.textContent = data.providers_unavailable?.length ? "Search completed with one or more unavailable sources. Results remain clearly marked." : "Search complete. Availability and confidence are shown on each result.";
+    } catch (error) {
+      panel.hidden = false;
+      panel.innerHTML = `<div class="gm-empty"><strong>Movie search unavailable</strong><span>${escapeHtml(error.message || "The source could not be checked.")}</span></div>`;
+      status.textContent = "The search could not be completed.";
+    }
+  }
   document.addEventListener("click", (event) => {
     const viewButton = event.target.closest("[data-view]"); if (viewButton) selectView(viewButton.dataset.view);
     if (event.target.closest("[data-mobile-menu]")) document.body.classList.toggle("menu-open"); if (event.target.closest("[data-focus-first]")) byId("movie-title").focus();
     if (event.target.closest("[data-select-all]")) { const boxes = all('input[name="theaters"]'); const select = boxes.some((box) => !box.checked); boxes.forEach((box) => { box.checked = select; }); updateSummary(); }
+    const gmMode = event.target.closest("[data-gm-mode]"); if (gmMode) { movieGMMode = gmMode.dataset.gmMode; all("[data-gm-mode]").forEach((button) => button.classList.toggle("is-active", button === gmMode)); }
     if (event.target.closest("[data-save-watch]")) createDraft(); if (event.target.closest("[data-save-deal-watch]")) createDraft("family-deals"); if (event.target.closest("[data-focus-deal]")) byId("deal-location").focus();
     if (event.target.closest("[data-preview-action]")) showToast("Provider request skipped — AMC block protection is active."); if (event.target.closest("[data-location]")) showToast("Location access is not requested in this offline preview."); if (event.target.closest("[data-help]")) showToast("Configure a search, search once, then save the same criteria as a Watch.");
     if (event.target.closest("[data-deal-location]")) {
@@ -112,6 +149,7 @@
     }
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
   });
+  byId("movie-gm-form").addEventListener("submit", (event) => { event.preventDefault(); runMovieGM(); });
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); showDealPreview(); });
   updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate();
