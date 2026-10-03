@@ -155,8 +155,8 @@ class Default(WorkerEntrypoint):
             viewers = tuple(_viewer(row) for row in (viewer_result.results or []))
 
             config = RuntimeConfig(
-                tmdb_token=str(self.env.TMDB_READ_ACCESS_TOKEN or "").strip(),
-                omdb_api_key=str(self.env.OMDB_API_KEY or "").strip(),
+                tmdb_token=str(getattr(self.env, "TMDB_READ_ACCESS_TOKEN", "") or "").strip(),
+                omdb_api_key=str(getattr(self.env, "OMDB_API_KEY", "") or "").strip(),
             )
             result = run_live_movie_gm(
                 query=query,
