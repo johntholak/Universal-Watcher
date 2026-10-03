@@ -101,6 +101,105 @@
     try { const [watchResponse, resultResponse] = await Promise.all([fetch("/api/watches", { cache: "no-store" }), fetch("/api/results", { cache: "no-store" })]); if (watchResponse.ok) { const watches = await watchResponse.json(); if (Array.isArray(watches)) state.watches = watches.filter((watch) => Object.hasOwn(moduleLabels, watch.module)); } if (resultResponse.ok) { const results = await resultResponse.json(); if (Array.isArray(results)) state.results = results.filter((result) => Object.hasOwn(moduleLabels, result.module)); } renderWatches(); renderResults(); } catch (_error) { /* Static preview remains useful without the API. */ }
   }
   let movieGMMode = "everyone";
+  const movieGMState = { viewers: [], learning: null };
+
+  function listValue(id) {
+    return byId(id).value.split(",").map((item) => item.trim()).filter(Boolean).slice(0, 20);
+  }
+  function renderMovieGMLearning(data) {
+    movieGMState.learning = data || null;
+    const target = byId("gm-learning-summary");
+    if (!target) return;
+    const count = Number(data?.evidence_count || 0);
+    if (!count) {
+      target.textContent = "No explicit feedback yet. Rate a movie after a recommendation and Movie GM will learn from it.";
+      return;
+    }
+    const liked = (data.preferred_genres || []).slice(0, 4).join(", ");
+    const disliked = (data.disliked_genres || []).slice(0, 4).join(", ");
+    target.innerHTML = `Learning from <strong>${count}</strong> explicit ratings.${liked ? ` Likes are trending toward <strong>${escapeHtml(liked)}</strong>.` : ""}${disliked ? ` Avoidance signals include <strong>${escapeHtml(disliked)}</strong>.` : ""}`;
+  }
+
+  function renderMovieGMViewers() {
+    const target = byId("gm-viewer-list");
+    if (!target) return;
+    if (!movieGMState.viewers.length) {
+      target.innerHTML = '<p class="gm-viewer-empty">No individual profiles yet. Movie GM will use learned household feedback when available.</p>';
+      return;
+    }
+    target.innerHTML = movieGMState.viewers.map((viewer) => `<article class="gm-viewer">
+      <div><strong>${escapeHtml(viewer.display_name)}</strong><span>Weight ${Number(viewer.weight).toFixed(1)}${viewer.preferred_genres?.length ? " · Likes " + escapeHtml(viewer.preferred_genres.slice(0,3).join(", ")) : ""}</span></div>
+      <div><button type="button" data-edit-viewer="${escapeHtml(viewer.viewer_id)}">Edit</button><button type="button" data-delete-viewer="${escapeHtml(viewer.viewer_id)}">Delete</button></div>
+    </article>`).join("");
+  }
+
+  function fillMovieGMViewer(viewer) {
+    byId("gm-viewer-name").value = viewer.display_name || "";
+    byId("gm-viewer-name").dataset.viewerId = viewer.viewer_id || "";
+    byId("gm-viewer-weight").value = viewer.weight ?? 1;
+    byId("gm-viewer-preferred-genres").value = (viewer.preferred_genres || []).join(", ");
+    byId("gm-viewer-disliked-genres").value = (viewer.disliked_genres || []).join(", ");
+    byId("gm-viewer-preferred-keywords").value = (viewer.preferred_keywords || []).join(", ");
+    byId("gm-viewer-disliked-keywords").value = (viewer.disliked_keywords || []).join(", ");
+    byId("gm-viewer-runtime-min").value = viewer.preferred_runtime_min ?? "";
+    byId("gm-viewer-runtime-max").value = viewer.preferred_runtime_max ?? "";
+  }
+
+  async function hydrateMovieGMSettings() {
+    try {
+      const [viewerResponse, learningResponse] = await Promise.all([
+        fetch("/api/movies/viewers", { cache: "no-store" }),
+        fetch("/api/movies/feedback", { cache: "no-store" })
+      ]);
+      if (viewerResponse.ok) {
+        const data = await viewerResponse.json();
+        movieGMState.viewers = Array.isArray(data.viewers) ? data.viewers : [];
+        renderMovieGMViewers();
+      }
+      if (learningResponse.ok) renderMovieGMLearning(await learningResponse.json());
+    } catch (_error) {
+      renderMovieGMViewers();
+    }
+  }
+
+  async function saveMovieGMViewer(event) {
+    event.preventDefault();
+    const name = byId("gm-viewer-name");
+    const displayName = name.value.trim();
+    if (!displayName) { name.focus(); return; }
+    const viewerId = name.dataset.viewerId || displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || `viewer-${Date.now()}`;
+    const payload = {
+      viewer_id: viewerId,
+      display_name: displayName,
+      weight: Number(byId("gm-viewer-weight").value || 1),
+      preferred_genres: listValue("gm-viewer-preferred-genres"),
+      disliked_genres: listValue("gm-viewer-disliked-genres"),
+      preferred_keywords: listValue("gm-viewer-preferred-keywords"),
+      disliked_keywords: listValue("gm-viewer-disliked-keywords"),
+      preferred_runtime_min: byId("gm-viewer-runtime-min").value || null,
+      preferred_runtime_max: byId("gm-viewer-runtime-max").value || null
+    };
+    try {
+      const response = await fetch("/api/movies/viewers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save household profile");
+      await hydrateMovieGMSettings();
+      event.target.reset();
+      name.dataset.viewerId = "";
+      byId("gm-viewer-weight").value = "1";
+      showToast("Household profile saved. Movie GM will use it next time.");
+    } catch (error) { showToast(error.message || "Household profile could not be saved."); }
+  }
+
+  async function deleteMovieGMViewer(viewerId) {
+    try {
+      const response = await fetch(`/api/movies/viewers/${encodeURIComponent(viewerId)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Could not delete household profile");
+      await hydrateMovieGMSettings();
+      showToast("Household profile removed.");
+    } catch (error) { showToast(error.message || "Household profile could not be removed."); }
+  }
+
   function formatRuntime(minutes) {
     if (!Number.isFinite(minutes)) return "Runtime unknown";
     const hours = Math.floor(minutes / 60); const mins = minutes % 60;
@@ -154,6 +253,14 @@
       if (!navigator.geolocation) { showToast("Location is unavailable in this browser. Enter an address or ZIP instead."); return; }
       navigator.geolocation.getCurrentPosition(({ coords }) => { byId("deal-location").value = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`; updateDealSummary(); }, () => showToast("Location access was unavailable. Enter an address or ZIP instead."), { timeout: 10000, maximumAge: 300000 });
     }
+    const editViewer = event.target.closest("[data-edit-viewer]");
+    if (editViewer) {
+      const viewer = movieGMState.viewers.find((item) => item.viewer_id === editViewer.dataset.editViewer);
+      if (viewer) fillMovieGMViewer(viewer);
+    }
+    const deleteViewer = event.target.closest("[data-delete-viewer]");
+    if (deleteViewer) deleteMovieGMViewer(deleteViewer.dataset.deleteViewer);
+
     const feedback = event.target.closest("[data-movie-feedback]");
     if (feedback) {
       const payload = { title: feedback.dataset.title, rating: feedback.dataset.movieFeedback, genres: (feedback.dataset.genres || "").split("|").filter(Boolean) };
@@ -165,7 +272,8 @@
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
   });
   byId("movie-gm-form").addEventListener("submit", (event) => { event.preventDefault(); runMovieGM(); });
+  byId("gm-viewer-form").addEventListener("submit", saveMovieGMViewer);
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); showDealPreview(); });
-  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate();
+  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); hydrateMovieGMSettings();
 })();
