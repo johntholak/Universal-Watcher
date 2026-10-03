@@ -112,7 +112,14 @@
     const cards = (data.recommendations || []).map((item) => {
       const providers = (item.offers || []).map((offer) => `<a href="${escapeHtml(offer.watch_url || "#")}" target="_blank" rel="noopener noreferrer">${escapeHtml(offer.provider)}</a>`).join(", ") || "No accessible offer";
       const why = (item.why || []).slice(0, 4).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("");
-      return `<article class="gm-card"><header><div><h3>${escapeHtml(item.title)}</h3><span>${escapeHtml(item.year || "Year unknown")} · ${escapeHtml(formatRuntime(item.runtime_minutes))} · ${escapeHtml(item.age_rating || "Rating unknown")}</span></div><strong class="gm-score">${Number(item.combined_score).toFixed(1)}</strong></header><div class="gm-meta"><span>Quality ${Number(item.quality_score).toFixed(1)}</span><span>Household ${Number(item.household_score).toFixed(1)}</span><span>Availability ${escapeHtml(item.availability_confidence)}</span></div><p class="gm-providers"><strong>Available via:</strong> ${providers}</p><details><summary>Why this result?</summary><ul>${why || "<li>No additional explanation available.</li>"}</ul></details></article>`;
+      const ratings = item.ratings || {};
+      const ratingBadges = [
+        Number.isFinite(ratings.imdb) ? "IMDb " + Number(ratings.imdb).toFixed(1) + (ratings.imdb_votes ? " · " + Number(ratings.imdb_votes).toLocaleString() + " votes" : "") : "",
+        Number.isFinite(ratings.rotten_tomatoes_critics) ? "RT Critics " + Number(ratings.rotten_tomatoes_critics).toFixed(0) + "%" : "",
+        Number.isFinite(ratings.rotten_tomatoes_audience) ? "RT Audience " + Number(ratings.rotten_tomatoes_audience).toFixed(0) + "%" : "",
+        Number.isFinite(ratings.metacritic) ? "Metacritic " + Number(ratings.metacritic).toFixed(0) : "",
+      ].filter(Boolean).map((rating) => `<span>${escapeHtml(rating)}</span>`).join("");
+      return `<article class="gm-card"><header><div><h3>${escapeHtml(item.title)}</h3><span>${escapeHtml(item.year || "Year unknown")} · ${escapeHtml(formatRuntime(item.runtime_minutes))} · ${escapeHtml(item.age_rating || "Rating unknown")}</span></div><strong class="gm-score">${Number(item.combined_score).toFixed(1)}</strong></header><div class="gm-meta"><span>Quality ${Number(item.quality_score).toFixed(1)}</span><span>Household ${Number(item.household_score).toFixed(1)}</span><span>Availability ${escapeHtml(item.availability_confidence)}</span></div>${ratingBadges ? `<div class="gm-ratings">${ratingBadges}</div>` : ""}<p class="gm-providers"><strong>Available via:</strong> ${providers}</p><details><summary>Why this result?</summary><ul>${why || "<li>No additional explanation available.</li>"}</ul></details></article>`;
     }).join("");
     const upcoming = (data.upcoming || []).map((item) => `<article class="gm-upcoming"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.year || "Year unknown")} · ${escapeHtml(formatRuntime(item.runtime_minutes))} · ${escapeHtml(item.age_rating || "Rating unknown")}</span><small>${escapeHtml((item.why || [])[0] || "Confirmed upcoming offer")}</small></article>`).join("");
     panel.hidden = false;
