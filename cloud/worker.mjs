@@ -299,7 +299,7 @@ export default {
         const stamp = now();
         try {
           const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM movie_viewers WHERE user_id=?").bind(identity.user_id).first();
-          const exists = await env.DB.prepare("SELECT viewer_id FROM movie_viewers WHERE user_id=? AND viewer_id=?").bind(identity.user_id, viewer.viewerId).first();
+          const exists = await env.DB.prepare("SELECT viewer_id,created_at FROM movie_viewers WHERE user_id=? AND viewer_id=?").bind(identity.user_id, viewer.viewerId).first();
           if (!exists && Number(count?.total || 0) >= 8) return json({ error: "Movie GM supports up to 8 household profiles" }, 400);
           await env.DB.prepare(`INSERT INTO movie_viewers
             (viewer_id,user_id,display_name,weight,preferred_genres_json,disliked_genres_json,preferred_keywords_json,disliked_keywords_json,preferred_runtime_min,preferred_runtime_max,created_at,updated_at)
