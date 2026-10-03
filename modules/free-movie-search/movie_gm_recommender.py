@@ -12,7 +12,7 @@ from typing import Sequence
 
 from .free_movie_search import MovieCandidate, RankedMovie, rank_movies, split_current_and_upcoming
 from .movie_gm_decision import HouseholdFit, ScoreBreakdown, ViewerProfile, breakdown, household_fit
-from .movie_gm_profile import TasteProfile, WatchRecord, is_watched
+from .movie_gm_profile import TasteProfile, WatchRecord, is_watched, score_taste
 
 
 @dataclass(frozen=True)
@@ -104,8 +104,16 @@ def recommend_movies(
             runtime_minutes=result.movie.runtime_minutes,
             viewers=viewers,
         )
-        taste = result.personal_fit_score if taste_profile is not None else 50.0
-        household_score = household.score if viewers else taste
+        if taste_profile is not None:
+            taste, taste_reasons = score_taste(
+                genres=result.movie.genres,
+                title=result.movie.title,
+                profile=taste_profile,
+                runtime_minutes=result.movie.runtime_minutes,
+            )
+        else:
+            taste, taste_reasons = 50.0, ()
+        household_score = household.score if viewers else 50.0
         score = breakdown(
             quality=result.quality_score,
             taste=taste,
@@ -121,6 +129,7 @@ def recommend_movies(
             continue
 
         why = list(score.reasons)
+        why.extend(taste_reasons)
         why.extend(household.reasons)
         if hidden_reason:
             why.append(hidden_reason)
