@@ -12,7 +12,7 @@ from typing import Sequence
 
 from .free_movie_search import MovieCandidate, RankedMovie, rank_movies, split_current_and_upcoming
 from .movie_gm_decision import HouseholdFit, ScoreBreakdown, ViewerProfile, breakdown, household_fit
-from .movie_gm_profile import TasteProfile, WatchRecord
+from .movie_gm_profile import TasteProfile, WatchRecord, is_watched
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,7 @@ def recommend_movies(
         raise ValueError(f"Unsupported Movie GM mode: {mode}")
 
     kids_mode = normalized_mode == "kids"
+    suppressed_count = sum(1 for movie in movies if is_watched(movie.title, watch_history)) if watch_history else 0
     ranked = rank_movies(
         movies,
         minimum_imdb=minimum_imdb,
@@ -158,4 +159,5 @@ def recommend_movies(
     return MovieRecommendationResult(
         recommendations=tuple(recommendations),
         upcoming=tuple(upcoming),
+        suppressed_count=suppressed_count,
     )
