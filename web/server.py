@@ -29,6 +29,7 @@ from modules.free_movie_search.movie_gm_runtime import run_live_movie_gm
 from modules.free_movie_search.movie_gm_profile import WatchRecord, TasteProfile
 from modules.free_movie_search.movie_gm_decision import learn_taste_from_history
 from movie_gm_store import MovieGMStore
+from movie_gm_household import HouseholdProfileStore
 
 SUPPORTED_MODULES = (
     {"id": "movies", "name": "Movies", "description": "Seat availability and showtimes"},
@@ -40,7 +41,9 @@ SUPPORTED_MODULE_IDS = {module["id"] for module in SUPPORTED_MODULES}
 class DraftWatchStore:
     def __init__(self, movie_db_path: str | Path | None = None) -> None:
         self._lock = threading.Lock()
-        self._movie_store = MovieGMStore(movie_db_path or REPO_ROOT / "data" / "movie_gm.sqlite3")
+        db_path = movie_db_path or REPO_ROOT / "data" / "movie_gm.sqlite3"
+        self._movie_store = MovieGMStore(db_path)
+        self._household_store = HouseholdProfileStore(db_path)
         self._watches: list[WatchDefinition] = []
         self._results: list[WatchResult] = []
 
@@ -80,6 +83,13 @@ class DraftWatchStore:
 
     def movie_history(self) -> tuple[WatchRecord, ...]:
         return self._movie_store.history()
+
+    def movie_viewers(self):
+        return self._household_store.viewers()
+
+    def close_movie_stores(self) -> None:
+        self._movie_store.close()
+        self._household_store.close()
 
 
 def serialize_watch(watch: WatchDefinition) -> dict[str, Any]:
@@ -240,6 +250,7 @@ def make_handler(store: DraftWatchStore):
                 try:
                     feedback = store.movie_feedback()
                     learned = learn_taste_from_history(feedback)
+        viewers = store.movie_viewers()
                     taste_profile = TasteProfile(
                         preferred_genres=learned.preferred_genres,
                         disliked_genres=learned.disliked_genres,
@@ -252,6 +263,7 @@ def make_handler(store: DraftWatchStore):
                         child_ages=(6, 9) if requested_mode == "kids" else (),
                         taste_profile=taste_profile if learned.evidence_count else None,
                         watch_history=store.movie_history(),
+                viewers=viewers,
                     )
                     self._send_json(serialize_movie_search(result))
                 except Exception as exc:
