@@ -2,7 +2,7 @@
 
 **Status date:** October 3, 2026
 **Overall stage:** Foundation / consolidation  
-**Current milestone:** Movie GM decision engine and provider integration boundary are built; live free-movie provider adapters are not yet connected
+**Current milestone:** Movie GM decision engine, first live provider adapter, runtime path, and web search UI are connected; independent ratings and availability sources remain next
 
 ## October 3 Movie GM checkpoint
 
@@ -14,9 +14,13 @@
 - The adapter maps free/ad-supported and subscription offers into the existing normalized offer contract, excludes rental/purchase-only offers, records provenance and checked timestamps, and preserves provider failures as `UNAVAILABLE`.
 - TMDB vote average/count are represented as TMDB evidence rather than being mislabeled as IMDb data.
 - The adapter requires `TMDB_READ_ACCESS_TOKEN`; no credential is stored in the repository. TMDB/JustWatch attribution requirements are documented for the eventual UI.
-- Offline adapter tests are included. No live request has been made because no runtime credential was supplied to this build session.
+- Offline adapter tests now cover runtime/certification enrichment and the corrected `free|ads|flatrate` monetization filter. Detail enrichment is best-effort so one missing metadata response does not invalidate an otherwise verified offer.
+- Added `movie_gm_runtime.py` as the secure environment boundary and wired `GET /api/movies/search` to the live Movie GM pipeline when `TMDB_READ_ACCESS_TOKEN` is configured.
+- Added a real Movies UI panel with Everyone, Kids, Tonight, and Hidden Gems modes, optional title/keyword search, truthful provider status, recommendation explanations, runtime/rating display, availability confidence, and a separate upcoming section.
+- The UI labels the TMDB region link as source availability rather than pretending it is a provider deep link. Missing credentials still fail closed.
+- No live request has been made in this build session because no runtime credential was supplied, so live source acceptance is not claimed.
 
-**NEXT TASK:** Run the adapter with a securely configured TMDB token, inspect the real US provider payload, then connect the live normalized results to the Movie GM pipeline. After that, add a second independent availability source/provider path so one source failure cannot define the catalog.
+**NEXT TASK:** Validate the live TMDB path with the token configured securely in the runtime, then add independent rating evidence and a genuinely independent availability source. After those sources are connected, harden Movie GM scoring to eliminate any remaining taste double-counting and add truthful suppressed-count reporting.
 
 ## September 26 browser-fixture gate
 
@@ -246,7 +250,7 @@ live web adapters gated until that acceptance passes.
 | Module | Status | Current baseline | In this repo? | Immediate next step |
 |---|---|---|---|---|
 | Universal Watcher Core | 🟡 | Minimal watch/result contracts + Family Deals and Ticket mappings | Yes | Keep live execution gated; add execution boundary after Movies acceptance |
-| Universal Watcher Web App | 🟡 | Approved dark Home and offline Movies search/Watch flow | Yes | Build Family Deals, then complete shared Watches; live execution gated |
+| Universal Watcher Web App | 🟡 | Approved dark Home plus Movie GM streaming search and existing Movies seat/Watch flow | Yes | Validate live Movie GM sources; continue shared Watches and live execution gates |
 | Family Deals | 🟡 | V5.0 Fast Filters + Semantic Verifier; V5.0.1 conservative hours parsing; isolated result adapter mapping | Yes, intact import | Live benchmark V5, validate every claimed match, improve hours/source coverage |
 | Seat Watcher | 🟡 reconstructed / live regression in progress | V44.7; catalog authorized; 32/32 sampled showtimes; final seat fixes offline-only; 47 Movies tests | Yes | Mac seat-map comparison, then broader reliability/NEXT BEST acceptance |
 | Ticket Watcher | Shelved / hidden | Bundle V1.11; Ticketmaster V1.9 path and isolated mapping preserved | Yes | Preserve only; reactivation requires a new decision |
