@@ -40,6 +40,12 @@ class MovieCandidate:
     age_rating: str | None = None
     personal_fit: float = 0.0
     taste_reasons: tuple[str, ...] = ()
+    # Explicit per-child fit supplied by the normalization/content-review layer.
+    # This keeps developmental judgments out of the generic quality score.
+    age_fit_by_age: tuple[tuple[int, float], ...] = ()
+    kids_eligible: bool | None = None
+    pg13_kid_friendly: bool | None = None
+    pg13_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -103,6 +109,38 @@ def quality_score(ratings: RatingEvidence) -> tuple[float, float]:
     return _clamp(score), _clamp(confidence)
 
 
+def _age_fit_score(movie: MovieCandidate, age: int) -> float:
+    """Return explicit fit for one child age, without inventing missing evidence."""
+    for candidate_age, score in movie.age_fit_by_age:
+        if candidate_age == age:
+            return _clamp(score)
+    return 0.0
+
+
+def _kids_gate(movie: MovieCandidate, allow_pg13: bool) -> tuple[bool, str | None]:
+    rating = (movie.age_rating or "").upper().strip()
+
+    if movie.kids_eligible is False:
+        return False, None
+
+    if rating in {"R", "NC-17"}:
+        return False, None
+
+    if movie.kids_eligible is None:
+        return False, None
+
+    if rating == "PG-13":
+        if not allow_pg13 or movie.pg13_kid_friendly is not True:
+            return False, None
+        return True, movie.pg13_reason or "PG-13 approved as kid-friendly"
+
+    if rating in {"G", "PG", "TV-G", "TV-PG"}:
+        return True, None
+
+    # Unrated or unknown classifications require explicit kid eligibility.
+    return movie.kids_eligible is True, None
+
+
 def rank_movies(
     movies: Iterable[MovieCandidate],
     *,
@@ -112,6 +150,10 @@ def rank_movies(
     excluded_genres: Sequence[str] = (),
     preferred_providers: Sequence[str] = (),
     personal_fit_weight: float = 0.35,
+    kids_mode: bool = False,
+    child_ages: Sequence[int] = (),
+    allow_pg13: bool = True,
+    age_fit_weight: float = 0.45,
 ) -> list[RankedMovie]:
     allowed = {g.casefold() for g in allowed_genres}
     excluded = {g.casefold() for g in excluded_genres}
@@ -141,6 +183,12 @@ def rank_movies(
         if excluded and genres & excluded:
             continue
 
+        pg13_note: str | None = None
+        if kids_mode:
+            passed, pg13_note = _kids_gate(movie, allow_pg13)
+            if not passed:
+                continue
+
         quality, confidence = quality_score(movie.ratings)
 
         provider_bonus = 0.0
@@ -150,12 +198,35 @@ def rank_movies(
             provider_bonus = 5.0
 
         personal = _clamp(movie.personal_fit + provider_bonus)
+
+        reasons = list(movie.taste_reasons)
+
+        if kids_mode and child_ages:
+            child_scores = [
+                (age, _age_fit_score(movie, age))
+                for age in child_ages
+            ]
+            combined_age_fit = sum(score for _, score in child_scores) / len(child_scores)
+            # Penalize a large age mismatch instead of hiding it inside one family score.
+            spread = max(score for _, score in child_scores) - min(
+                score for _, score in child_scores
+            )
+            age_component = _clamp(combined_age_fit - spread * 0.20)
+            personal = _clamp(
+                personal * (1.0 - age_fit_weight)
+                + age_component * age_fit_weight
+            )
+            for age, score in child_scores:
+                reasons.append(f"Age {age} fit: {score:.0f}/100")
+            reasons.append(f"Mixed-age fit: {age_component:.0f}/100")
+            if pg13_note:
+                reasons.append(f"PG-13 approved for kids: {pg13_note}")
+
         combined = _clamp(
             quality * (1.0 - personal_fit_weight)
             + personal * personal_fit_weight
         )
 
-        reasons = list(movie.taste_reasons)
         if movie.ratings.imdb_votes:
             reasons.append(
                 f"IMDb evidence: {movie.ratings.imdb:.1f}/10 "
