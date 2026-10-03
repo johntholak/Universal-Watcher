@@ -119,7 +119,7 @@
         Number.isFinite(ratings.rotten_tomatoes_audience) ? "RT Audience " + Number(ratings.rotten_tomatoes_audience).toFixed(0) + "%" : "",
         Number.isFinite(ratings.metacritic) ? "Metacritic " + Number(ratings.metacritic).toFixed(0) : "",
       ].filter(Boolean).map((rating) => `<span>${escapeHtml(rating)}</span>`).join("");
-      return `<article class="gm-card"><header><div><h3>${escapeHtml(item.title)}</h3><span>${escapeHtml(item.year || "Year unknown")} · ${escapeHtml(formatRuntime(item.runtime_minutes))} · ${escapeHtml(item.age_rating || "Rating unknown")}</span></div><strong class="gm-score">${Number(item.combined_score).toFixed(1)}</strong></header><div class="gm-meta"><span>Quality ${Number(item.quality_score).toFixed(1)}</span><span>Household ${Number(item.household_score).toFixed(1)}</span><span>Availability ${escapeHtml(item.availability_confidence)}</span></div>${ratingBadges ? `<div class="gm-ratings">${ratingBadges}</div>` : ""}<p class="gm-providers"><strong>Available via:</strong> ${providers}</p><details><summary>Why this result?</summary><ul>${why || "<li>No additional explanation available.</li>"}</ul></details></article>`;
+      return `<article class="gm-card"><header><div><h3>${escapeHtml(item.title)}</h3><span>${escapeHtml(item.year || "Year unknown")} · ${escapeHtml(formatRuntime(item.runtime_minutes))} · ${escapeHtml(item.age_rating || "Rating unknown")}</span></div><strong class="gm-score">${Number(item.combined_score).toFixed(1)}</strong></header><div class="gm-meta"><span>Quality ${Number(item.quality_score).toFixed(1)}</span><span>Household ${Number(item.household_score).toFixed(1)}</span><span>Availability ${escapeHtml(item.availability_confidence)}</span></div>${ratingBadges ? `<div class="gm-ratings">${ratingBadges}</div>` : ""}<p class="gm-providers"><strong>Available via:</strong> ${providers}</p><details><summary>Why this result?</summary><ul>${why || "<li>No additional explanation available.</li>"}</ul></details><div class="gm-feedback"><span>How did this sound?</span><button type="button" data-movie-feedback="loved" data-title="${escapeHtml(item.title)}" data-genres="${escapeHtml((item.genres || []).join("|"))}">Loved it</button><button type="button" data-movie-feedback="liked" data-title="${escapeHtml(item.title)}" data-genres="${escapeHtml((item.genres || []).join("|"))}">Liked it</button><button type="button" data-movie-feedback="disliked" data-title="${escapeHtml(item.title)}" data-genres="${escapeHtml((item.genres || []).join("|"))}">Not for us</button></div></article>`;
     }).join("");
     const upcoming = (data.upcoming || []).map((item) => `<article class="gm-upcoming"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.year || "Year unknown")} · ${escapeHtml(formatRuntime(item.runtime_minutes))} · ${escapeHtml(item.age_rating || "Rating unknown")}</span><small>${escapeHtml((item.why || [])[0] || "Confirmed upcoming offer")}</small></article>`).join("");
     panel.hidden = false;
@@ -128,7 +128,7 @@
   async function runMovieGM() {
     const status = byId("movie-gm-status"); const panel = byId("movie-gm-results");
     const query = byId("movie-gm-query").value.trim();
-    status.textContent = movieGMMode === "kids" ? "Checking streaming offers and applying the kids safety gate..." : "Searching current streaming offers, ratings, and household fit...";
+    status.textContent = movieGMMode === "kids" ? "Checking streaming offers and applying the kids safety gate..." : "Finding something good for you...";
     panel.hidden = true;
     const params = new URLSearchParams({ mode: movieGMMode }); if (query) params.set("query", query);
     try {
@@ -153,6 +153,14 @@
     if (event.target.closest("[data-deal-location]")) {
       if (!navigator.geolocation) { showToast("Location is unavailable in this browser. Enter an address or ZIP instead."); return; }
       navigator.geolocation.getCurrentPosition(({ coords }) => { byId("deal-location").value = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`; updateDealSummary(); }, () => showToast("Location access was unavailable. Enter an address or ZIP instead."), { timeout: 10000, maximumAge: 300000 });
+    }
+    const feedback = event.target.closest("[data-movie-feedback]");
+    if (feedback) {
+      const payload = { title: feedback.dataset.title, rating: feedback.dataset.movieFeedback, genres: (feedback.dataset.genres || "").split("|").filter(Boolean) };
+      fetch("/api/movies/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+        .then((response) => { if (!response.ok) throw new Error("Could not save feedback"); return response.json(); })
+        .then(() => showToast("Got it. Movie GM will use that feedback next time."))
+        .catch(() => showToast("Feedback could not be saved in this preview."));
     }
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
   });
