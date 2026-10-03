@@ -1,0 +1,13 @@
+name = "universal-watcher-movie-gm"
+main = "cloud/movie_gm_worker.py"
+compatibility_date = "2026-10-02"
+compatibility_flags = ["python_workers"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "universal-watcher"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Configure these as Cloudflare Worker secrets:
+# TMDB_READ_ACCESS_TOKEN
+# OMDB_API_KEY
