@@ -10,3 +10,12 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
 [triggers]
 crons = ["*/15 * * * *"]
+
+[assets]
+directory = "../web"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[services]]
+binding = "MOVIE_GM"
+service = "universal-watcher-movie-gm"
