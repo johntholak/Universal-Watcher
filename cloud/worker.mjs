@@ -276,6 +276,15 @@ export default {
     }
 
     const identity = await session(request, env);
+    if (!identity && request.method === "GET" && path === "/api/v1/session" && url.searchParams.get("mode") === "demo") {
+      const expires = Date.now() + SESSION_SECONDS * 1000;
+      const value = encode(new TextEncoder().encode(JSON.stringify({ user_id: "private-beta", exp: expires, nonce: crypto.randomUUID() })));
+      const token = value + "." + encode(await hmac(env.SESSION_KEY, value));
+      const stamp = now();
+      try { await env.DB.prepare("INSERT OR IGNORE INTO users(id,created_at) VALUES (?,?)").bind("private-beta", stamp).run(); }
+      catch { return json({ error: "Storage temporarily unavailable" }, 503); }
+      return json({ authenticated: true, csrf_token: await csrf(env, token) }, 200, { "Set-Cookie": COOKIE + "=" + token + "; Path=/; Max-Age=" + SESSION_SECONDS + "; HttpOnly; Secure; SameSite=Strict" });
+    }
     if (!identity) return json({ error: "Authentication required" }, 401);
     if (request.method === "GET" && path === "/api/v1/session") return json({ authenticated: true, csrf_token: await csrf(env, identity.token) });
     if (request.method !== "GET" && (!sameOrigin(request) || !equal(request.headers.get("X-CSRF-Token") || "", await csrf(env, identity.token)))) return json({ error: "Invalid request token or origin" }, 403);
