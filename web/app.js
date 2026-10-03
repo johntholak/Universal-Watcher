@@ -1,5 +1,5 @@
 (() => {
-  const moduleLabels = { movies: "Movies", "family-deals": "Family Deals" };
+  const moduleLabels = { movies: "Seat Finder", "movie-gm": "Streaming GM", "family-deals": "Family Deals" };
   const state = { watches: [], results: [] };
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
