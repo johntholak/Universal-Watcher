@@ -48,7 +48,7 @@ class MovieGMHouseholdTests(unittest.TestCase):
         self.assertEqual(learned.preferred_genres[0], "comedy")
         self.assertEqual(learned.disliked_genres[0], "horror")
         self.assertNotIn("drama", learned.preferred_genres)
-        self.assertNotIn("great", learned.preferred_keywords)
+        self.assertNotIn("drama", learned.preferred_keywords)
 
 
 if __name__ == "__main__":
