@@ -51,6 +51,8 @@ class MovieCandidate:
     year: int | None
     ratings: RatingEvidence
     offers: tuple[FreeOffer, ...]
+    # Streaming availability date. None means currently available or unknown.
+    available_from: str | None = None
     genres: tuple[str, ...] = ()
     runtime_minutes: int | None = None
     age_rating: str | None = None
@@ -277,3 +279,35 @@ def rank_movies(
         ),
         reverse=True,
     )
+
+
+def split_current_and_upcoming(
+    ranked: Sequence[RankedMovie],
+    *,
+    as_of: str,
+    days: int = 30,
+) -> tuple[list[RankedMovie], list[RankedMovie]]:
+    """Split ranked results into currently available and upcoming releases.
+
+    Dates are ISO-8601 YYYY-MM-DD strings. Unknown dates stay in the current
+    bucket only when the candidate already has a verified accessible offer.
+    The provider layer should supply future availability dates for upcoming
+    titles. This function does not invent them.
+    """
+    from datetime import date, timedelta
+
+    start = date.fromisoformat(as_of)
+    end = start + timedelta(days=days)
+    current: list[RankedMovie] = []
+    upcoming: list[RankedMovie] = []
+
+    for result in ranked:
+        available_from = result.movie.available_from
+        if available_from:
+            release_date = date.fromisoformat(available_from)
+            if start < release_date <= end:
+                upcoming.append(result)
+                continue
+        current.append(result)
+
+    return current, upcoming
