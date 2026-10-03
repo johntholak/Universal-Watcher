@@ -276,7 +276,7 @@ export default {
     }
 
     const identity = await session(request, env);
-    if (!identity && request.method === "GET" && path === "/api/v1/session" && url.searchParams.get("mode") === "demo") {
+    if (!identity && request.method === "GET" && path === "/api/v1/session") {
       const expires = Date.now() + SESSION_SECONDS * 1000;
       const value = encode(new TextEncoder().encode(JSON.stringify({ user_id: "private-beta", exp: expires, nonce: crypto.randomUUID() })));
       const token = value + "." + encode(await hmac(env.SESSION_KEY, value));
