@@ -69,14 +69,11 @@ jobs:
               .replace('database_name = "universal-watcher"', f'database_name = "{database_name}"')
               .replace('database_id = "REPLACE_WITH_D1_DATABASE_ID"', f'database_id = "{database_id}"')
           )
-          c1 = 'database_id = "' + database_id + '"'
-          c2 = c1 + '\nmigrations_dir = "cloud/migrations"'
-          py_config = py_config.replace(c1, c2)
           Path("movie-gm-wrangler.toml").write_text(py_config)
           PY
 
       - name: Apply remote D1 migrations
-        run: npx --yes wrangler@4 d1 migrations apply "${UW_D1_DATABASE_NAME}" --remote --config movie-gm-wrangler.toml
+        run: npx --yes wrangler@4 d1 migrations apply "${UW_D1_DATABASE_NAME}" --remote --config cloud/wrangler.toml
 
       - name: Deploy Movie GM Python Worker
         run: npx --yes wrangler@4 deploy --config movie-gm-wrangler.toml
