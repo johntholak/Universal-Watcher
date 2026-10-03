@@ -250,7 +250,7 @@ def make_handler(store: DraftWatchStore):
                 try:
                     feedback = store.movie_feedback()
                     learned = learn_taste_from_history(feedback)
-        viewers = store.movie_viewers()
+                    viewers = store.movie_viewers()
                     taste_profile = TasteProfile(
                         preferred_genres=learned.preferred_genres,
                         disliked_genres=learned.disliked_genres,
@@ -263,13 +263,15 @@ def make_handler(store: DraftWatchStore):
                         child_ages=(6, 9) if requested_mode == "kids" else (),
                         taste_profile=taste_profile if learned.evidence_count else None,
                         watch_history=store.movie_history(),
-                viewers=viewers,
+                        viewers=viewers,
                     )
                     self._send_json(serialize_movie_search(result))
                 except Exception as exc:
                     self._send_error_json(f"Movie search failed: {exc.__class__.__name__}", HTTPStatus.INTERNAL_SERVER_ERROR)
             elif path == "/api/watches":
                 self._send_json([serialize_watch(watch) for watch in store.all()])
+            elif path == "/api/movies/viewers":
+                self._send_json({"viewers": list(store._household_store.viewer_rows())})
             elif path == "/api/movies/feedback":
                 feedback = store.movie_feedback()
                 learned = learn_taste_from_history(feedback)
@@ -286,6 +288,42 @@ def make_handler(store: DraftWatchStore):
                 self._serve_static(path)
 
         def do_POST(self) -> None:
+            if urlparse(self.path).path == "/api/movies/viewers":
+                payload = self._read_json()
+                if payload is None:
+                    self._send_error_json("Request body must be a JSON object under 16 KB", HTTPStatus.BAD_REQUEST)
+                    return
+                try:
+                    viewer_id = str(payload.get("viewer_id") or "").strip()
+                    display_name = str(payload.get("display_name") or "").strip()
+                    weight = float(payload.get("weight", 1.0))
+                    if not viewer_id or not display_name or len(viewer_id) > 80 or len(display_name) > 120 or not 0 <= weight <= 10:
+                        raise ValueError("Viewer requires a name, ID, and weight between 0 and 10")
+                    def values(name):
+                        value = payload.get(name) or []
+                        if not isinstance(value, list) or len(value) > 20:
+                            raise ValueError(name + " must be a list of at most 20 items")
+                        return tuple(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
+                    profile = TasteProfile(
+                        preferred_genres=values("preferred_genres"),
+                        disliked_genres=values("disliked_genres"),
+                        preferred_keywords=values("preferred_keywords"),
+                        disliked_keywords=values("disliked_keywords"),
+                        preferred_runtime_min=int(payload["preferred_runtime_min"]) if payload.get("preferred_runtime_min") not in (None, "") else None,
+                        preferred_runtime_max=int(payload["preferred_runtime_max"]) if payload.get("preferred_runtime_max") not in (None, "") else None,
+                    )
+                    if profile.preferred_runtime_min and profile.preferred_runtime_max and profile.preferred_runtime_min > profile.preferred_runtime_max:
+                        raise ValueError("Preferred runtime minimum cannot exceed maximum")
+                    store._household_store.upsert(viewer_id, display_name, profile, weight)
+                    self._send_json({"saved": True, "viewer": {
+                        "viewer_id": viewer_id, "display_name": display_name, "weight": weight,
+                        "preferred_genres": list(profile.preferred_genres), "disliked_genres": list(profile.disliked_genres),
+                        "preferred_keywords": list(profile.preferred_keywords), "disliked_keywords": list(profile.disliked_keywords),
+                        "preferred_runtime_min": profile.preferred_runtime_min, "preferred_runtime_max": profile.preferred_runtime_max,
+                    }}, HTTPStatus.OK)
+                except (TypeError, ValueError) as exc:
+                    self._send_error_json(str(exc), HTTPStatus.BAD_REQUEST)
+                return
             if urlparse(self.path).path == "/api/movies/feedback":
                 payload = self._read_json()
                 if payload is None:
@@ -325,6 +363,17 @@ def make_handler(store: DraftWatchStore):
                 return
             store.add(watch)
             self._send_json(serialize_watch(watch), HTTPStatus.CREATED)
+
+        def do_DELETE(self) -> None:
+            path = urlparse(self.path).path
+            prefix = "/api/movies/viewers/"
+            if not path.startswith(prefix) or not path[len(prefix):]:
+                self._send_error_json("Not found", HTTPStatus.NOT_FOUND)
+                return
+            if store._household_store.delete(path[len(prefix):]):
+                self._send_json({"deleted": True})
+            else:
+                self._send_error_json("Viewer not found", HTTPStatus.NOT_FOUND)
 
         def do_PATCH(self) -> None:
             path = urlparse(self.path).path
