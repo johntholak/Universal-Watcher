@@ -35,6 +35,8 @@
         return;
       }
       movieApi.production = true;
+      const previewBanner = byId("movie-preview-banner");
+      if (previewBanner) previewBanner.hidden = true;
       if (response.ok) {
         const data = await response.json();
         movieApi.csrf = data.csrf_token || "";
