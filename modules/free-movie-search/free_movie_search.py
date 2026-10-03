@@ -10,6 +10,21 @@ from math import log10
 from typing import Iterable, Sequence
 
 
+# Household services the caller already pays for. Offers on these services
+# can be treated as zero incremental cost by the search engine.
+DEFAULT_INCLUDED_SUBSCRIPTIONS: tuple[str, ...] = (
+    "Prime Video",
+    "Max",
+    "Apple TV+",
+    "Hulu",
+    "Peacock",
+)
+
+# Services the caller does not currently own but wants surfaced as options.
+# These are never treated as actually accessible without an explicit override.
+DEFAULT_OPTIONAL_SERVICES: tuple[str, ...] = ("Netflix",)
+
+
 @dataclass(frozen=True)
 class RatingEvidence:
     imdb: float | None = None
@@ -162,11 +177,16 @@ def rank_movies(
     results: list[RankedMovie] = []
 
     for movie in movies:
-        verified_free = [
+        accessible_offers = [
             offer for offer in movie.offers
-            if offer.verified and offer.access in {"free_ads", "free"}
+            if _offer_accessible(
+                offer,
+                included_subscriptions=included_subscriptions,
+                include_optional_services=include_optional_services,
+                include_optional_as_free=include_optional_as_free,
+            )
         ]
-        if not verified_free:
+        if not accessible_offers:
             continue
 
         if minimum_imdb is not None:
@@ -193,7 +213,7 @@ def rank_movies(
 
         provider_bonus = 0.0
         if preferred and any(
-            offer.provider.casefold() in preferred for offer in verified_free
+            offer.provider.casefold() in preferred for offer in accessible_offers
         ):
             provider_bonus = 5.0
 
