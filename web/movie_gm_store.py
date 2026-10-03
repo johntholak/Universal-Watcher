@@ -16,6 +16,9 @@ from modules.free_movie_search.movie_gm_profile import WatchRecord, normalize_ti
 
 class MovieGMStore:
     def __init__(self, path: str | Path = "data/movie_gm.sqlite3") -> None:
+        path = Path(path)
+        if str(path) != ":memory:":
+            path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._db = sqlite3.connect(str(path), check_same_thread=False)
         self._db.row_factory = sqlite3.Row
