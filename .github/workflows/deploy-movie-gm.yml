@@ -1,0 +1,108 @@
+name: Deploy Movie GM production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: movie-gm-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      UW_D1_DATABASE_NAME: ${{ secrets.UW_D1_DATABASE_NAME }}
+      UW_D1_DATABASE_ID: ${{ secrets.UW_D1_DATABASE_ID }}
+      TMDB_READ_ACCESS_TOKEN: ${{ secrets.TMDB_READ_ACCESS_TOKEN }}
+      OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+      ACCESS_SECRET: ${{ secrets.UW_ACCESS_SECRET }}
+      SESSION_KEY: ${{ secrets.UW_SESSION_KEY }}
+      WORKER_SECRET: ${{ secrets.UW_WORKER_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate deployment inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN UW_D1_DATABASE_NAME UW_D1_DATABASE_ID TMDB_READ_ACCESS_TOKEN OMDB_API_KEY ACCESS_SECRET SESSION_KEY WORKER_SECRET; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+          if [ "${#ACCESS_SECRET}" -lt 32 ] || [ "${#SESSION_KEY}" -lt 32 ] || [ "${#WORKER_SECRET}" -lt 32 ]; then
+            echo "::error::UW_ACCESS_SECRET, UW_SESSION_KEY, and UW_WORKER_SECRET must each be at least 32 characters."
+            exit 1
+          fi
+
+      - name: Generate production Wrangler configs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import os
+
+          database_name = os.environ["UW_D1_DATABASE_NAME"]
+          database_id = os.environ["UW_D1_DATABASE_ID"]
+
+          js_template = Path("cloud/wrangler.example.toml").read_text()
+          js_config = (
+              js_template
+              .replace('database_name = "universal-watcher"', f'database_name = "{database_name}"')
+              .replace('database_id = "REPLACE_WITH_D1_DATABASE_ID"', f'database_id = "{database_id}"')
+          )
+          Path("cloud/wrangler.toml").write_text(js_config)
+
+          py_template = Path("cloud/movie-gm-wrangler.example.toml").read_text()
+          py_config = (
+              py_template
+              .replace('database_name = "universal-watcher"', f'database_name = "{database_name}"')
+              .replace('database_id = "REPLACE_WITH_D1_DATABASE_ID"', f'database_id = "{database_id}"')
+          )
+          py_config += '\n[vars]\n\n'
+          py_config = py_config.replace(
+              'database_id = "' + database_id + '"',
+              'database_id = "' + database_id + '"\nmigrations_dir = "cloud/migrations"'
+          )
+          Path("movie-gm-wrangler.toml").write_text(py_config)
+          PY
+
+      - name: Apply remote D1 migrations
+        run: npx --yes wrangler@4 d1 migrations apply "${UW_D1_DATABASE_NAME}" --remote --config movie-gm-wrangler.toml
+
+      - name: Deploy Movie GM Python Worker
+        run: npx --yes wrangler@4 deploy --config movie-gm-wrangler.toml
+
+      - name: Set Movie GM Worker secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$TMDB_READ_ACCESS_TOKEN" | npx --yes wrangler@4 secret put TMDB_READ_ACCESS_TOKEN --name universal-watcher-movie-gm
+          printf '%s' "$OMDB_API_KEY" | npx --yes wrangler@4 secret put OMDB_API_KEY --name universal-watcher-movie-gm
+
+      - name: Deploy Universal Watcher API Worker
+        run: npx --yes wrangler@4 deploy --config cloud/wrangler.toml
+
+      - name: Set Universal Watcher API secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$ACCESS_SECRET" | npx --yes wrangler@4 secret put ACCESS_SECRET --name universal-watcher-api
+          printf '%s' "$SESSION_KEY" | npx --yes wrangler@4 secret put SESSION_KEY --name universal-watcher-api
+          printf '%s' "$WORKER_SECRET" | npx --yes wrangler@4 secret put WORKER_SECRET --name universal-watcher-api
+
+      - name: Deployment summary
+        run: |
+          echo "Movie GM Python Worker: universal-watcher-movie-gm"
+          echo "API Worker: universal-watcher-api"
+          echo "D1 migrations: applied remotely"
+          echo "Service binding: MOVIE_GM -> universal-watcher-movie-gm"
