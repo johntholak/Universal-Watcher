@@ -115,3 +115,43 @@ def test_pipeline_reports_watched_suppression():
     result = run_movie_gm_pipeline([GoodProvider()], watch_history=[WatchRecord("One", rating="liked")])
     assert result.recommendation.suppressed_count == 1
     assert [item.ranked.movie.title for item in result.recommendation.recommendations] == ["Two"]
+
+
+def test_hidden_gems_enriches_before_applying_hidden_gem_gate():
+    class HiddenGemProvider:
+        provider = "HiddenGemProvider"
+
+        def discover(self, *, query="", as_of=None):
+            return ProviderBatch(provider=self.provider, movies=(
+                MovieCandidate(
+                    title="Unknown Reach",
+                    year=2026,
+                    ratings=RatingEvidence(tmdb=7.8, tmdb_votes=600),
+                    offers=(FreeOffer(provider="Tubi", watch_url="https://example.test",
+                                      verified=True, availability_confidence="direct"),),
+                    genres=("Drama",),
+                    runtime_minutes=105,
+                ),
+            ))
+
+    class HiddenGemEnricher:
+        provider = "OMDb"
+
+        def enrich(self, candidate):
+            return MovieCandidate(
+                title=candidate.title,
+                year=candidate.year,
+                ratings=RatingEvidence(imdb=7.9, imdb_votes=12000,
+                                       rotten_tomatoes_critics=84),
+                offers=candidate.offers,
+                genres=candidate.genres,
+                runtime_minutes=candidate.runtime_minutes,
+            )
+
+    result = run_movie_gm_pipeline(
+        [HiddenGemProvider()],
+        mode="hidden_gems",
+        rating_enrichers=[HiddenGemEnricher()],
+        rating_enrichment_limit=1,
+    )
+    assert [item.ranked.movie.title for item in result.recommendation.recommendations] == ["Unknown Reach"]
