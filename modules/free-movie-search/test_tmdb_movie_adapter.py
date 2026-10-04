@@ -24,22 +24,21 @@ class FakeTMDB(TMDBMovieAdapter):
                 }],
             }
         if path == "/movie/10":
-            assert params["append_to_response"] == "release_dates"
+            assert params["append_to_response"] == "watch/providers,release_dates"
             return {
                 "runtime": 112,
                 "genres": [{"id": 12, "name": "Adventure"}, {"id": 35, "name": "Comedy"}],
                 "release_dates": {"results": [{"iso_3166_1": "US", "release_dates": [{"certification": "PG"}]}]},
-            }
-        if path == "/movie/10/watch/providers":
-            return {
-                "results": {
-                    "US": {
-                        "link": "https://www.themoviedb.org/movie/10",
-                        "ads": [{"provider_name": "Tubi"}],
-                        "flatrate": [{"provider_name": "Prime Video"}],
-                        "rent": [{"provider_name": "Rental Store"}],
+                "watch/providers": {
+                    "results": {
+                        "US": {
+                            "link": "https://www.themoviedb.org/movie/10",
+                            "ads": [{"provider_name": "Tubi"}],
+                            "flatrate": [{"provider_name": "Prime Video"}],
+                            "rent": [{"provider_name": "Rental Store"}],
+                        }
                     }
-                }
+                },
             }
         raise AssertionError(path)
 
