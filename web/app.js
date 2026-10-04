@@ -22,14 +22,9 @@
     }
     requestOptions.headers = headers;
     const response = await fetch(movieApiPath(path), requestOptions);
-    if (response.status === 401 && movieApi.production) showAuthDialog();
     return response;
   }
 
-  function showAuthDialog() {
-    const dialog = byId("auth-dialog");
-    if (dialog && !dialog.open) dialog.showModal();
-  }
 
   async function bootstrapMovieApi() {
     try {
@@ -49,38 +44,11 @@
         if (demoResponse.ok) {
           const data = await demoResponse.json();
           movieApi.csrf = data.csrf_token || "";
-        } else {
-          showAuthDialog();
         }
       }
       movieApi.ready = true;
     } catch (_error) {
       movieApi.ready = true;
-    }
-  }
-
-  async function loginMovieApi(event) {
-    event.preventDefault();
-    const status = byId("auth-status");
-    const secret = byId("access-secret").value;
-    status.textContent = "Checking access...";
-    try {
-      const response = await fetch("/api/v1/session", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_secret: secret })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Access denied");
-      movieApi.production = true;
-      movieApi.csrf = data.csrf_token || "";
-      status.textContent = "";
-      byId("access-secret").value = "";
-      byId("auth-dialog").close();
-      hydrateMovieGMSettings();
-    } catch (error) {
-      status.textContent = error.message || "Access denied";
     }
   }
 
@@ -458,7 +426,6 @@
     }
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
   });
-  byId("auth-form").addEventListener("submit", loginMovieApi);
   byId("movie-gm-form").addEventListener("submit", (event) => { event.preventDefault(); runMovieGM(); });
   byId("gm-viewer-form").addEventListener("submit", saveMovieGMViewer);
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
