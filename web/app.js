@@ -95,14 +95,19 @@
   }
   function updateDealSummary() {
     const c = dealCriteria();
-    byId("deal-summary-location").textContent = c.location || "Add a location";
-    byId("deal-summary-radius").textContent = `${c.radius_miles || "?"} miles`;
-    byId("deal-summary-party").textContent = `${c.party_size} people`;
-    byId("deal-summary-budget").textContent = byId("deal-budget").value ? `$${c.max_total_price.toFixed(2)} total` : "Add a maximum";
-    const names = all('input[name="deal-cuisine"]:checked').map((input) => input.parentElement.textContent.trim());
-    byId("deal-summary-cuisine").textContent = names.join(", ") || "Any cuisine";
-    byId("deal-summary-type").textContent = restaurantTypes[c.restaurant_type];
-    byId("deal-summary-hours").textContent = c.open_tonight ? "Open tonight, if verified" : "Any availability";
+    const fields = {
+      "deal-summary-location": c.location || "Add a location",
+      "deal-summary-radius": `${c.radius_miles || "?"} miles`,
+      "deal-summary-party": `${c.party_size} people`,
+      "deal-summary-budget": byId("deal-budget").value ? `$${c.max_total_price.toFixed(2)} total` : "Add a maximum",
+      "deal-summary-cuisine": all('input[name="deal-cuisine"]:checked').map((input) => input.parentElement.textContent.trim()).join(", ") || "Any cuisine",
+      "deal-summary-type": restaurantTypes[c.restaurant_type],
+      "deal-summary-hours": c.open_tonight ? "Open tonight, if verified" : "Any availability"
+    };
+    Object.entries(fields).forEach(([id, value]) => {
+      const target = byId(id);
+      if (target) target.textContent = value;
+    });
   }
   function showToast(message) {
     const toast = byId("toast"); toast.textContent = message; toast.classList.add("is-visible"); window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 3600);
