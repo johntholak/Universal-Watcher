@@ -244,6 +244,9 @@ class TMDBMovieAdapter:
         runtime = details.get("runtime")
         runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
         age_rating = self._us_certification(details.get("release_dates", {}))
+        kids_eligible = age_rating in {"G", "PG", "TV-G", "TV-PG"}
+        pg13_kid_friendly = False if age_rating == "PG-13" else None
+        pg13_reason = "PG-13 requires independent kid-friendly evidence" if age_rating == "PG-13" else None
         if not genres:
             genres = tuple(
                 g.get("name", "").strip()
