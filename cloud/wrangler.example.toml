@@ -11,6 +11,10 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 [triggers]
 crons = ["*/15 * * * *"]
 
+[vars]
+DISPATCH_ENABLED = "true"
+DISPATCH_DAILY_LIMIT = "24"
+
 [assets]
 directory = "../web"
 binding = "ASSETS"
