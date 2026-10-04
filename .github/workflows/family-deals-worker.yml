@@ -2,30 +2,43 @@ name: Family Deals batch worker
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "7,22,37,52 * * * *"
 
 permissions:
   contents: read
 
+# Interactive searches must not wait behind an older batch run.
+# The Cloudflare Worker controls dispatch frequency.
 concurrency:
-  group: family-deals-worker
+  group: family-deals-worker-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
   batch:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
           cache: pip
+
+      - name: Restore Family Deals caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.hunt_cache
+          key: family-deals-v5-${{ runner.os }}-${{ hashFiles('requirements.txt', 'modules/family-deals/server.py') }}
+          restore-keys: |
+            family-deals-v5-${{ runner.os }}-
+
       - name: Install pinned dependencies and Chromium
         run: |
           python -m pip install -r requirements.txt
           python -m playwright install --with-deps chromium
+
       - name: Run bounded Family Deals batch
         env:
           UW_API_BASE: ${{ secrets.UW_API_BASE }}
