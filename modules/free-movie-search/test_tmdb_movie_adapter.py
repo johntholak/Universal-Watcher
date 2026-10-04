@@ -20,7 +20,7 @@ class FakeTMDB(TMDBMovieAdapter):
                     "title": "Free Adventure",
                     "original_title": "Free Adventure",
                     "release_date": "2026-01-02",
-                    "genre_ids": [12, 35],
+                    "genre_ids": [12, 35, 10751],
                 }],
             }
         if path == "/movie/10":
