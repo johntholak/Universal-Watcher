@@ -121,9 +121,7 @@ class Default(WorkerEntrypoint):
                 return Response.json({"error": "Unsupported Movie GM mode"}, status=400)
 
             query = str(body.get("query") or "").strip()
-            if mode == "kids":
-                query = "__UW_KIDS__" + query
-            if len(query) > 220:
+            if len(query) > 200:
                 return Response.json({"error": "Query is too long"}, status=400)
 
             feedback_result = await self.env.DB.prepare(
@@ -164,10 +162,6 @@ class Default(WorkerEntrypoint):
 
             config = RuntimeConfig(
                 tmdb_token=str(getattr(self.env, "TMDB_READ_ACCESS_TOKEN", "") or "").strip(),
-                # Keep the live search on the stable TMDB/JustWatch path.
-                # OMDb enrichment remains supported by the engine, but is
-                # disabled at the Worker boundary until it can be isolated
-                # from the production request path.
                 include_omdb=False,
                 omdb_api_key=str(getattr(self.env, "OMDB_API_KEY", "") or "").strip(),
             )
@@ -183,10 +177,6 @@ class Default(WorkerEntrypoint):
             return Response.json(_serialize(result))
         except Exception as exc:
             return Response.json(
-                {
-                    "error": "Movie GM execution failed",
-                    "type": exc.__class__.__name__,
-                    "detail": str(exc)[:300],
-                },
+                {"error": "Movie GM execution failed", "type": exc.__class__.__name__},
                 status=503,
             )
