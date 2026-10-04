@@ -168,12 +168,26 @@ class TMDBMovieAdapter:
     async def discover_async(self, *, query: str = "", as_of: str | None = None) -> ProviderBatch:
         checked_at = as_of or datetime.now(timezone.utc).isoformat()
         try:
-            if query.strip():
-                payload = await self._get_async("/search/movie", {"query": query.strip(), "include_adult": "false", "language": self.config.language, "region": self.config.region, "page": 1})
+            kids_marker = query.startswith("__UW_KIDS__")
+            clean_query = query[len("__UW_KIDS__"):].strip() if kids_marker else query.strip()
+            if kids_marker:
+                payloads = []
+                if clean_query:
+                    payloads.append(await self._get_async("/search/movie", {"query": clean_query, "include_adult": "false", "language": self.config.language, "region": self.config.region, "page": 1}))
+                payloads.append(await self._get_async("/discover/movie", {"include_adult": "false", "include_video": "false", "language": self.config.language, "region": self.config.region, "watch_region": self.config.region, "with_genres": "16|10751", "with_watch_monetization_types": "free|ads|flatrate", "sort_by": "popularity.desc", "page": 1}))
+                items = []
+                seen_ids = set()
+                for payload in payloads:
+                    for item in payload.get("results", []):
+                        if item.get("id") not in seen_ids:
+                            seen_ids.add(item.get("id"))
+                            items.append(item)
+            elif query.strip():
+                items = (await self._get_async("/search/movie", {"query": query.strip(), "include_adult": "false", "language": self.config.language, "region": self.config.region, "page": 1})).get("results", [])
             else:
-                payload = await self._get_async("/discover/movie", {"include_adult": "false", "include_video": "false", "language": self.config.language, "region": self.config.region, "watch_region": self.config.region, "with_watch_monetization_types": "free|ads|flatrate", "sort_by": "popularity.desc", "page": 1})
-            movies = []
-            for item in payload.get("results", []):
+                items = (await self._get_async("/discover/movie", {"include_adult": "false", "include_video": "false", "language": self.config.language, "region": self.config.region, "watch_region": self.config.region, "with_watch_monetization_types": "free|ads|flatrate", "sort_by": "popularity.desc", "page": 1})).get("results", [])
+            movies = [] 
+            for item in items:
                 candidate = await self._normalize_async(item, checked_at)
                 if candidate is not None:
                     movies.append(candidate)
