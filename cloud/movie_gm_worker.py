@@ -156,6 +156,11 @@ class Default(WorkerEntrypoint):
 
             config = RuntimeConfig(
                 tmdb_token=str(getattr(self.env, "TMDB_READ_ACCESS_TOKEN", "") or "").strip(),
+                # Keep the live search on the stable TMDB/JustWatch path.
+                # OMDb enrichment remains supported by the engine, but is
+                # disabled at the Worker boundary until it can be isolated
+                # from the production request path.
+                include_omdb=False,
                 omdb_api_key=str(getattr(self.env, "OMDB_API_KEY", "") or "").strip(),
             )
             result = await run_live_movie_gm(
