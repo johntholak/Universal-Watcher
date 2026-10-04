@@ -7,7 +7,9 @@
   const movieApi = { production: false, csrf: "", ready: false, bootstrapPromise: null };
 
   function movieApiPath(path) {
-    return movieApi.production ? `/api/v1${path}` : path;
+    if (!movieApi.production) return path;
+    if (path.startsWith("/api/")) return `/api/v1${path.slice(4)}`;
+    return `/api/v1${path}`;
   }
 
   async function movieApiFetch(path, options = {}) {
