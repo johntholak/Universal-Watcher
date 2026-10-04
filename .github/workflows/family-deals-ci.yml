@@ -1,0 +1,37 @@
+name: Family Deals CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  family-deals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install Python test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Run Family Deals and web tests
+        run: |
+          python -m unittest modules/family-deals/tests/test_coverage.py modules/family-deals/tests/test_hours.py modules/family-deals/tests/test_strict_parser.py web/test_web_shell.py -v
+          python -m unittest cloud/test_family_deals_v5.py cloud/test_run_family_deals_batch.py -v
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Validate Family Deals Worker JavaScript
+        run: |
+          node --check cloud/worker.mjs
+          node --check cloud/criteria.mjs
+          node --check cloud/results.mjs
+          node --check cloud/dispatch.mjs
