@@ -175,6 +175,10 @@ class Default(WorkerEntrypoint):
             return Response.json(_serialize(result))
         except Exception as exc:
             return Response.json(
-                {"error": "Movie GM execution failed", "type": exc.__class__.__name__},
+                {
+                    "error": "Movie GM execution failed",
+                    "type": exc.__class__.__name__,
+                    "detail": str(exc)[:300],
+                },
                 status=503,
             )
