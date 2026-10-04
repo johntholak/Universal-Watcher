@@ -1,4 +1,5 @@
 name: Deploy Movie GM production
+# CI trigger for Hidden Gems verification
 
 on:
   workflow_dispatch:
