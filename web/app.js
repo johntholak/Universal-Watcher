@@ -5,7 +5,7 @@
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
-  const movieApi = { production: false, csrf: "", ready: false, bootstrapPromise: null };
+  const movieApi = { production: !["localhost", "127.0.0.1"].includes(window.location.hostname), csrf: "", ready: false, bootstrapPromise: null };
 
   function movieApiPath(path) {
     if (!movieApi.production) return path;
@@ -32,7 +32,7 @@
         const statusResponse = await fetch("/api/v1/system/status", { credentials: "same-origin", cache: "no-store" });
         if (statusResponse.ok) {
           const status = await statusResponse.json();
-          movieApi.production = status.state === "production";
+          if (status.state === "production") movieApi.production = true;
         } else if (statusResponse.status !== 404) {
           movieApi.production = true;
         }
