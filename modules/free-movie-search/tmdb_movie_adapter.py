@@ -150,15 +150,19 @@ class TMDBMovieAdapter:
         runtime = details.get("runtime")
         runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
         age_rating = self._us_certification(details.get("release_dates", {}))
-        # Kids mode requires an explicit safety classification. TMDB supplies the
-        # US certification, so do not leave this as None and accidentally make
-        # every title fail the kids gate. Keep PG-13 conservative until a title
-        # has independent kid-friendly evidence.
-        kids_eligible = age_rating in {"G", "PG", "TV-G", "TV-PG"}
-        pg13_kid_friendly = False if age_rating == "PG-13" else None
-        pg13_reason = "PG-13 requires independent kid-friendly evidence" if age_rating == "PG-13" else None
         if not genres:
             genres = tuple(g.get("name", "").strip() for g in details.get("genres", []) if g.get("name"))
+        # Kids mode must fail closed. A PG rating by itself is not enough because
+        # TMDB marks many non-kids titles PG. Require an explicit family/animation
+        # genre for PG/TV-PG. PG-13 remains excluded until independent evidence
+        # supports a kid-friendly exception.
+        kid_genres = {genre.casefold() for genre in genres}
+        family_evidence = bool({"family", "animation", "children", "kids"} & kid_genres)
+        kids_eligible = age_rating in {"G", "TV-G"} or (
+            age_rating in {"PG", "TV-PG"} and family_evidence
+        )
+        pg13_kid_friendly = False
+        pg13_reason = "PG-13 requires independent kid-friendly evidence" if age_rating == "PG-13" else None
         return MovieCandidate(title=title, year=year, ratings=RatingEvidence(tmdb=item.get("vote_average"), tmdb_votes=item.get("vote_count")), offers=tuple(offers), available_from=None, genres=genres, runtime_minutes=runtime_minutes, age_rating=age_rating, kids_eligible=kids_eligible, pg13_kid_friendly=pg13_kid_friendly, pg13_reason=pg13_reason)
 
     async def discover_async(self, *, query: str = "", as_of: str | None = None) -> ProviderBatch:
@@ -188,7 +192,13 @@ class TMDBMovieAdapter:
             for entry in (us.get("release_dates", []) or [])
             if (entry.get("certification") or "").strip()
         ]
-        return certifications[0] if certifications else None
+        # If TMDB has multiple US release-date certifications, use the most
+        # restrictive recognized rating rather than whichever entry happens to
+        # appear first. Kids mode therefore cannot accidentally trust a weaker
+        # certification.
+        order = {"G": 0, "TV-G": 0, "PG": 1, "TV-PG": 1, "PG-13": 2, "R": 3, "NC-17": 4}
+        recognized = [rating for rating in certifications if rating in order]
+        return max(recognized, key=order.get) if recognized else (certifications[0] if certifications else None)
 
     def _normalize(self, item: dict, checked_at: str) -> MovieCandidate | None:
         movie_id = item.get("id")
@@ -244,15 +254,19 @@ class TMDBMovieAdapter:
         runtime = details.get("runtime")
         runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
         age_rating = self._us_certification(details.get("release_dates", {}))
-        kids_eligible = age_rating in {"G", "PG", "TV-G", "TV-PG"}
-        pg13_kid_friendly = False if age_rating == "PG-13" else None
-        pg13_reason = "PG-13 requires independent kid-friendly evidence" if age_rating == "PG-13" else None
         if not genres:
             genres = tuple(
                 g.get("name", "").strip()
                 for g in details.get("genres", [])
                 if g.get("name")
             )
+        kid_genres = {genre.casefold() for genre in genres}
+        family_evidence = bool({"family", "animation", "children", "kids"} & kid_genres)
+        kids_eligible = age_rating in {"G", "TV-G"} or (
+            age_rating in {"PG", "TV-PG"} and family_evidence
+        )
+        pg13_kid_friendly = False
+        pg13_reason = "PG-13 requires independent kid-friendly evidence" if age_rating == "PG-13" else None
 
         return MovieCandidate(
             title=title,
