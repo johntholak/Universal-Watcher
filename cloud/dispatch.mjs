@@ -99,7 +99,7 @@ export async function dispatchPending(env, at = new Date()) {
       headers: { Authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`,
                  Accept: "application/vnd.github+json", "Content-Type": "application/json",
                  "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "Universal-Watcher" },
-      body: JSON.stringify({ ref: "main" }),
+      body: JSON.stringify({ ref: "movie-gm-deploy" }),
     });
     return response.status === 204 ? "signaled" : "deferred";
   } catch {
