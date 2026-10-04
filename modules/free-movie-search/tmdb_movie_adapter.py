@@ -16,7 +16,10 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from workers import fetch
+try:
+    from workers import fetch
+except ImportError:  # Local test environment
+    fetch = None
 
 from .free_movie_search import FreeOffer, MovieCandidate, RatingEvidence
 from .movie_gm_pipeline import ProviderBatch
@@ -74,7 +77,14 @@ class TMDBMovieAdapter:
         with urlopen(request, timeout=self.config.timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
 
-    def discover(self, *, query: str = "", as_of: str | None = None) -> ProviderBatch:
+    def _discover_params(self, *, mode: str = "") -> dict[str, str | int]:
+        params: dict[str, str | int] = {"include_adult": "false", "include_video": "false", "language": self.config.language, "region": self.config.region, "watch_region": self.config.region, "with_watch_monetization_types": "free|ads|flatrate", "sort_by": "popularity.desc", "page": 1}
+        if mode.casefold().strip() == "kids":
+            params["certification_country"] = self.config.region
+            params["certification.lte"] = "PG"
+        return params
+
+    def discover(self, *, query: str = "", as_of: str | None = None, mode: str = "") -> ProviderBatch:
         checked_at = as_of or datetime.now(timezone.utc).isoformat()
         movies: list[MovieCandidate] = []
         try:
@@ -87,16 +97,7 @@ class TMDBMovieAdapter:
                     "page": 1,
                 })
             else:
-                payload = self._get("/discover/movie", {
-                    "include_adult": "false",
-                    "include_video": "false",
-                    "language": self.config.language,
-                    "region": self.config.region,
-                    "watch_region": self.config.region,
-                    "with_watch_monetization_types": "free|ads|flatrate",
-                    "sort_by": "popularity.desc",
-                    "page": 1,
-                })
+                payload = self._get("/discover/movie", self._discover_params(mode=mode))
 
             for item in payload.get("results", []):
                 candidate = self._normalize(item, checked_at)
@@ -161,13 +162,13 @@ class TMDBMovieAdapter:
             genres = tuple(g.get("name", "").strip() for g in details.get("genres", []) if g.get("name"))
         return MovieCandidate(title=title, year=year, ratings=RatingEvidence(tmdb=item.get("vote_average"), tmdb_votes=item.get("vote_count")), offers=tuple(offers), available_from=None, genres=genres, runtime_minutes=runtime_minutes, age_rating=age_rating, kids_eligible=kids_eligible, pg13_kid_friendly=pg13_kid_friendly, pg13_reason=pg13_reason)
 
-    async def discover_async(self, *, query: str = "", as_of: str | None = None) -> ProviderBatch:
+    async def discover_async(self, *, query: str = "", as_of: str | None = None, mode: str = "") -> ProviderBatch:
         checked_at = as_of or datetime.now(timezone.utc).isoformat()
         try:
             if query.strip():
                 payload = await self._get_async("/search/movie", {"query": query.strip(), "include_adult": "false", "language": self.config.language, "region": self.config.region, "page": 1})
             else:
-                payload = await self._get_async("/discover/movie", {"include_adult": "false", "include_video": "false", "language": self.config.language, "region": self.config.region, "watch_region": self.config.region, "with_watch_monetization_types": "free|ads|flatrate", "sort_by": "popularity.desc", "page": 1})
+                payload = await self._get_async("/discover/movie", self._discover_params(mode=mode))
             movies = []
             for item in payload.get("results", []):
                 candidate = await self._normalize_async(item, checked_at)
@@ -244,6 +245,9 @@ class TMDBMovieAdapter:
         runtime = details.get("runtime")
         runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
         age_rating = self._us_certification(details.get("release_dates", {}))
+        kids_eligible = age_rating in {"G", "PG", "TV-G", "TV-PG"}
+        pg13_kid_friendly = False if age_rating == "PG-13" else None
+        pg13_reason = "PG-13 requires independent kid-friendly evidence" if age_rating == "PG-13" else None
         if not genres:
             genres = tuple(
                 g.get("name", "").strip()
