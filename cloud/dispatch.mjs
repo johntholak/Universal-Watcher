@@ -101,7 +101,7 @@ export async function dispatchPending(env, at = new Date()) {
                  "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "Universal-Watcher" },
       body: JSON.stringify({ ref: "movie-gm-deploy" }),
     });
-    if (response.status === 204) return "signaled";
+    if (response.status === 200 || response.status === 204) return "signaled";
     const detail = await response.text().catch(() => "");
     console.error("GitHub workflow dispatch rejected", response.status, detail.slice(0, 300));
     return "dispatch_error";
