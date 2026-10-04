@@ -93,3 +93,12 @@ def test_discovery_requests_free_ads_or_subscription_offers():
     discover_calls = [params for path, params in fake.calls if path == "/discover/movie"]
     assert discover_calls
     assert discover_calls[0]["with_watch_monetization_types"] == "free|ads|flatrate"
+
+
+def test_hidden_gems_uses_quality_first_discovery_pool():
+    fake = FakeTMDB()
+    fake.discover(mode="hidden_gems")
+    discover_calls = [params for path, params in fake.calls if path == "/discover/movie"]
+    assert discover_calls
+    assert discover_calls[0]["sort_by"] == "vote_average.desc"
+    assert discover_calls[0]["vote_count.gte"] == 200
