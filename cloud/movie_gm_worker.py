@@ -121,7 +121,9 @@ class Default(WorkerEntrypoint):
                 return Response.json({"error": "Unsupported Movie GM mode"}, status=400)
 
             query = str(body.get("query") or "").strip()
-            if len(query) > 200:
+            if mode == "kids":
+                query = "__UW_KIDS__" + query
+            if len(query) > 220:
                 return Response.json({"error": "Query is too long"}, status=400)
 
             feedback_result = await self.env.DB.prepare(
