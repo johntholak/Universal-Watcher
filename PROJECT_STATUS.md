@@ -4,6 +4,15 @@
 **Overall stage:** Foundation / consolidation  
 **Current milestone:** Movie GM decision engine, first live provider adapter, runtime path, and web search UI are connected; independent ratings and availability sources remain next
 
+## October 4 Family Deals cloud/site integration checkpoint
+
+- Isolated Family Deals work on family-deals-work-2026-10-03 now starts from the current movie-gm-deploy production-site baseline, so the existing Streaming GM web experience is preserved while Family Deals is developed separately.
+- Wired the Family Deals web form to the authenticated Worker API: a phone search now creates a real D1-backed Search, polls cloud status, and renders returned Family Deals candidates with price, serving capacity, distance, classification, evidence, and official-source links. The UI explicitly distinguishes partial candidates from verified matches.
+- Added active worker-state reporting to Search status so the site can show queued versus actively running work. The phone is only the control surface; execution remains in GitHub Actions.
+- Configured the Universal Watcher API Worker template to serve the existing web shell as Cloudflare Static Assets on the same origin, with API routes invoking the Worker first. This removes the previous same-origin gap between the site and /api/v1.
+- Added isolated Family Deals CI coverage for Worker syntax, web shell, V5 bridge, runner, and Family Deals tests.
+- No production Worker, D1 migration, GitHub dispatch, or live restaurant-provider run was performed from this branch. The guarded dispatch still requires the existing GitHub Actions dispatch permission/token and a conservative daily allowance.
+
 ## October 3 Movie GM checkpoint
 
 - Added the Movie GM recommendation orchestrator with Everyone, Kids, Tonight, and Hidden Gems modes.
