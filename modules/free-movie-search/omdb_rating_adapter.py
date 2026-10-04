@@ -12,10 +12,7 @@ from dataclasses import dataclass
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-try:
-    from workers import fetch
-except ImportError:  # Local test environment
-    fetch = None
+from workers import fetch
 
 from .free_movie_search import MovieCandidate, RatingEvidence
 
