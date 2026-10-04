@@ -70,24 +70,47 @@ export async function dispatchPending(env, at = new Date()) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || typeof env.GITHUB_DISPATCH_TOKEN !== "string" || env.GITHUB_DISPATCH_TOKEN.length < 20) return "not_configured";
   const stamp = at.toISOString();
   const day = stamp.slice(0, 10);
-  const pending = await env.DB.prepare(`SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
-    WHERE j.module='family-deals' AND j.attempt_number<3 AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?)
-      OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
-      AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
-        OR (w.status='DELAYED' AND j.status IN ('RETRYABLE','CLAIMED','RUNNING'))) LIMIT 1`).bind(stamp, stamp).first();
+  let pending;
+  try {
+    pending = await env.DB.prepare(`SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
+      WHERE j.module='family-deals' AND j.attempt_number<3 AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?)
+        OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
+        AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
+          OR (w.status='DELAYED' AND j.status IN ('RETRYABLE','CLAIMED','RUNNING'))) LIMIT 1`).bind(stamp, stamp).first();
+  } catch (error) {
+    console.error("Family Deals dispatch pending-job query failed", error instanceof Error ? error.message : "unknown error");
+    return "dispatch_db_pending";
+  }
   if (!pending) return "idle";
 
   // Count the reservation before contacting GitHub. An ambiguous network failure
   // must not let retries exceed the configured free-run allowance.
-  const reserved = await env.DB.prepare(`UPDATE dispatch_gate SET
-      utc_day=?, runs_today=CASE WHEN utc_day=? THEN runs_today+1 ELSE 1 END,
-      next_allowed_at=?, updated_at=?
-    WHERE id=1 AND next_allowed_at<=? AND (utc_day<>? OR runs_today<?)
-    RETURNING runs_today`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, stamp, day, limit).first();
+  let reserved;
+  try {
+    reserved = await env.DB.prepare(`UPDATE dispatch_gate SET
+        utc_day=?, runs_today=CASE WHEN utc_day=? THEN runs_today+1 ELSE 1 END,
+        next_allowed_at=?, updated_at=?
+      WHERE id=1 AND next_allowed_at<=? AND (utc_day<>? OR runs_today<?)
+      RETURNING runs_today`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, stamp, day, limit).first();
+  } catch (error) {
+    console.error("Family Deals dispatch gate reservation failed", error instanceof Error ? error.message : "unknown error");
+    return "dispatch_db_gate";
+  }
   if (!reserved) {
-    const gate = await env.DB.prepare("SELECT utc_day,runs_today FROM dispatch_gate WHERE id=1").bind().first();
+    let gate;
+    try {
+      gate = await env.DB.prepare("SELECT utc_day,runs_today FROM dispatch_gate WHERE id=1").bind().first();
+    } catch (error) {
+      console.error("Family Deals dispatch gate read failed", error instanceof Error ? error.message : "unknown error");
+      return "dispatch_db_gate_read";
+    }
     if (gate?.utc_day === day && gate.runs_today >= limit) {
-      await delayForFreeCapacity(env, at);
+      try {
+        await delayForFreeCapacity(env, at);
+      } catch (error) {
+        console.error("Family Deals dispatch capacity delay failed", error instanceof Error ? error.message : "unknown error");
+        return "dispatch_db_delay";
+      }
       return "free_capacity";
     }
     return "deferred";
