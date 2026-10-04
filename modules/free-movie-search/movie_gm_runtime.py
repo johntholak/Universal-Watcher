@@ -55,7 +55,7 @@ def build_movie_rating_enrichers(config: RuntimeConfig | None = None):
     return (OMDbRatingAdapter(OMDbConfig(api_key=key)),)
 
 
-def run_live_movie_gm(
+async def run_live_movie_gm(
     *,
     query: str = "",
     mode: str = "everyone",
