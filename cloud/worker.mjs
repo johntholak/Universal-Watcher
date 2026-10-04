@@ -95,8 +95,7 @@ export default {
       const value = encode(new TextEncoder().encode(JSON.stringify({ user_id: "private-beta", exp: expires, nonce: crypto.randomUUID() })));
       const token = `${value}.${encode(await hmac(env.SESSION_KEY, value))}`;
       const stamp = now();
-      try { await env.DB.prepare("INSERT OR IGNORE INTO users(id,created_at) VALUES (?,?)").bind("private-beta", stamp).run(); }
-      catch { return json({ error: "Storage temporarily unavailable" }, 503); }
+      try { await env.DB.prepare("INSERT OR IGNORE INTO users(id,created_at) VALUES (?,?)").bind("private-beta", stamp).run(); } catch { /* Demo session remains usable for read-only Movie GM searches. */ }
       return json({ authenticated: true, csrf_token: await csrf(env, token) }, 200, { "Set-Cookie": `${COOKIE}=${token}; Path=/; Max-Age=${SESSION_SECONDS}; HttpOnly; Secure; SameSite=Strict` });
     }
 
@@ -294,7 +293,7 @@ export default {
       if (!env.MOVIE_GM) return json({ error: "Movie GM service is not connected" }, 503);
       const mode = url.searchParams.get("mode") || "everyone";
       const query = (url.searchParams.get("query") || "").trim();
-      if (!["everyone", "kids", "tonight", "hidden_gems"].includes(mode)) return json({ error: "Unsupported Movie GM mode" }, 400);
+      if (!["everyone", "kids", "tonight"].includes(mode)) return json({ error: "Unsupported Movie GM mode" }, 400);
       if (query.length > 200) return json({ error: "Query is too long" }, 400);
       try {
         const downstream = await env.MOVIE_GM.fetch(new Request("https://movie-gm.internal/internal/movie-gm/search", {
