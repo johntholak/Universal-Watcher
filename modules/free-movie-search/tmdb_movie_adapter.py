@@ -63,37 +63,30 @@ class TMDBMovieAdapter:
         checked_at = as_of or datetime.now(timezone.utc).isoformat()
         movies: list[MovieCandidate] = []
         try:
-            page = 1
-            total_pages = 1
-            while page <= total_pages:
-                if query.strip():
-                    payload = self._get("/search/movie", {
-                        "query": query.strip(),
-                        "include_adult": "false",
-                        "language": self.config.language,
-                        "region": self.config.region,
-                        "page": page,
-                    })
-                else:
-                    payload = self._get("/discover/movie", {
-                        "include_adult": "false",
-                        "include_video": "false",
-                        "language": self.config.language,
-                        "region": self.config.region,
-                        "watch_region": self.config.region,
-                        "with_watch_monetization_types": "free|ads|flatrate",
-                        "sort_by": "popularity.desc",
-                        "page": page,
-                    })
+            if query.strip():
+                payload = self._get("/search/movie", {
+                    "query": query.strip(),
+                    "include_adult": "false",
+                    "language": self.config.language,
+                    "region": self.config.region,
+                    "page": 1,
+                })
+            else:
+                payload = self._get("/discover/movie", {
+                    "include_adult": "false",
+                    "include_video": "false",
+                    "language": self.config.language,
+                    "region": self.config.region,
+                    "watch_region": self.config.region,
+                    "with_watch_monetization_types": "free|ads|flatrate",
+                    "sort_by": "popularity.desc",
+                    "page": 1,
+                })
 
-                results = payload.get("results", [])
-                for item in results:
-                    candidate = self._normalize(item, checked_at)
-                    if candidate is not None:
-                        movies.append(candidate)
-
-                total_pages = int(payload.get("total_pages", page) or page)
-                page += 1
+            for item in payload.get("results", []):
+                candidate = self._normalize(item, checked_at)
+                if candidate is not None:
+                    movies.append(candidate)
 
             return ProviderBatch(
                 provider=self.provider,
@@ -117,7 +110,11 @@ class TMDBMovieAdapter:
         us = next((entry for entry in results if entry.get("iso_3166_1") == "US"), None)
         if not us:
             return None
-        certifications = [(entry.get("certification") or "").strip().upper() for entry in (us.get("release_dates", []) or []) if (entry.get("certification") or "").strip()]
+        certifications = [
+            (entry.get("certification") or "").strip().upper()
+            for entry in (us.get("release_dates", []) or [])
+            if (entry.get("certification") or "").strip()
+        ]
         return certifications[0] if certifications else None
 
     def _normalize(self, item: dict, checked_at: str) -> MovieCandidate | None:
@@ -126,7 +123,21 @@ class TMDBMovieAdapter:
         if not movie_id or not title:
             return None
 
-        provider_payload = self._get(f"/movie/{int(movie_id)}/watch/providers", {})
+        # One detail request carries both watch-provider and release-date data.
+        # This keeps the complete request well below Cloudflare Free's
+        # external-subrequest limit while retaining runtime and rating data.
+        try:
+            details = self._get(
+                f"/movie/{int(movie_id)}",
+                {
+                    "language": self.config.language,
+                    "append_to_response": "watch/providers,release_dates",
+                },
+            )
+        except Exception:
+            return None
+
+        provider_payload = details.get("watch/providers", {})
         region = provider_payload.get("results", {}).get(self.config.region, {})
         offers: list[FreeOffer] = []
         seen: set[str] = set()
@@ -157,17 +168,15 @@ class TMDBMovieAdapter:
         release_date = (item.get("release_date") or "").strip() or None
         year = int(release_date[:4]) if release_date and release_date[:4].isdigit() else None
         genres = tuple(GENRE_NAMES[g] for g in item.get("genre_ids", []) if g in GENRE_NAMES)
-        # Detail enrichment is best-effort. A missing detail response must not
-        # turn an otherwise verified availability result into provider UNAVAILABLE.
-        try:
-            details = self._get(f"/movie/{int(movie_id)}", {"language": self.config.language, "append_to_response": "release_dates"})
-        except Exception:
-            details = {}
         runtime = details.get("runtime")
         runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
         age_rating = self._us_certification(details.get("release_dates", {}))
         if not genres:
-            genres = tuple(g.get("name", "").strip() for g in details.get("genres", []) if g.get("name"))
+            genres = tuple(
+                g.get("name", "").strip()
+                for g in details.get("genres", [])
+                if g.get("name")
+            )
 
         return MovieCandidate(
             title=title,
