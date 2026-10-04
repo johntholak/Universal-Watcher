@@ -123,7 +123,7 @@ jobs:
           open("/tmp/movie-gm-csrf","w").write(data["csrf_token"])
           PY
           CSRF="$(cat /tmp/movie-gm-csrf)"
-          RESULT="$(curl -fsS --retry 2 --retry-delay 1 -b "$COOKIE_JAR" -H "Origin: $BASE_URL" -H "X-CSRF-Token: $CSRF" "$BASE_URL/api/v1/movies/search?mode=kids&query=kids%20movie")"
+          RESULT="$(curl -sS --retry 2 --retry-delay 1 -b "$COOKIE_JAR" -H "Origin: $BASE_URL" -H "X-CSRF-Token: $CSRF" "$BASE_URL/api/v1/movies/search?mode=kids&query=kids%20movie")"
           python - "$RESULT" <<'PY'
           import json,sys
           data=json.loads(sys.argv[1])
