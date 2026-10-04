@@ -80,7 +80,8 @@ export default {
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
     const url = new URL(request.url);
     const path = url.pathname;
-    if (!path.startsWith("/api/v1/")) {
+    const legacyMovieSearch = path === "/api/movies/search";
+    if (!path.startsWith("/api/v1/") && !legacyMovieSearch) {
       if (request.method === "GET" && env.ASSETS) return env.ASSETS.fetch(request);
       return json({ error: "Not found" }, 404);
     }
@@ -289,7 +290,7 @@ export default {
     if (request.method === "GET" && path === "/api/v1/session") return json({ authenticated: true, csrf_token: await csrf(env, identity.token) });
     if (request.method !== "GET" && (!sameOrigin(request) || !equal(request.headers.get("X-CSRF-Token") || "", await csrf(env, identity.token)))) return json({ error: "Invalid request token or origin" }, 403);
 
-    if (path === "/api/v1/movies/search" && request.method === "GET") {
+    if ((path === "/api/v1/movies/search" || path === "/api/movies/search") && request.method === "GET") {
       if (!env.MOVIE_GM) return json({ error: "Movie GM service is not connected" }, 503);
       const mode = url.searchParams.get("mode") || "everyone";
       const query = (url.searchParams.get("query") || "").trim();
