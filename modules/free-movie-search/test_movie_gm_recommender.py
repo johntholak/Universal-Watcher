@@ -44,8 +44,9 @@ def test_watched_movies_are_suppressed():
 def test_kids_mode_keeps_strict_gate():
     adult = candidate("Adult Movie", age_rating="R")
     adult = MovieCandidate(**{**adult.__dict__, "kids_eligible": False})
-    result = recommend_movies([adult, candidate("Kids Movie")], mode="kids",
-                              child_ages=(6, 9))
+    kids = candidate("Kids Movie")
+    kids = MovieCandidate(**{**kids.__dict__, "genres": ("Family",), "age_rating": "PG", "kids_eligible": True})
+    result = recommend_movies([adult, kids], mode="kids", child_ages=(6, 9))
     assert [r.ranked.movie.title for r in result.recommendations] == ["Kids Movie"]
 
 
