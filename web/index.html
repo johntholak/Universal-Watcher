@@ -105,7 +105,10 @@
               <label class="check-row"><input id="deal-open-tonight" type="checkbox" name="open_tonight"> Open tonight for dinner only</label><p class="field-note">Unknown classification or hours will be identified as uncertain, never guessed.</p>
             </article>
           </div>
-          <aside class="search-summary deal-summary" aria-labelledby="deal-summary-title"><header><h2 id="deal-summary-title">Your Family Deals Search</h2><button type="button" data-focus-deal>✎ Edit</button></header><dl><div><dt>Near</dt><dd id="deal-summary-location">Add a location</dd></div><div><dt>Radius</dt><dd id="deal-summary-radius">7 miles</dd></div><div><dt>Party</dt><dd id="deal-summary-party">4 people</dd></div><div><dt>Total budget</dt><dd id="deal-summary-budget">Add a maximum</dd></div><div><dt>Cuisine</dt><dd id="deal-summary-cuisine">Any cuisine</dd></div><div><dt>Restaurants</dt><dd id="deal-summary-type">Any</dd></div><div><dt>Dinner</dt><dd id="deal-summary-hours">Any availability</dd></div></dl><button class="button button-primary button-wide" type="submit">⌕ &nbsp; Find Family Deals</button><button class="button button-watch button-wide" type="button" data-save-deal-watch>♧ &nbsp; Save this Search</button><p>In production, Search runs in the cloud. Save a completed Search as a Watch to check the same criteria again later.</p></aside>
+          <div class="deal-actions">
+            <button class="button button-primary" type="submit">⌕ &nbsp; Find Family Deals</button>
+            <button class="button button-watch" type="button" data-save-deal-watch>♧ &nbsp; Save this Search</button>
+          </div>
         </form>
         <section id="deal-preview-result" class="preview-result" hidden aria-live="polite"></section>
       </section>
