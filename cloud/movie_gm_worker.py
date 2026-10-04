@@ -158,7 +158,7 @@ class Default(WorkerEntrypoint):
                 tmdb_token=str(getattr(self.env, "TMDB_READ_ACCESS_TOKEN", "") or "").strip(),
                 omdb_api_key=str(getattr(self.env, "OMDB_API_KEY", "") or "").strip(),
             )
-            result = run_live_movie_gm(
+            result = await run_live_movie_gm(
                 query=query,
                 mode=mode,
                 child_ages=(6, 9) if mode == "kids" else (),
