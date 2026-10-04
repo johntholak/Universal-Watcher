@@ -19,7 +19,7 @@ from .omdb_rating_adapter import OMDbConfig, OMDbRatingAdapter
 class RuntimeConfig:
     include_tmdb: bool = True
     include_omdb: bool = True
-    rating_enrichment_limit: int = 25
+    rating_enrichment_limit: int = 10
     tmdb_token: str | None = None
     omdb_api_key: str | None = None
 
