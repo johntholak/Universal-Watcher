@@ -125,7 +125,7 @@ class Default(WorkerEntrypoint):
                 return Response.json({"error": "Query is too long"}, status=400)
 
             feedback_result = await self.env.DB.prepare(
-                """SELECT title_key,title,rating,genres_json FROM movie_feedback
+                """SELECT title_key,title,rating,watched,genres_json FROM movie_feedback
                    WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 200"""
             ).bind(user_id).run()
             feedback_rows = feedback_result.results or []
