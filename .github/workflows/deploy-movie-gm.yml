@@ -129,7 +129,7 @@ jobs:
           RESULT="$(curl -sS --retry 2 --retry-delay 1 -b "$COOKIE_JAR" -H "Origin: $BASE_URL" -H "X-CSRF-Token: $CSRF" "$BASE_URL/api/v1/movies/search?mode=kids&query=kids%20movie")"
           python - "$RESULT" <<'PY'
           import json,sys
-          data=json.loads(sys.argv[1])
+          data=json.JSONDecoder().raw_decode(sys.argv[1])[0]
           if "error" in data:
               raise SystemExit(f"Movie GM smoke test failed: {data}")
           assert "recommendations" in data, data
