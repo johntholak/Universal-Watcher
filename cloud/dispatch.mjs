@@ -1,6 +1,6 @@
 // A fixed workflow and an atomic D1 gate keep dispatch bounded. No criteria leave D1.
 const WORKFLOW_URL = "https://api.github.com/repos/johntholak/Universal-Watcher/actions/workflows/family-deals-worker.yml/dispatches";
-const COOLDOWN_MS = 15 * 60 * 1000;
+const COOLDOWN_MS = 60 * 1000;
 
 export async function expireExhaustedJobs(env, stamp = new Date().toISOString()) {
   const expired = await env.DB.prepare(`SELECT id,user_id,search_id,watch_id FROM jobs
@@ -101,8 +101,12 @@ export async function dispatchPending(env, at = new Date()) {
                  "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "Universal-Watcher" },
       body: JSON.stringify({ ref: "main" }),
     });
-    return response.status === 204 ? "signaled" : "deferred";
-  } catch {
-    return "deferred";
+    if (response.status === 204) return "signaled";
+    const detail = await response.text().catch(() => "");
+    console.error("GitHub workflow dispatch rejected", response.status, detail.slice(0, 300));
+    return "dispatch_error";
+  } catch (error) {
+    console.error("GitHub workflow dispatch failed", error instanceof Error ? error.message : "unknown error");
+    return "dispatch_error";
   }
 }
