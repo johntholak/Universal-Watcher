@@ -1,6 +1,6 @@
 // A fixed workflow and an atomic D1 gate keep dispatch bounded. No criteria leave D1.
 const WORKFLOW_URL = "https://api.github.com/repos/johntholak/Universal-Watcher/actions/workflows/family-deals-worker.yml/dispatches";
-const COOLDOWN_MS = 15 * 60 * 1000;
+// Searches dispatch immediately. The gate only prevents accidental rapid-fire dispatches.\nconst COOLDOWN_MS = 60 * 1000;
 
 export async function expireExhaustedJobs(env, stamp = new Date().toISOString()) {
   const expired = await env.DB.prepare(`SELECT id,user_id,search_id,watch_id FROM jobs
