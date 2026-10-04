@@ -6,6 +6,7 @@ decision code remains deterministic and never performs network calls.
 """
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Protocol, Sequence
 
@@ -237,22 +238,30 @@ async def run_movie_gm_pipeline_async(
             )
             selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year)
                                for item in preview.recommendations[:rating_enrichment_limit]}
-        enriched = []
-        for movie in unique:
-            key = (movie.title.casefold(), movie.year)
-            if key in selected_titles:
-                current = movie
-                for enricher in rating_enrichers:
-                    try:
-                        enrich_async = getattr(enricher, "enrich_async", None)
-                        current = await enrich_async(current) if enrich_async else enricher.enrich(current)
-                    except Exception as exc:
-                        pass
-                        break
-                enriched.append(current)
-            else:
-                enriched.append(movie)
-        unique = tuple(enriched)
+        async def enrich_one(movie: MovieCandidate) -> MovieCandidate:
+            current = movie
+            for enricher in rating_enrichers:
+                try:
+                    enrich_async = getattr(enricher, "enrich_async", None)
+                    current = await enrich_async(current) if enrich_async else enricher.enrich(current)
+                except Exception:
+                    break
+            return current
+
+        # Cloudflare Workers Free allows only six simultaneous outgoing
+        # connections. Enrich in small concurrent batches so OMDb latency does
+        # not turn a normal search into a Worker 503 while staying under that
+        # connection ceiling.
+        selected = [movie for movie in unique if (movie.title.casefold(), movie.year) in selected_titles]
+        enriched_selected: dict[tuple[str, int | None], MovieCandidate] = {}
+        for offset in range(0, len(selected), 5):
+            batch = selected[offset:offset + 5]
+            results = await asyncio.gather(*(enrich_one(movie) for movie in batch))
+            enriched_selected.update({(movie.title.casefold(), movie.year): movie for movie in results})
+        unique = tuple(
+            enriched_selected.get((movie.title.casefold(), movie.year), movie)
+            for movie in unique
+        )
 
     recommendation = recommend_movies(
         unique, mode=mode, as_of=as_of, taste_profile=taste_profile,
