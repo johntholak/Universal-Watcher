@@ -133,7 +133,7 @@ def run_movie_gm_pipeline(
                     try:
                         current = enricher.enrich(current)
                     except Exception as exc:
-                        pass
+                        unavailable.append((getattr(enricher, "provider", enricher.__class__.__name__), f"UNAVAILABLE: {exc.__class__.__name__}"))
                         break
                 enriched.append(current)
             else:
