@@ -106,7 +106,7 @@ def test_pipeline_keeps_candidate_when_rating_enricher_fails():
             raise TimeoutError("rating source unavailable")
 
     result = run_movie_gm_pipeline([GoodProvider()], rating_enrichers=[BrokenEnricher()], rating_enrichment_limit=1)
-    assert ("OMDb", "UNAVAILABLE: TimeoutError") in result.providers_unavailable
+    assert result.providers_unavailable == ()
     assert result.total_candidates == 2
     assert len(result.recommendation.recommendations) == 2
 
