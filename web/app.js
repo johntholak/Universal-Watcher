@@ -5,7 +5,7 @@
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
-  const movieApi = { production: !["localhost", "127.0.0.1"].includes(window.location.hostname), csrf: "", ready: false, bootstrapPromise: null };
+  const movieApi = { production: document.documentElement.dataset.uwProduction === "true" || !["localhost", "127.0.0.1"].includes(window.location.hostname), csrf: "", ready: false, bootstrapPromise: null };
 
   function movieApiPath(path) {
     if (!movieApi.production) return path;
