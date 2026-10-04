@@ -23,6 +23,12 @@ jobs:
           rm -rf cloud/free_movie_search
           cp -R modules/free-movie-search cloud/free_movie_search
           touch cloud/free_movie_search/__init__.py
+      - name: Provide test-only Workers fetch shim
+        run: |
+          cat > workers.py <<'PY'
+          async def fetch(*args, **kwargs):
+              raise RuntimeError("Cloudflare Workers fetch is unavailable in offline CI tests")
+          PY
       - name: Compile Movie GM Worker and engine
         run: |
           python -m py_compile cloud/movie_gm_worker.py
