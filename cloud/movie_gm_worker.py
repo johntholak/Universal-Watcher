@@ -11,7 +11,7 @@ from free_movie_search.movie_gm_runtime import RuntimeConfig, run_live_movie_gm
 
 
 MAX_BODY_BYTES = 16_384
-ALLOWED_MODES = {"everyone", "kids", "tonight"}
+ALLOWED_MODES = {"everyone", "kids", "tonight", "hidden_gems"}
 
 
 def _json_list(value):
@@ -125,13 +125,10 @@ class Default(WorkerEntrypoint):
                 return Response.json({"error": "Query is too long"}, status=400)
 
             feedback_result = await self.env.DB.prepare(
-                """SELECT title_key,title,rating,watched,genres_json FROM movie_feedback
+                """SELECT title_key,title,rating,genres_json FROM movie_feedback
                    WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 200"""
             ).bind(user_id).run()
-            feedback_rows = tuple(
-                row.to_py() if hasattr(row, "to_py") else row
-                for row in (feedback_result.results or [])
-            )
+            feedback_rows = feedback_result.results or []
 
             history = []
             learning_rows = []
@@ -155,14 +152,10 @@ class Default(WorkerEntrypoint):
                           preferred_keywords_json,disliked_keywords_json,preferred_runtime_min,preferred_runtime_max
                    FROM movie_viewers WHERE user_id=? ORDER BY created_at,viewer_id"""
             ).bind(user_id).run()
-            viewers = tuple(
-                _viewer(row.to_py() if hasattr(row, "to_py") else row)
-                for row in (viewer_result.results or [])
-            )
+            viewers = tuple(_viewer(row) for row in (viewer_result.results or []))
 
             config = RuntimeConfig(
                 tmdb_token=str(getattr(self.env, "TMDB_READ_ACCESS_TOKEN", "") or "").strip(),
-                include_omdb=False,
                 omdb_api_key=str(getattr(self.env, "OMDB_API_KEY", "") or "").strip(),
             )
             result = await run_live_movie_gm(
