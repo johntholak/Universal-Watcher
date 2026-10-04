@@ -20,14 +20,14 @@ class FakeTMDB(TMDBMovieAdapter):
                     "title": "Free Adventure",
                     "original_title": "Free Adventure",
                     "release_date": "2026-01-02",
-                    "genre_ids": [12, 35, 10751],
+                    "genre_ids": [12, 35],
                 }],
             }
         if path == "/movie/10":
             assert params["append_to_response"] == "watch/providers,release_dates"
             return {
                 "runtime": 112,
-                "genres": [{"id": 12, "name": "Adventure"}, {"id": 35, "name": "Comedy"}, {"id": 10751, "name": "Family"}],
+                "genres": [{"id": 12, "name": "Adventure"}, {"id": 35, "name": "Comedy"}],
                 "release_dates": {"results": [{"iso_3166_1": "US", "release_dates": [{"certification": "PG"}]}]},
                 "watch/providers": {
                     "results": {
@@ -52,7 +52,7 @@ def test_adapter_normalizes_free_and_subscription_offers():
     assert movie.runtime_minutes == 112
     assert movie.age_rating == "PG"
     assert movie.kids_eligible is True
-    assert movie.genres == ("Adventure", "Comedy", "Family")
+    assert movie.genres == ("Adventure", "Comedy")
     assert {offer.provider for offer in movie.offers} == {"Tubi", "Prime Video"}
     assert {offer.access for offer in movie.offers} == {"free_ads", "subscription"}
     assert all(offer.verified for offer in movie.offers)
