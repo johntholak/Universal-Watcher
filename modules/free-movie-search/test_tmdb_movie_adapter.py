@@ -51,6 +51,7 @@ def test_adapter_normalizes_free_and_subscription_offers():
     assert movie.title == "Free Adventure"
     assert movie.runtime_minutes == 112
     assert movie.age_rating == "PG"
+    assert movie.kids_eligible is True
     assert movie.genres == ("Adventure", "Comedy")
     assert {offer.provider for offer in movie.offers} == {"Tubi", "Prime Video"}
     assert {offer.access for offer in movie.offers} == {"free_ads", "subscription"}
