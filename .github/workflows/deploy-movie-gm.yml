@@ -27,6 +27,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: movie-gm-deploy
 
       - name: Validate deployment inputs
         shell: bash
@@ -135,6 +137,7 @@ jobs:
 
       - name: Deployment summary
         run: |
+          echo "Source branch: movie-gm-deploy"
           echo "Movie GM Python Worker: universal-watcher-movie-gm"
           echo "API Worker: universal-watcher-api"
           echo "D1 migrations: applied remotely"
