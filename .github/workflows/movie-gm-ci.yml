@@ -18,6 +18,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
+      - name: Prepare Movie GM package imports
+        run: |
+          rm -rf cloud/free_movie_search
+          cp -R modules/free-movie-search cloud/free_movie_search
+          touch cloud/free_movie_search/__init__.py
       - name: Compile Movie GM Worker and engine
         run: |
           python -m py_compile cloud/movie_gm_worker.py
