@@ -67,6 +67,16 @@ def test_kids_mode_rejects_pg_without_family_evidence():
     assert rank_movies([m], kids_mode=True, child_ages=(6, 9)) == []
 
 
+def test_kids_mode_rejects_g_rating_without_kid_genre():
+    m = movie("Not A Kids Movie")
+    m = MovieCandidate(
+        m.title, m.year, m.ratings, m.offers,
+        genres=("Documentary",), age_rating="G", kids_eligible=True,
+        age_fit_by_age=((6, 90.0), (9, 95.0)),
+    )
+    assert rank_movies([m], kids_mode=True, child_ages=(6, 9)) == []
+
+
 def test_kids_mode_accepts_pg_with_family_evidence():
     m = movie("Family Movie")
     m = MovieCandidate(
