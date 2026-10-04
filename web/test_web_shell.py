@@ -36,7 +36,7 @@ class WebShellTests(unittest.TestCase):
             'name="deal-cuisine"', 'id="deal-restaurant-type"',
             'value="independent_local"', 'value="independent"', 'value="chains"',
             'id="deal-open-tonight"', 'Find Family Deals', 'data-save-deal-watch',
-            'id="deal-preview-result"', 'No restaurant sources are contacted',
+            'id="deal-preview-result"', 'Live cloud checking is not connected',
         ):
             self.assertIn(marker, html)
         self.assertNotIn("Family Deals is next", html)
