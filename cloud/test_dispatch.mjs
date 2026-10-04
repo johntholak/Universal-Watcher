@@ -62,6 +62,15 @@ test("current GitHub API 200 dispatch response is accepted", async (t) => {
   assert.equal(calls, 1);
 });
 
+test("GitHub permission failures are classified without exposing response details", async (t) => {
+  const { sqlite, env } = environment();
+  t.after(() => sqlite.close());
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ status: 403, text: async () => '{"message":"permission details"}' });
+  t.after(() => { globalThis.fetch = oldFetch; });
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "dispatch_forbidden");
+});
+
 test("disabled dispatch never contacts GitHub; failed dispatch stays queued with conservative reservation", async (t) => {
   const { sqlite, env } = environment();
   t.after(() => sqlite.close());
