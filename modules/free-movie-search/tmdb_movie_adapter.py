@@ -150,9 +150,16 @@ class TMDBMovieAdapter:
         runtime = details.get("runtime")
         runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
         age_rating = self._us_certification(details.get("release_dates", {}))
+        # Kids mode requires an explicit safety classification. TMDB supplies the
+        # US certification, so do not leave this as None and accidentally make
+        # every title fail the kids gate. Keep PG-13 conservative until a title
+        # has independent kid-friendly evidence.
+        kids_eligible = age_rating in {"G", "PG", "TV-G", "TV-PG"}
+        pg13_kid_friendly = False if age_rating == "PG-13" else None
+        pg13_reason = "PG-13 requires independent kid-friendly evidence" if age_rating == "PG-13" else None
         if not genres:
             genres = tuple(g.get("name", "").strip() for g in details.get("genres", []) if g.get("name"))
-        return MovieCandidate(title=title, year=year, ratings=RatingEvidence(tmdb=item.get("vote_average"), tmdb_votes=item.get("vote_count")), offers=tuple(offers), available_from=None, genres=genres, runtime_minutes=runtime_minutes, age_rating=age_rating)
+        return MovieCandidate(title=title, year=year, ratings=RatingEvidence(tmdb=item.get("vote_average"), tmdb_votes=item.get("vote_count")), offers=tuple(offers), available_from=None, genres=genres, runtime_minutes=runtime_minutes, age_rating=age_rating, kids_eligible=kids_eligible, pg13_kid_friendly=pg13_kid_friendly, pg13_reason=pg13_reason)
 
     async def discover_async(self, *, query: str = "", as_of: str | None = None) -> ProviderBatch:
         checked_at = as_of or datetime.now(timezone.utc).isoformat()
@@ -261,4 +268,7 @@ class TMDBMovieAdapter:
             genres=genres,
             runtime_minutes=runtime_minutes,
             age_rating=age_rating,
+            kids_eligible=kids_eligible,
+            pg13_kid_friendly=pg13_kid_friendly,
+            pg13_reason=pg13_reason,
         )
