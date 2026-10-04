@@ -419,8 +419,12 @@ export default {
         console.error("Family Deals dispatch failed", error instanceof Error ? error.message : "unknown error");
         dispatch = "dispatch_error";
       }
-      if (dispatch === "dispatch_error" || dispatch === "not_configured") {
-        const reason = dispatch === "not_configured" ? "worker_dispatch_not_configured" : "worker_dispatch_error";
+      if (dispatch.startsWith("dispatch_") || dispatch === "not_configured") {
+        const reason = dispatch === "not_configured" ? "worker_dispatch_not_configured" :
+          dispatch === "dispatch_unauthorized" ? "worker_dispatch_unauthorized" :
+          dispatch === "dispatch_forbidden" ? "worker_dispatch_forbidden" :
+          dispatch === "dispatch_not_found" ? "worker_dispatch_not_found" :
+          dispatch === "dispatch_invalid" ? "worker_dispatch_invalid" : "worker_dispatch_error";
         try {
           await env.DB.batch([
             env.DB.prepare("UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?,completed_at=? WHERE id=? AND user_id=? AND status='QUEUED'")
