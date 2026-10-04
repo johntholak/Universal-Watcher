@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from .movie_gm_pipeline import MoviePipelineResult, ProviderBatch, run_movie_gm_pipeline
+from .movie_gm_pipeline import MoviePipelineResult, ProviderBatch, run_movie_gm_pipeline_async
 from .movie_gm_profile import TasteProfile, WatchRecord
 from .movie_gm_decision import ViewerProfile
 from .tmdb_movie_adapter import TMDBConfig, TMDBMovieAdapter
@@ -71,7 +71,7 @@ def run_live_movie_gm(
     config: RuntimeConfig | None = None,
 ) -> MoviePipelineResult:
     config = config or RuntimeConfig()
-    return run_movie_gm_pipeline(
+    return await run_movie_gm_pipeline_async(
         build_movie_adapters(config),
         query=query,
         mode=mode,
