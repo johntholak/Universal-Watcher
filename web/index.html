@@ -6,16 +6,6 @@
   <link rel="stylesheet" href="styles.css"><script src="app.js?v=20261003-2356" defer></script>
 </head>
 <body>
-  <dialog id="auth-dialog" class="auth-dialog">
-    <form id="auth-form" method="dialog">
-      <p class="eyebrow">PRIVATE BETA</p>
-      <h2>Unlock Universal Watcher</h2>
-      <p>Enter the access secret for this private deployment. It stays in the secure session and is never saved in the page.</p>
-      <label class="field">Access secret<input id="access-secret" type="password" autocomplete="current-password" required></label>
-      <button class="button button-primary" type="submit">Continue</button>
-      <p id="auth-status" class="auth-status" role="status"></p>
-    </form>
-  </dialog>
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <header class="topbar">
     <button class="brand" type="button" data-view="home" aria-label="Universal Watcher home"><span class="eye-mark" aria-hidden="true"><span></span></span><span><strong>UNIVERSAL WATCHER</strong><small>Find it once. Or let us keep watching.</small></span></button>
@@ -43,7 +33,7 @@
       <section class="view" data-page="movie-gm" aria-labelledby="movie-gm-page-title">
   <header class="page-header"><span class="page-icon movie-glyph">✦</span><div><p class="eyebrow">STREAMING GM</p><h1 id="movie-gm-page-title">Streaming GM</h1><p>Find something great to watch. Movie GM ranks legal streaming options using quality, household fit, availability, and your feedback.</p></div></header>
   <section class="movie-gm-panel" aria-labelledby="movie-gm-title">
-  <div class="movie-gm-heading"><div><p class="eyebrow">STREAMING GM</p><h2 id="movie-gm-title">Find something to watch</h2><p>Search current legal streaming offers, apply household fit, and separate confirmed upcoming releases.</p></div><div class="movie-gm-modes" role="group" aria-label="Movie search mode"><button type="button" class="gm-mode is-active" data-gm-mode="everyone">Everyone</button><button type="button" class="gm-mode" data-gm-mode="kids">Kids</button><button type="button" class="gm-mode" data-gm-mode="tonight">Tonight</button><button type="button" class="gm-mode" data-gm-mode="hidden_gems">Hidden Gems</button></div></div>
+  <div class="movie-gm-heading"><div><p class="eyebrow">STREAMING GM</p><h2 id="movie-gm-title">Find something to watch</h2><p>Search current legal streaming offers, apply household fit, and separate confirmed upcoming releases.</p></div><div class="movie-gm-modes" role="group" aria-label="Movie search mode"><button type="button" class="gm-mode is-active" data-gm-mode="everyone">Everyone</button><button type="button" class="gm-mode" data-gm-mode="kids">Kids</button><button type="button" class="gm-mode" data-gm-mode="tonight">Tonight</button></div></div>
   <form id="movie-gm-form" class="movie-gm-search">
     <button class="button button-primary gm-pick-button" type="submit">✦ &nbsp; Find Me Something Good</button>
     <details class="gm-specific-search">
