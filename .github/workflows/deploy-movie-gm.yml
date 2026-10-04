@@ -24,6 +24,7 @@ jobs:
       ACCESS_SECRET: ${{ secrets.UW_ACCESS_SECRET }}
       SESSION_KEY: ${{ secrets.UW_SESSION_KEY }}
       WORKER_SECRET: ${{ secrets.UW_WORKER_SECRET }}
+      GITHUB_DISPATCH_TOKEN: ${{ secrets.GITHUB_DISPATCH_TOKEN }}
 
     steps:
       - uses: actions/checkout@v6
@@ -32,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN UW_D1_DATABASE_NAME UW_D1_DATABASE_ID TMDB_READ_ACCESS_TOKEN OMDB_API_KEY ACCESS_SECRET SESSION_KEY WORKER_SECRET; do
+          for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN UW_D1_DATABASE_NAME UW_D1_DATABASE_ID TMDB_READ_ACCESS_TOKEN OMDB_API_KEY ACCESS_SECRET SESSION_KEY WORKER_SECRET GITHUB_DISPATCH_TOKEN; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing GitHub Actions secret: $name"
               exit 1
@@ -103,6 +104,7 @@ jobs:
           printf '%s' "$ACCESS_SECRET" | npx --yes wrangler@4 secret put ACCESS_SECRET --name universal-watcher-api
           printf '%s' "$SESSION_KEY" | npx --yes wrangler@4 secret put SESSION_KEY --name universal-watcher-api
           printf '%s' "$WORKER_SECRET" | npx --yes wrangler@4 secret put WORKER_SECRET --name universal-watcher-api
+          printf '%s' "$GITHUB_DISPATCH_TOKEN" | npx --yes wrangler@4 secret put GITHUB_DISPATCH_TOKEN --name universal-watcher-api
 
       - name: Production Movie GM smoke test
         shell: bash
