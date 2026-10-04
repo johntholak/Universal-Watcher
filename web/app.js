@@ -28,8 +28,16 @@
 
   async function bootstrapMovieApi() {
     try {
+      const statusResponse = await fetch("/api/v1/system/status", { credentials: "same-origin", cache: "no-store" });
+      if (statusResponse.ok) {
+        const status = await statusResponse.json();
+        movieApi.production = status.state === "production";
+      } else if (statusResponse.status !== 404) {
+        movieApi.production = true;
+      }
+
       const response = await fetch("/api/v1/session", { credentials: "same-origin", cache: "no-store" });
-      if (response.status === 404) {
+      if (response.status === 404 && !movieApi.production) {
         movieApi.ready = true;
         return;
       }
