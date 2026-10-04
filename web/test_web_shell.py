@@ -13,7 +13,7 @@ class WebShellTests(unittest.TestCase):
 
     def test_index_has_core_shell_surfaces(self):
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
-        for marker in ("UNIVERSAL WATCHER", "Active Watches", "Recent Results", "My Watches", "result-list", "Find Movie Seats", "data-view=\"movies\"", "movie-search-form"):
+        for marker in ("UNIVERSAL WATCHER", "Active Watches", "Recent Results", "My Watches", "result-list", "Find Seats", "data-view=\"movies\"", "movie-search-form"):
             self.assertIn(marker, html)
 
     def test_movies_flow_preserves_approved_controls(self):
@@ -36,11 +36,11 @@ class WebShellTests(unittest.TestCase):
             'name="deal-cuisine"', 'id="deal-restaurant-type"',
             'value="independent_local"', 'value="independent"', 'value="chains"',
             'id="deal-open-tonight"', 'Find Family Deals', 'data-save-deal-watch',
-            'id="deal-preview-result"', 'No restaurant sources are contacted',
+            'id="deal-preview-result"', 'Live cloud checking is not connected',
         ):
             self.assertIn(marker, html)
         self.assertNotIn("Family Deals is next", html)
-        for marker in ("dealCriteria()", "updateDealSummary()", "showDealPreview()", 'createDraft("family-deals")', "No restaurants were checked"):
+        for marker in ("dealCriteria()", "updateDealSummary()", "runFamilyDealsSearch()", 'createDraft("family-deals")', "Family Deals live checking is not connected"):
             self.assertIn(marker, js)
 
     def test_shell_uses_locked_visual_language_and_hides_shelved_modules(self):

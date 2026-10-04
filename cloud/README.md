@@ -80,3 +80,14 @@ node --test cloud/test_*.mjs
 Do not run a remote D1 migration or deploy until live adapter acceptance and the private beta
 auth, zero-cost account setup and quota behavior are reviewable together. The
 site and API must share an origin for the strict cookie and CSRF checks.
+
+
+## Phone/site integration checkpoint
+
+The web shell is now intended to ship as Static Assets from the same Worker
+origin. The Wrangler template points assets at ../web and routes /api/* through
+the Worker first. The browser Family Deals form uses the authenticated
+/api/v1/searches, /api/v1/searches/:id, and /api/v1/results routes, polls queued
+and running state, and renders evidence without treating PARTIAL candidates as
+verified matches. This wiring is implemented on the isolated Family Deals
+branch; production deployment and live provider acceptance are still gated.

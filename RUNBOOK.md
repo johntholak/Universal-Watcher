@@ -750,3 +750,24 @@ The repository + Git history + the four top-level documents are the source of tr
 For `NEXT BEST`, Activity should show dates advancing continuously, even across days with zero qualifying showtimes. The run should end only when the latest selectable AMC date has been reached, or at the 35-day safety ceiling if AMC never exposes a reliable endpoint. Any HTTP 403 dated-results response must appear as `SHOWTIME DISCOVERY UNAVAILABLE`, not as zero qualifying showtimes.
 
 Run the exact acceptance case from `WORK_START_HERE.md`. For every discovered showtime, Activity must show either a matched group, a no-group result backed by captured inventory, or `Seat inventory unavailable` with diagnostics. Preserve the Activity log for comparison against AMC's visible schedule.
+
+
+## Family Deals phone/site integration
+
+The Family Deals web form is now wired to the authenticated cloud API on the
+isolated family-deals-work-2026-10-03 branch. Once the branch is merged into the
+production site branch and the API Worker is deployed, the Universal Watcher
+site and API share one origin. Cloudflare Static Assets serves web/index.html,
+web/app.js, and web/styles.css while /api/* is handled by the Worker. This is
+the intended phone-first flow: the iPhone submits criteria, D1 queues the
+Search, GitHub Actions executes the preserved V5 browser flow, and the site
+polls the Search and renders evidence-backed results. No Mac is required.
+
+The web UI deliberately shows PARTIAL candidates when V5 proves meal, price and
+serving capacity but cannot prove that a generic official source applies to the
+specific restaurant location. It must not turn those into verified MATCH cards.
+
+The production deployment still requires the existing Cloudflare/GitHub
+secrets, the ordered D1 migrations, and guarded GitHub workflow dispatch. Do not
+claim live Family Deals execution until one controlled provider acceptance has
+completed.
