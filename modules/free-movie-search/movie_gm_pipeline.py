@@ -91,7 +91,10 @@ def run_movie_gm_pipeline(
     for adapter in adapters:
         provider = getattr(adapter, "provider", adapter.__class__.__name__)
         try:
-            try:\n                batch = adapter.discover(query=query, as_of=as_of, mode=mode)\n            except TypeError:\n                batch = adapter.discover(query=query, as_of=as_of)
+            try:
+                batch = adapter.discover(query=query, as_of=as_of, mode=mode)
+            except TypeError:
+                batch = adapter.discover(query=query, as_of=as_of)
         except Exception as exc:
             unavailable.append((provider, f"UNAVAILABLE: {exc.__class__.__name__}"))
             continue
@@ -194,7 +197,10 @@ async def run_movie_gm_pipeline_async(
             if discover_async is None:
                 batch = adapter.discover(query=query, as_of=as_of)
             else:
-                try:\n                    batch = await discover_async(query=query, as_of=as_of, mode=mode)\n                except TypeError:\n                    batch = await discover_async(query=query, as_of=as_of)
+                try:
+                    batch = await discover_async(query=query, as_of=as_of, mode=mode)
+                except TypeError:
+                    batch = await discover_async(query=query, as_of=as_of)
         except Exception as exc:
             unavailable.append((provider, f"UNAVAILABLE: {exc.__class__.__name__}: {exc}"))
             continue
