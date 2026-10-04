@@ -1,4 +1,5 @@
 name: Deploy Movie GM production
+  # Production source is pinned to movie-gm-deploy.
 
 on:
   push:
