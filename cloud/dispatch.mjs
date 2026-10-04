@@ -101,8 +101,12 @@ export async function dispatchPending(env, at = new Date()) {
                  "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "Universal-Watcher" },
       body: JSON.stringify({ ref: "movie-gm-deploy" }),
     });
-    return response.status === 204 ? "signaled" : "deferred";
-  } catch {
-    return "deferred";
+    if (response.status === 204) return "signaled";
+    const detail = await response.text().catch(() => "");
+    console.error("GitHub workflow dispatch rejected", response.status, detail.slice(0, 300));
+    return "dispatch_error";
+  } catch (error) {
+    console.error("GitHub workflow dispatch failed", error instanceof Error ? error.message : "unknown error");
+    return "dispatch_error";
   }
 }
