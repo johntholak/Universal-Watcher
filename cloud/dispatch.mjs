@@ -104,6 +104,10 @@ export async function dispatchPending(env, at = new Date()) {
     if (response.status === 200 || response.status === 204) return "signaled";
     const detail = await response.text().catch(() => "");
     console.error("GitHub workflow dispatch rejected", response.status, detail.slice(0, 300));
+    if (response.status === 401) return "dispatch_unauthorized";
+    if (response.status === 403) return "dispatch_forbidden";
+    if (response.status === 404) return "dispatch_not_found";
+    if (response.status === 422) return "dispatch_invalid";
     return "dispatch_error";
   } catch (error) {
     console.error("GitHub workflow dispatch failed", error instanceof Error ? error.message : "unknown error");
