@@ -11,7 +11,7 @@ from free_movie_search.movie_gm_runtime import RuntimeConfig, run_live_movie_gm
 
 
 MAX_BODY_BYTES = 16_384
-ALLOWED_MODES = {"everyone", "kids", "tonight", "hidden_gems"}
+ALLOWED_MODES = {"everyone", "kids", "tonight"}
 
 
 def _json_list(value):
