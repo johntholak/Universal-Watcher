@@ -180,6 +180,9 @@
     } else if (status === "DELAYED") {
       heading = "Family Deals search is delayed";
       body = "The free execution allowance is temporarily full. Universal Watcher will retry when capacity is available.";
+    } else if (status === "RUNNING") {
+      heading = "Family Deals search is running";
+      body = "The cloud worker is actively checking restaurants and official sources. No Mac or local computer is required.";
     } else if (status === "QUEUED") {
       heading = "Family Deals search queued";
       body = "Your search is queued for the cloud worker. No Mac or local computer is required.";
@@ -196,7 +199,7 @@
       const response = await movieApiFetch("/api/searches/" + encodeURIComponent(searchId));
       if (!response.ok) throw new Error("Could not read Family Deals search status");
       const search = await response.json();
-      const status = search.status || "QUEUED";
+      const status = search.status === "QUEUED" && ["CLAIMED", "RUNNING"].includes(search.job_status) ? "RUNNING" : (search.status || "QUEUED");
       let results = [];
       if (status === "COMPLETED") {
         results = await loadFamilyResults(searchId) || [];
