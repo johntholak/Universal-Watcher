@@ -424,7 +424,9 @@ export default {
           dispatch === "dispatch_unauthorized" ? "worker_dispatch_unauthorized" :
           dispatch === "dispatch_forbidden" ? "worker_dispatch_forbidden" :
           dispatch === "dispatch_not_found" ? "worker_dispatch_not_found" :
-          dispatch === "dispatch_invalid" ? "worker_dispatch_invalid" : "worker_dispatch_error";
+          dispatch === "dispatch_invalid" ? "worker_dispatch_invalid" :
+          dispatch === "dispatch_network" ? "worker_dispatch_network" :
+          dispatch.startsWith("dispatch_http_") ? `worker_${dispatch}` : "worker_dispatch_error";
         try {
           await env.DB.batch([
             env.DB.prepare("UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?,completed_at=? WHERE id=? AND user_id=? AND status='QUEUED'")
