@@ -27,8 +27,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: movie-gm-deploy
 
       - name: Validate deployment inputs
         shell: bash
@@ -77,6 +75,14 @@ jobs:
       - name: Apply remote D1 migrations
         run: npx --yes wrangler@4 d1 migrations apply "${UW_D1_DATABASE_NAME}" --remote --config cloud/wrangler.toml
 
+      - name: Prepare Movie GM Python package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf cloud/free_movie_search
+          cp -R modules/free-movie-search cloud/free_movie_search
+          touch cloud/free_movie_search/__init__.py
+
       - name: Deploy Movie GM Python Worker
         run: npx --yes wrangler@4 deploy --config movie-gm-wrangler.toml
 
@@ -98,9 +104,37 @@ jobs:
           printf '%s' "$SESSION_KEY" | npx --yes wrangler@4 secret put SESSION_KEY --name universal-watcher-api
           printf '%s' "$WORKER_SECRET" | npx --yes wrangler@4 secret put WORKER_SECRET --name universal-watcher-api
 
+      - name: Production Movie GM smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="https://universal-watcher-api.johntholak.workers.dev"
+          COOKIE_JAR="$(mktemp)"
+          trap 'rm -f "$COOKIE_JAR" /tmp/movie-gm-csrf' EXIT
+          SESSION_JSON="$(curl -fsS --retry 3 --retry-delay 1 -c "$COOKIE_JAR" -H "Origin: $BASE_URL" -H "Content-Type: application/json" -X POST "$BASE_URL/api/v1/session" --data "$(python -c 'import json,os; print(json.dumps({"access_secret":os.environ["ACCESS_SECRET"]}))')")"
+          python - "$SESSION_JSON" <<'PY'
+          import json,sys
+          data=json.loads(sys.argv[1])
+          assert data.get("authenticated") is True, data
+          assert data.get("csrf_token"), data
+          print("Session authentication: OK")
+          open("/tmp/movie-gm-csrf","w").write(data["csrf_token"])
+          PY
+          CSRF="$(cat /tmp/movie-gm-csrf)"
+          RESULT="$(curl -fsS --retry 2 --retry-delay 1 -b "$COOKIE_JAR" -H "Origin: $BASE_URL" -H "X-CSRF-Token: $CSRF" "$BASE_URL/api/v1/movies/search?mode=kids&query=kids%20movie")"
+          python - "$RESULT" <<'PY'
+          import json,sys
+          data=json.loads(sys.argv[1])
+          if "error" in data:
+              raise SystemExit(f"Movie GM smoke test failed: {data}")
+          assert "recommendations" in data, data
+          assert "providers_checked" in data, data
+          print(f"Movie GM production search: OK ({len(data['recommendations'])} recommendations, {data.get('total_candidates', 0)} candidates)")
+          print("Providers checked:", ", ".join(data.get("providers_checked", [])) or "none")
+          PY
+
       - name: Deployment summary
         run: |
-          echo "Source branch: movie-gm-deploy"
           echo "Movie GM Python Worker: universal-watcher-movie-gm"
           echo "API Worker: universal-watcher-api"
           echo "D1 migrations: applied remotely"
