@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from workers import fetch
+
 from .free_movie_search import FreeOffer, MovieCandidate, RatingEvidence
 from .movie_gm_pipeline import ProviderBatch
 
@@ -46,6 +48,19 @@ class TMDBMovieAdapter:
         if not token:
             raise ValueError("TMDB_READ_ACCESS_TOKEN is required")
         self.config = config or TMDBConfig(token=token)
+
+    async def _get_async(self, path: str, params: dict[str, str | int]) -> dict:
+        query = urlencode(params)
+        response = await fetch(
+            f"https://api.themoviedb.org/3{path}?{query}",
+            headers={
+                "Authorization": f"Bearer {self.config.token}",
+                "accept": "application/json",
+            },
+        )
+        if not response.ok:
+            raise RuntimeError(f"TMDB HTTP {response.status}")
+        return await response.json()
 
     def _get(self, path: str, params: dict[str, str | int]) -> dict:
         query = urlencode(params)
@@ -103,6 +118,57 @@ class TMDBMovieAdapter:
                 checked_at=checked_at,
                 source="TMDB watch providers powered by JustWatch",
             )
+
+    async def _normalize_async(self, item: dict, checked_at: str) -> MovieCandidate | None:
+        movie_id = item.get("id")
+        title = (item.get("title") or item.get("original_title") or "").strip()
+        if not movie_id or not title:
+            return None
+        try:
+            details = await self._get_async(
+                f"/movie/{int(movie_id)}",
+                {"language": self.config.language, "append_to_response": "watch/providers,release_dates"},
+            )
+        except Exception:
+            return None
+        provider_payload = details.get("watch/providers", {})
+        region = provider_payload.get("results", {}).get(self.config.region, {})
+        offers: list[FreeOffer] = []
+        seen: set[str] = set()
+        for access, key in (("free_ads", "ads"), ("free", "free"), ("subscription", "flatrate")):
+            for entry in region.get(key, []) or []:
+                name = (entry.get("provider_name") or "").strip()
+                if not name or name.casefold() in seen:
+                    continue
+                seen.add(name.casefold())
+                offers.append(FreeOffer(provider=name, watch_url=region.get("link") or "https://www.themoviedb.org/", access=access, checked_at=checked_at, source="TMDB/JustWatch", verified=True, availability_confidence="direct"))
+        if not offers:
+            return None
+        release_date = (item.get("release_date") or "").strip() or None
+        year = int(release_date[:4]) if release_date and release_date[:4].isdigit() else None
+        genres = tuple(GENRE_NAMES[g] for g in item.get("genre_ids", []) if g in GENRE_NAMES)
+        runtime = details.get("runtime")
+        runtime_minutes = int(runtime) if isinstance(runtime, (int, float)) and runtime > 0 else None
+        age_rating = self._us_certification(details.get("release_dates", {}))
+        if not genres:
+            genres = tuple(g.get("name", "").strip() for g in details.get("genres", []) if g.get("name"))
+        return MovieCandidate(title=title, year=year, ratings=RatingEvidence(tmdb=item.get("vote_average"), tmdb_votes=item.get("vote_count")), offers=tuple(offers), available_from=None, genres=genres, runtime_minutes=runtime_minutes, age_rating=age_rating)
+
+    async def discover_async(self, *, query: str = "", as_of: str | None = None) -> ProviderBatch:
+        checked_at = as_of or datetime.now(timezone.utc).isoformat()
+        try:
+            if query.strip():
+                payload = await self._get_async("/search/movie", {"query": query.strip(), "include_adult": "false", "language": self.config.language, "region": self.config.region, "page": 1})
+            else:
+                payload = await self._get_async("/discover/movie", {"include_adult": "false", "include_video": "false", "language": self.config.language, "region": self.config.region, "watch_region": self.config.region, "with_watch_monetization_types": "free|ads|flatrate", "sort_by": "popularity.desc", "page": 1})
+            movies = []
+            for item in payload.get("results", []):
+                candidate = await self._normalize_async(item, checked_at)
+                if candidate is not None:
+                    movies.append(candidate)
+            return ProviderBatch(provider=self.provider, movies=tuple(movies), status="OK", checked_at=checked_at, source="TMDB watch providers powered by JustWatch")
+        except Exception as exc:
+            return ProviderBatch(provider=self.provider, status="UNAVAILABLE", reason=f"{exc.__class__.__name__}: {exc}", checked_at=checked_at, source="TMDB watch providers powered by JustWatch")
 
     @staticmethod
     def _us_certification(release_dates: dict) -> str | None:
