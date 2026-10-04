@@ -2,28 +2,34 @@ name: Family Deals batch worker
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "7,12,17,22,27,32,37,42,47,52,57 * * * *"
 
 permissions:
   contents: read
 
 concurrency:
-  group: family-deals-worker
+  group: family-deals-worker-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
   batch:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: movie-gm-deploy
       - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
           cache: pip
+      - name: Restore Family Deals caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.hunt_cache
+          key: family-deals-v5-${{ runner.os }}-${{ hashFiles('requirements.txt', 'modules/family-deals/server.py') }}
+          restore-keys: |
+            family-deals-v5-${{ runner.os }}-
+
       - name: Install pinned dependencies and Chromium
         run: |
           python -m pip install -r requirements.txt
