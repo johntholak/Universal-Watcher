@@ -6,7 +6,6 @@ decision code remains deterministic and never performs network calls.
 """
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from typing import Protocol, Sequence
 
@@ -92,10 +91,7 @@ def run_movie_gm_pipeline(
     for adapter in adapters:
         provider = getattr(adapter, "provider", adapter.__class__.__name__)
         try:
-            try:
-                batch = adapter.discover(query=query, as_of=as_of, mode=mode)
-            except TypeError:
-                batch = adapter.discover(query=query, as_of=as_of)
+            batch = adapter.discover(query=query, as_of=as_of)
         except Exception as exc:
             unavailable.append((provider, f"UNAVAILABLE: {exc.__class__.__name__}"))
             continue
@@ -112,30 +108,22 @@ def run_movie_gm_pipeline(
     # candidates using the existing deterministic GM ordering, enrich that set,
     # then run the final recommendation pass with the added evidence.
     if rating_enrichers and unique and rating_enrichment_limit > 0:
-        if mode.casefold().strip() == "hidden_gems":
-            # Hidden Gems cannot be identified until IMDb vote volume exists.
-            # Enrich the discovery pool first, then apply the hidden-gem gate.
-            selected_titles = {
-                (movie.title.casefold(), movie.year)
-                for movie in unique[:rating_enrichment_limit]
-            }
-        else:
-            preview = recommend_movies(
-                unique,
-                mode=mode,
-                as_of=as_of,
-                taste_profile=taste_profile,
-                viewers=viewers,
-                watch_history=watch_history,
-                child_ages=child_ages,
-                allow_pg13=allow_pg13,
-                runtime_max=runtime_max,
-                minimum_imdb=minimum_imdb,
-                minimum_votes=minimum_votes,
-                hidden_gem_max_votes=hidden_gem_max_votes,
-                hidden_gem_min_quality=hidden_gem_min_quality,
-            )
-            selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year) for item in preview.recommendations[:rating_enrichment_limit]}
+        preview = recommend_movies(
+            unique,
+            mode=mode,
+            as_of=as_of,
+            taste_profile=taste_profile,
+            viewers=viewers,
+            watch_history=watch_history,
+            child_ages=child_ages,
+            allow_pg13=allow_pg13,
+            runtime_max=runtime_max,
+            minimum_imdb=minimum_imdb,
+            minimum_votes=minimum_votes,
+            hidden_gem_max_votes=hidden_gem_max_votes,
+            hidden_gem_min_quality=hidden_gem_min_quality,
+        )
+        selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year) for item in preview.recommendations[:rating_enrichment_limit]}
         enriched = []
         for movie in unique:
             key = (movie.title.casefold(), movie.year)
@@ -206,10 +194,7 @@ async def run_movie_gm_pipeline_async(
             if discover_async is None:
                 batch = adapter.discover(query=query, as_of=as_of)
             else:
-                try:
-                    batch = await discover_async(query=query, as_of=as_of, mode=mode)
-                except TypeError:
-                    batch = await discover_async(query=query, as_of=as_of)
+                batch = await discover_async(query=query, as_of=as_of)
         except Exception as exc:
             unavailable.append((provider, f"UNAVAILABLE: {exc.__class__.__name__}: {exc}"))
             continue
@@ -222,46 +207,32 @@ async def run_movie_gm_pipeline_async(
     unique = _dedupe_movies(candidates)
 
     if rating_enrichers and unique and rating_enrichment_limit > 0:
-        if mode.casefold().strip() == "hidden_gems":
-            selected_titles = {
-                (movie.title.casefold(), movie.year)
-                for movie in unique[:rating_enrichment_limit]
-            }
-        else:
-            preview = recommend_movies(
-                unique, mode=mode, as_of=as_of, taste_profile=taste_profile,
-                viewers=viewers, watch_history=watch_history, child_ages=child_ages,
-                allow_pg13=allow_pg13, runtime_max=runtime_max,
-                minimum_imdb=minimum_imdb, minimum_votes=minimum_votes,
-                hidden_gem_max_votes=hidden_gem_max_votes,
-                hidden_gem_min_quality=hidden_gem_min_quality,
-            )
-            selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year)
-                               for item in preview.recommendations[:rating_enrichment_limit]}
-        async def enrich_one(movie: MovieCandidate) -> MovieCandidate:
-            current = movie
-            for enricher in rating_enrichers:
-                try:
-                    enrich_async = getattr(enricher, "enrich_async", None)
-                    current = await enrich_async(current) if enrich_async else enricher.enrich(current)
-                except Exception:
-                    break
-            return current
-
-        # Cloudflare Workers Free allows only six simultaneous outgoing
-        # connections. Enrich in small concurrent batches so OMDb latency does
-        # not turn a normal search into a Worker 503 while staying under that
-        # connection ceiling.
-        selected = [movie for movie in unique if (movie.title.casefold(), movie.year) in selected_titles]
-        enriched_selected: dict[tuple[str, int | None], MovieCandidate] = {}
-        for offset in range(0, len(selected), 5):
-            batch = selected[offset:offset + 5]
-            results = await asyncio.gather(*(enrich_one(movie) for movie in batch))
-            enriched_selected.update({(movie.title.casefold(), movie.year): movie for movie in results})
-        unique = tuple(
-            enriched_selected.get((movie.title.casefold(), movie.year), movie)
-            for movie in unique
+        preview = recommend_movies(
+            unique, mode=mode, as_of=as_of, taste_profile=taste_profile,
+            viewers=viewers, watch_history=watch_history, child_ages=child_ages,
+            allow_pg13=allow_pg13, runtime_max=runtime_max,
+            minimum_imdb=minimum_imdb, minimum_votes=minimum_votes,
+            hidden_gem_max_votes=hidden_gem_max_votes,
+            hidden_gem_min_quality=hidden_gem_min_quality,
         )
+        selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year)
+                           for item in preview.recommendations[:rating_enrichment_limit]}
+        enriched = []
+        for movie in unique:
+            key = (movie.title.casefold(), movie.year)
+            if key in selected_titles:
+                current = movie
+                for enricher in rating_enrichers:
+                    try:
+                        enrich_async = getattr(enricher, "enrich_async", None)
+                        current = await enrich_async(current) if enrich_async else enricher.enrich(current)
+                    except Exception as exc:
+                        pass
+                        break
+                enriched.append(current)
+            else:
+                enriched.append(movie)
+        unique = tuple(enriched)
 
     recommendation = recommend_movies(
         unique, mode=mode, as_of=as_of, taste_profile=taste_profile,
