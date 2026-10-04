@@ -426,6 +426,10 @@ export default {
           dispatch === "dispatch_not_found" ? "worker_dispatch_not_found" :
           dispatch === "dispatch_invalid" ? "worker_dispatch_invalid" :
           dispatch === "dispatch_network" ? "worker_dispatch_network" :
+          dispatch === "dispatch_db_pending" ? "worker_dispatch_db_pending" :
+          dispatch === "dispatch_db_gate" ? "worker_dispatch_db_gate" :
+          dispatch === "dispatch_db_gate_read" ? "worker_dispatch_db_gate_read" :
+          dispatch === "dispatch_db_delay" ? "worker_dispatch_db_delay" :
           dispatch.startsWith("dispatch_http_") ? `worker_${dispatch}` : "worker_dispatch_error";
         try {
           await env.DB.batch([
