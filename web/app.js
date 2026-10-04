@@ -28,12 +28,16 @@
 
   async function bootstrapMovieApi() {
     try {
-      const statusResponse = await fetch("/api/v1/system/status", { credentials: "same-origin", cache: "no-store" });
-      if (statusResponse.ok) {
-        const status = await statusResponse.json();
-        movieApi.production = status.state === "production";
-      } else if (statusResponse.status !== 404) {
-        movieApi.production = true;
+      try {
+        const statusResponse = await fetch("/api/v1/system/status", { credentials: "same-origin", cache: "no-store" });
+        if (statusResponse.ok) {
+          const status = await statusResponse.json();
+          movieApi.production = status.state === "production";
+        } else if (statusResponse.status !== 404) {
+          movieApi.production = true;
+        }
+      } catch (_error) {
+        // Production detection is advisory. Do not block the existing session bootstrap.
       }
 
       const response = await fetch("/api/v1/session", { credentials: "same-origin", cache: "no-store" });
