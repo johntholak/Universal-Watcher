@@ -161,3 +161,90 @@ def run_movie_gm_pipeline(
         providers_unavailable=tuple(unavailable),
         total_candidates=len(unique),
     )
+
+
+async def run_movie_gm_pipeline_async(
+    adapters: Sequence[MovieSourceAdapter],
+    *,
+    query: str = "",
+    mode: str = "everyone",
+    as_of: str | None = None,
+    taste_profile: TasteProfile | None = None,
+    viewers: Sequence[ViewerProfile] = (),
+    watch_history: Sequence[WatchRecord] = (),
+    child_ages: Sequence[int] = (),
+    allow_pg13: bool = True,
+    runtime_max: int | None = None,
+    minimum_imdb: float | None = None,
+    minimum_votes: int | None = None,
+    hidden_gem_max_votes: int = 50000,
+    hidden_gem_min_quality: float = 68.0,
+    rating_enrichers: Sequence[MovieEvidenceEnricher] = (),
+    rating_enrichment_limit: int = 25,
+) -> MoviePipelineResult:
+    """Async Cloudflare Workers path. Uses native Worker fetch-capable adapters."""
+    candidates: list[MovieCandidate] = []
+    checked: list[str] = []
+    unavailable: list[tuple[str, str]] = []
+
+    for adapter in adapters:
+        provider = getattr(adapter, "provider", adapter.__class__.__name__)
+        try:
+            discover_async = getattr(adapter, "discover_async", None)
+            if discover_async is None:
+                batch = adapter.discover(query=query, as_of=as_of)
+            else:
+                batch = await discover_async(query=query, as_of=as_of)
+        except Exception as exc:
+            unavailable.append((provider, f"UNAVAILABLE: {exc.__class__.__name__}: {exc}"))
+            continue
+        checked.append(provider)
+        if batch.status.casefold() != "ok":
+            unavailable.append((provider, batch.reason or f"UNAVAILABLE: {batch.status}"))
+            continue
+        candidates.extend(batch.movies)
+
+    unique = _dedupe_movies(candidates)
+
+    if rating_enrichers and unique and rating_enrichment_limit > 0:
+        preview = recommend_movies(
+            unique, mode=mode, as_of=as_of, taste_profile=taste_profile,
+            viewers=viewers, watch_history=watch_history, child_ages=child_ages,
+            allow_pg13=allow_pg13, runtime_max=runtime_max,
+            minimum_imdb=minimum_imdb, minimum_votes=minimum_votes,
+            hidden_gem_max_votes=hidden_gem_max_votes,
+            hidden_gem_min_quality=hidden_gem_min_quality,
+        )
+        selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year)
+                           for item in preview.recommendations[:rating_enrichment_limit]}
+        enriched = []
+        for movie in unique:
+            key = (movie.title.casefold(), movie.year)
+            if key in selected_titles:
+                current = movie
+                for enricher in rating_enrichers:
+                    try:
+                        enrich_async = getattr(enricher, "enrich_async", None)
+                        current = await enrich_async(current) if enrich_async else enricher.enrich(current)
+                    except Exception as exc:
+                        unavailable.append((getattr(enricher, "provider", enricher.__class__.__name__), f"UNAVAILABLE: {exc.__class__.__name__}: {exc}"))
+                        break
+                enriched.append(current)
+            else:
+                enriched.append(movie)
+        unique = tuple(enriched)
+
+    recommendation = recommend_movies(
+        unique, mode=mode, as_of=as_of, taste_profile=taste_profile,
+        viewers=viewers, watch_history=watch_history, child_ages=child_ages,
+        allow_pg13=allow_pg13, runtime_max=runtime_max,
+        minimum_imdb=minimum_imdb, minimum_votes=minimum_votes,
+        hidden_gem_max_votes=hidden_gem_max_votes,
+        hidden_gem_min_quality=hidden_gem_min_quality,
+    )
+    return MoviePipelineResult(
+        recommendation=recommendation,
+        providers_checked=tuple(checked),
+        providers_unavailable=tuple(unavailable),
+        total_candidates=len(unique),
+    )
