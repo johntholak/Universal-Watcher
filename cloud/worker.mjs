@@ -82,7 +82,14 @@ export default {
     const path = url.pathname;
     const legacyMovieSearch = path === "/api/movies/search";
     if (!path.startsWith("/api/v1/") && !legacyMovieSearch) {
-      if (request.method === "GET" && env.ASSETS) return env.ASSETS.fetch(request);
+      if (request.method === "GET" && env.ASSETS) {
+        const asset = await env.ASSETS.fetch(request);
+        const headers = new Headers(asset.headers);
+        if (path === "/" || path.endsWith(".html") || path.endsWith(".js") || path.endsWith(".css")) {
+          headers.set("Cache-Control", "no-store");
+        }
+        return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
+      }
       return json({ error: "Not found" }, 404);
     }
     if (request.method === "GET" && path === "/api/v1/system/status") return json({ state: "production", execution: env.DISPATCH_ENABLED === "true" ? "connected" : "not_connected" });
