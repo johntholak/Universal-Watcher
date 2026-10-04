@@ -111,22 +111,30 @@ def run_movie_gm_pipeline(
     # candidates using the existing deterministic GM ordering, enrich that set,
     # then run the final recommendation pass with the added evidence.
     if rating_enrichers and unique and rating_enrichment_limit > 0:
-        preview = recommend_movies(
-            unique,
-            mode=mode,
-            as_of=as_of,
-            taste_profile=taste_profile,
-            viewers=viewers,
-            watch_history=watch_history,
-            child_ages=child_ages,
-            allow_pg13=allow_pg13,
-            runtime_max=runtime_max,
-            minimum_imdb=minimum_imdb,
-            minimum_votes=minimum_votes,
-            hidden_gem_max_votes=hidden_gem_max_votes,
-            hidden_gem_min_quality=hidden_gem_min_quality,
-        )
-        selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year) for item in preview.recommendations[:rating_enrichment_limit]}
+        if mode.casefold().strip() == "hidden_gems":
+            # Hidden Gems cannot be identified until IMDb vote volume exists.
+            # Enrich the discovery pool first, then apply the hidden-gem gate.
+            selected_titles = {
+                (movie.title.casefold(), movie.year)
+                for movie in unique[:rating_enrichment_limit]
+            }
+        else:
+            preview = recommend_movies(
+                unique,
+                mode=mode,
+                as_of=as_of,
+                taste_profile=taste_profile,
+                viewers=viewers,
+                watch_history=watch_history,
+                child_ages=child_ages,
+                allow_pg13=allow_pg13,
+                runtime_max=runtime_max,
+                minimum_imdb=minimum_imdb,
+                minimum_votes=minimum_votes,
+                hidden_gem_max_votes=hidden_gem_max_votes,
+                hidden_gem_min_quality=hidden_gem_min_quality,
+            )
+            selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year) for item in preview.recommendations[:rating_enrichment_limit]}
         enriched = []
         for movie in unique:
             key = (movie.title.casefold(), movie.year)
@@ -213,16 +221,22 @@ async def run_movie_gm_pipeline_async(
     unique = _dedupe_movies(candidates)
 
     if rating_enrichers and unique and rating_enrichment_limit > 0:
-        preview = recommend_movies(
-            unique, mode=mode, as_of=as_of, taste_profile=taste_profile,
-            viewers=viewers, watch_history=watch_history, child_ages=child_ages,
-            allow_pg13=allow_pg13, runtime_max=runtime_max,
-            minimum_imdb=minimum_imdb, minimum_votes=minimum_votes,
-            hidden_gem_max_votes=hidden_gem_max_votes,
-            hidden_gem_min_quality=hidden_gem_min_quality,
-        )
-        selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year)
-                           for item in preview.recommendations[:rating_enrichment_limit]}
+        if mode.casefold().strip() == "hidden_gems":
+            selected_titles = {
+                (movie.title.casefold(), movie.year)
+                for movie in unique[:rating_enrichment_limit]
+            }
+        else:
+            preview = recommend_movies(
+                unique, mode=mode, as_of=as_of, taste_profile=taste_profile,
+                viewers=viewers, watch_history=watch_history, child_ages=child_ages,
+                allow_pg13=allow_pg13, runtime_max=runtime_max,
+                minimum_imdb=minimum_imdb, minimum_votes=minimum_votes,
+                hidden_gem_max_votes=hidden_gem_max_votes,
+                hidden_gem_min_quality=hidden_gem_min_quality,
+            )
+            selected_titles = {(item.ranked.movie.title.casefold(), item.ranked.movie.year)
+                               for item in preview.recommendations[:rating_enrichment_limit]}
         enriched = []
         for movie in unique:
             key = (movie.title.casefold(), movie.year)
