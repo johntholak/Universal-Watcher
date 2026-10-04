@@ -231,6 +231,13 @@ def rank_movies(
 
         pg13_note = None
         if kids_mode:
+            # Kids mode is a content-mode search, not merely a rating filter.
+            # A G/PG label alone is not enough to call a title a kids movie.
+            # Require explicit Family/Animation/Children/Kids genre evidence,
+            # then apply the separate certification gate above.
+            kid_genres = {g.casefold().strip() for g in movie.genres}
+            if not kid_genres.intersection({"family", "animation", "children", "kids"}):
+                continue
             passed, pg13_note = _kids_gate(movie, allow_pg13)
             if not passed:
                 continue
