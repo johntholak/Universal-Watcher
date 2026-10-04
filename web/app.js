@@ -1,6 +1,7 @@
 (() => {
   const moduleLabels = { movies: "Seat Finder", "movie-gm": "Streaming GM", "family-deals": "Family Deals" };
   const state = { watches: [], results: [] };
+  const familyDealsState = { searchId: "", pollTimer: null, pollCount: 0 };
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
@@ -133,8 +134,113 @@
   }
   function showDealPreview() {
     const panel = byId("deal-preview-result"); panel.hidden = false;
-    panel.innerHTML = '<div class="result-state-icon">◷</div><div><p class="eyebrow">SEARCH CONFIGURED</p><h2>Live deal verification is unavailable in this preview</h2><p>No restaurants were checked, so there is no result or coverage count yet. The production search will show deals first with verified total price, serving capacity, included food, source, distance, and last checked time. Sources that cannot be verified will appear in coverage details.</p></div><button class="button button-watch" type="button" data-save-deal-watch>♧ &nbsp; Save this Search</button>';
+    panel.innerHTML = '<div class="result-state-icon">◷</div><div><p class="eyebrow">PREVIEW ONLY</p><h2>Family Deals live checking is not connected</h2><p>This local preview does not contact restaurant sources. The production Universal Watcher site will run the full-radius search and show verified or clearly partial results with source evidence.</p></div>';
     panel.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function setFamilyBanner(connected) {
+    const banner = byId("family-deals-preview-banner");
+    if (banner) banner.hidden = connected;
+  }
+
+  function familyResultCard(result) {
+    const d = result.details || {};
+    const evidence = Array.isArray(result.evidence) ? result.evidence[0] : null;
+    const price = Number.isFinite(Number(d.price_cents)) ? "$" + (Number(d.price_cents) / 100).toFixed(2) : "Price unavailable";
+    const serving = d.serving_label || (d.serves_max ? "Serves up to " + d.serves_max : "Serving capacity not shown");
+    const distance = Number.isFinite(Number(d.distance_miles)) ? Number(d.distance_miles).toFixed(1) + " mi" : "Distance unknown";
+    const classification = d.classification && d.classification !== "unknown" ? d.classification : "Classification unknown";
+    const destination = result.destination_url ? '<a class="deal-result-link" href="' + escapeHtml(result.destination_url) + '" target="_blank" rel="noopener">View official source ↗</a>' : "";
+    return '<article class="deal-result-card"><div class="deal-result-top"><div><span class="result-badge result-' + escapeHtml(result.outcome) + '">' + escapeHtml(result.outcome) + '</span><h3>' + escapeHtml(d.restaurant || result.title) + '</h3></div><strong class="deal-price">' + escapeHtml(price) + '</strong></div><p class="deal-result-summary">' + escapeHtml(result.summary || "") + '</p><dl class="deal-result-facts"><div><dt>Serves</dt><dd>' + escapeHtml(serving) + '</dd></div><div><dt>Distance</dt><dd>' + escapeHtml(distance) + '</dd></div><div><dt>Type</dt><dd>' + escapeHtml(classification) + '</dd></div></dl>' + (evidence ? '<div class="deal-evidence"><strong>Source evidence</strong><p>' + escapeHtml(evidence.summary || "") + '</p></div>' : "") + '<div class="deal-result-actions">' + destination + '<span class="deal-location-note">' + (d.location_verified ? "Location verified" : "Location applicability needs confirmation") + '</span></div></article>';
+  }
+
+  async function loadFamilyResults(searchId) {
+    const response = await movieApiFetch("/api/results?search_id=" + encodeURIComponent(searchId) + "&limit=50");
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data.results) ? data.results : [];
+  }
+
+  function renderFamilySearchState(status, search, results) {
+    results = results || [];
+    const panel = byId("deal-preview-result"); panel.hidden = false;
+    const coverage = search && search.coverage;
+    const coverageText = coverage ? (coverage.checked || 0) + " checked · " + (coverage.unavailable || 0) + " unavailable · " + (coverage.unresolved || 0) + " unresolved" : "Coverage will appear when the scan finishes.";
+    let heading = "Family Deals search";
+    let body = "Universal Watcher is checking the full selected radius. You can leave this page open while the worker runs.";
+    let icon = "◷";
+    if (status === "COMPLETED") {
+      heading = results.length ? results.length + " family meal candidate" + (results.length === 1 ? "" : "s") + " found" : "No verified family deal matches";
+      body = search.last_outcome === "PARTIAL" ? "The scan completed, but some candidates still need location applicability confirmation. They are shown below rather than being promoted to verified matches." : (search.last_outcome === "NO_MATCH" ? "The full selected radius was checked and no verified match was found." : "The scan completed.");
+      icon = results.length ? "✓" : "◌";
+    } else if (status === "FAILED") {
+      heading = "Family Deals search could not finish";
+      body = "The worker reported a failure. This is not a no-match result.";
+      icon = "!";
+    } else if (status === "DELAYED") {
+      heading = "Family Deals search is delayed";
+      body = "The free execution allowance is temporarily full. Universal Watcher will retry when capacity is available.";
+    } else if (status === "QUEUED") {
+      heading = "Family Deals search queued";
+      body = "Your search is queued for the cloud worker. No Mac or local computer is required.";
+    }
+    const save = status === "COMPLETED" ? '<button class="button button-watch" type="button" data-save-deal-watch>♧ &nbsp; Save this Search as a Watch</button>' : "";
+    const cards = results.map(familyResultCard).join("");
+    panel.innerHTML = '<div class="family-search-status"><div class="result-state-icon">' + icon + '</div><div><p class="eyebrow">' + escapeHtml(status) + '</p><h2>' + escapeHtml(heading) + '</h2><p>' + escapeHtml(body) + '</p><small>' + escapeHtml(coverageText) + '</small></div></div>' + (cards ? '<div class="deal-results-list">' + cards + '</div>' : "") + save;
+    panel.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function pollFamilySearch(searchId) {
+    if (familyDealsState.pollTimer) window.clearTimeout(familyDealsState.pollTimer);
+    try {
+      const response = await movieApiFetch("/api/searches/" + encodeURIComponent(searchId));
+      if (!response.ok) throw new Error("Could not read Family Deals search status");
+      const search = await response.json();
+      const status = search.status || "QUEUED";
+      let results = [];
+      if (status === "COMPLETED") {
+        results = await loadFamilyResults(searchId) || [];
+        state.results = results.map((item) => ({ ...item, module: "family-deals", reason: item.summary }));
+        renderResults();
+      }
+      renderFamilySearchState(status, search, results);
+      if (!["COMPLETED", "FAILED", "DELAYED"].includes(status) && familyDealsState.pollCount < 240) {
+        familyDealsState.pollCount += 1;
+        familyDealsState.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 5000);
+      }
+      if (status === "COMPLETED") showToast("Family Deals search finished.");
+    } catch (error) {
+      renderFamilySearchState("QUEUED", { status: "QUEUED" }, []);
+      if (familyDealsState.pollCount < 240) {
+        familyDealsState.pollCount += 1;
+        familyDealsState.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 7000);
+      } else {
+        showToast(error.message || "Family Deals status could not be read.");
+      }
+    }
+  }
+
+  async function runFamilyDealsSearch() {
+    const form = byId("deal-search-form");
+    if (!form.reportValidity()) return;
+    if (!movieApi.production) { showDealPreview(); return; }
+    const criteria = dealCriteria();
+    try {
+      const response = await movieApiFetch("/api/searches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ module: "family-deals", criteria })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Family Deals search could not be queued");
+      familyDealsState.searchId = data.id;
+      familyDealsState.pollCount = 0;
+      renderFamilySearchState(data.status || "QUEUED", data, []);
+      await pollFamilySearch(data.id);
+    } catch (error) {
+      renderFamilySearchState("FAILED", { status: "FAILED", last_outcome: "ERROR" }, []);
+      showToast(error.message || "Family Deals search could not start.");
+    }
   }
   const statusLabel = (status) => ({ draft: "Saved", active: "Watching", paused: "Paused", completed: "Stopped", error: "Needs attention" })[status] || "Saved";
   function criteriaSummary(watch) {
@@ -353,6 +459,6 @@
   byId("movie-gm-form").addEventListener("submit", (event) => { event.preventDefault(); runMovieGM(); });
   byId("gm-viewer-form").addEventListener("submit", saveMovieGMViewer);
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
-  byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); showDealPreview(); });
-  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); movieApi.bootstrapPromise = bootstrapMovieApi(); movieApi.bootstrapPromise.then(hydrateMovieGMSettings); const initialView = new URLSearchParams(window.location.search).get("view"); if (initialView) selectView(initialView);
+  byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); runFamilyDealsSearch(); });
+  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); movieApi.bootstrapPromise = bootstrapMovieApi(); movieApi.bootstrapPromise.then(() => { setFamilyBanner(movieApi.production); hydrateMovieGMSettings(); }); const initialView = new URLSearchParams(window.location.search).get("view"); if (initialView) selectView(initialView);
 })();
