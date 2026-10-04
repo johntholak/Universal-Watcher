@@ -75,16 +75,7 @@ class TMDBMovieAdapter:
             return json.loads(response.read().decode("utf-8"))
 
     def _discover_params(self, *, mode: str = "") -> dict[str, str | int]:
-        params: dict[str, str | int] = {
-            "include_adult": "false",
-            "include_video": "false",
-            "language": self.config.language,
-            "region": self.config.region,
-            "watch_region": self.config.region,
-            "with_watch_monetization_types": "free|ads|flatrate",
-            "sort_by": "popularity.desc",
-            "page": 1,
-        }
+        params: dict[str, str | int] = {"include_adult": "false", "include_video": "false", "language": self.config.language, "region": self.config.region, "watch_region": self.config.region, "with_watch_monetization_types": "free|ads|flatrate", "sort_by": "popularity.desc", "page": 1}
         if mode.casefold().strip() == "kids":
             params["certification_country"] = self.config.region
             params["certification.lte"] = "PG"
@@ -268,3 +259,17 @@ class TMDBMovieAdapter:
                 imdb=None,
                 imdb_votes=None,
                 rotten_tomatoes_critics=None,
+                rotten_tomatoes_audience=None,
+                metacritic=None,
+                tmdb=item.get("vote_average"),
+                tmdb_votes=item.get("vote_count"),
+            ),
+            offers=tuple(offers),
+            available_from=None,
+            genres=genres,
+            runtime_minutes=runtime_minutes,
+            age_rating=age_rating,
+            kids_eligible=kids_eligible,
+            pg13_kid_friendly=pg13_kid_friendly,
+            pg13_reason=pg13_reason,
+        )
