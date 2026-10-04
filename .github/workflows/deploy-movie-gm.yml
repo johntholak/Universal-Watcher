@@ -24,7 +24,7 @@ jobs:
       ACCESS_SECRET: ${{ secrets.UW_ACCESS_SECRET }}
       SESSION_KEY: ${{ secrets.UW_SESSION_KEY }}
       WORKER_SECRET: ${{ secrets.UW_WORKER_SECRET }}
-      GITHUB_DISPATCH_TOKEN: ${{ secrets.GITHUB_DISPATCH_TOKEN }}
+      GITHUB_DISPATCH_TOKEN: ${{ secrets.UW_DISPATCH_TOKEN }}
 
     steps:
       - uses: actions/checkout@v6
@@ -44,7 +44,7 @@ jobs:
             exit 1
           fi
           if [ "${#GITHUB_DISPATCH_TOKEN}" -lt 20 ]; then
-            echo "::error::GITHUB_DISPATCH_TOKEN must be at least 20 characters."
+            echo "::error::UW_DISPATCH_TOKEN must contain a valid GitHub token value."
             exit 1
           fi
 
