@@ -16,7 +16,10 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from workers import fetch
+try:
+    from workers import fetch
+except ImportError:  # Local test environment
+    fetch = None
 
 from .free_movie_search import FreeOffer, MovieCandidate, RatingEvidence
 from .movie_gm_pipeline import ProviderBatch
