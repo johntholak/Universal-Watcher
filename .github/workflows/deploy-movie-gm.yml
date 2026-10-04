@@ -117,6 +117,22 @@ jobs:
         run: |
           set -euo pipefail
           BASE_URL="https://universal-watcher-api.johntholak.workers.dev"
+          STATUS="$(curl -fsS --retry 3 --retry-delay 1 "$BASE_URL/api/v1/system/status")"
+          python - "$STATUS" <<'PY'
+          import json,sys
+          data=json.loads(sys.argv[1])
+          assert data.get("state") == "production", data
+          assert data.get("execution") == "connected", data
+          print("Production API status: OK", data)
+          PY
+          HTML="$(curl -fsS --retry 3 --retry-delay 1 "$BASE_URL/")"
+          python - "$HTML" <<'PY'
+          import sys
+          html=sys.argv[1]
+          assert "<!DOCTYPE html>" in html or "<html" in html, "Production web shell did not return HTML"
+          assert "Universal Watcher" in html, "Production web shell is not Universal Watcher"
+          print("Production web shell: OK")
+          PY
           COOKIE_JAR="$(mktemp)"
           trap 'rm -f "$COOKIE_JAR" /tmp/movie-gm-csrf' EXIT
           SESSION_JSON="$(curl -fsS --retry 3 --retry-delay 1 -c "$COOKIE_JAR" -H "Origin: $BASE_URL" -H "Content-Type: application/json" -X POST "$BASE_URL/api/v1/session" --data "$(python -c 'import json,os; print(json.dumps({"access_secret":os.environ["ACCESS_SECRET"]}))')")"
