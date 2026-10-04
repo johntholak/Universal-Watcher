@@ -28,6 +28,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: movie-gm-deploy
 
       - name: Validate deployment inputs
         shell: bash
