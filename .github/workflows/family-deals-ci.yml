@@ -24,7 +24,11 @@ jobs:
           python -m pip install pytest
       - name: Run Family Deals and web tests
         run: |
-          python -m unittest modules/family-deals/tests/test_coverage.py modules/family-deals/tests/test_hours.py modules/family-deals/tests/test_strict_parser.py web/test_web_shell.py -v
+          python -m unittest web/test_web_shell.py -v
+          cd modules/family-deals
+          python -m unittest discover -s tests -p "test_*.py" -v
+          cd ../..
+          python -m unittest cloud/test_family_deals_v5.py cloud/test_run_family_deals_batch.py -v
           python -m unittest cloud/test_family_deals_v5.py cloud/test_run_family_deals_batch.py -v
       - uses: actions/setup-node@v6
         with:
