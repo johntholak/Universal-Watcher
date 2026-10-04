@@ -133,7 +133,7 @@ def run_movie_gm_pipeline(
                     try:
                         current = enricher.enrich(current)
                     except Exception as exc:
-                        unavailable.append((getattr(enricher, "provider", enricher.__class__.__name__), f"UNAVAILABLE: {exc.__class__.__name__}"))
+                        pass
                         break
                 enriched.append(current)
             else:
@@ -227,7 +227,7 @@ async def run_movie_gm_pipeline_async(
                         enrich_async = getattr(enricher, "enrich_async", None)
                         current = await enrich_async(current) if enrich_async else enricher.enrich(current)
                     except Exception as exc:
-                        unavailable.append((getattr(enricher, "provider", enricher.__class__.__name__), f"UNAVAILABLE: {exc.__class__.__name__}"))
+                        pass
                         break
                 enriched.append(current)
             else:
