@@ -51,6 +51,17 @@ test("dispatch sends only a work signal and respects cooldown and daily reservat
   assert.equal(requests.length, 2);
 });
 
+test("current GitHub API 200 dispatch response is accepted", async (t) => {
+  const { sqlite, env } = environment();
+  t.after(() => sqlite.close());
+  const oldFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return { status: 200, text: async () => '{"workflow_run_id":123}' }; };
+  t.after(() => { globalThis.fetch = oldFetch; });
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "signaled");
+  assert.equal(calls, 1);
+});
+
 test("disabled dispatch never contacts GitHub; failed dispatch stays queued with conservative reservation", async (t) => {
   const { sqlite, env } = environment();
   t.after(() => sqlite.close());
@@ -61,7 +72,7 @@ test("disabled dispatch never contacts GitHub; failed dispatch stays queued with
   env.DISPATCH_ENABLED = "false";
   assert.equal(await dispatchPending(env), "not_connected");
   env.DISPATCH_ENABLED = "true";
-  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "deferred");
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "dispatch_error");
   assert.equal(calls, 1);
   assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id='j'").get().status, "QUEUED");
   assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 1);
