@@ -414,7 +414,12 @@ export default {
     }
     const match = /^\/api\/v1\/searches\/([0-9a-f-]{36})$/.exec(path);
     if (request.method === "GET" && match) {
-      let row; try { row = await env.DB.prepare("SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at FROM searches WHERE id=? AND user_id=?").bind(match[1], identity.user_id).first(); }
+      let row; try {
+        row = await env.DB.prepare(`SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at,
+          (SELECT status FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS job_status,
+          (SELECT attempt_number FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS attempt_number
+          FROM searches WHERE id=? AND user_id=?`).bind(match[1], identity.user_id).first();
+      }
       catch { return json({ error: "Storage temporarily unavailable" }, 503); }
       if (!row) return json({ error: "Search not found" }, 404);
       return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
