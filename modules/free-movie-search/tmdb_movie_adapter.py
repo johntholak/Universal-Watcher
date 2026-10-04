@@ -79,9 +79,17 @@ class TMDBMovieAdapter:
 
     def _discover_params(self, *, mode: str = "") -> dict[str, str | int]:
         params: dict[str, str | int] = {"include_adult": "false", "include_video": "false", "language": self.config.language, "region": self.config.region, "watch_region": self.config.region, "with_watch_monetization_types": "free|ads|flatrate", "sort_by": "popularity.desc", "page": 1}
-        if mode.casefold().strip() == "kids":
+        normalized_mode = mode.casefold().strip()
+        if normalized_mode == "kids":
             params["certification_country"] = self.config.region
             params["certification.lte"] = "PG"
+        elif normalized_mode == "hidden_gems":
+            # Start with well-reviewed, less-established titles instead of the
+            # same high-popularity catalog used by Everyone/Tonight. IMDb vote
+            # volume is applied later after OMDb enrichment, so TMDB filters
+            # only establish a useful discovery pool here.
+            params["sort_by"] = "vote_average.desc"
+            params["vote_count.gte"] = 200
         return params
 
     def discover(self, *, query: str = "", as_of: str | None = None, mode: str = "") -> ProviderBatch:
