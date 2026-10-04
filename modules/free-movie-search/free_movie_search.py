@@ -183,6 +183,7 @@ def rank_movies(
     included_subscriptions: Sequence[str] = DEFAULT_INCLUDED_SUBSCRIPTIONS,
     include_optional_services: Sequence[str] = DEFAULT_OPTIONAL_SERVICES,
     include_optional_as_free: bool = False,
+    include_all_verified_subscriptions: bool = True,
     availability_weight: float = 0.10,
     taste_profile: TasteProfile | None = None,
     watch_history: Sequence[WatchRecord] = (),
@@ -199,11 +200,21 @@ def rank_movies(
 
         accessible = [
             o for o in movie.offers
-            if _offer_accessible(
-                o,
-                included_subscriptions=included_subscriptions,
-                include_optional_services=include_optional_services,
-                include_optional_as_free=include_optional_as_free,
+            if o.verified and (
+                o.access.casefold() in {"free", "free_ads"}
+                or (
+                    include_all_verified_subscriptions
+                    and o.access.casefold() in {"subscription", "included_subscription", "paid_subscription"}
+                )
+                or (
+                    not include_all_verified_subscriptions
+                    and _offer_accessible(
+                        o,
+                        included_subscriptions=included_subscriptions,
+                        include_optional_services=include_optional_services,
+                        include_optional_as_free=include_optional_as_free,
+                    )
+                )
             )
         ]
         if not accessible:
