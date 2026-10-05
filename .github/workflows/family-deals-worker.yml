@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
 
+# One-time production recovery run.
+
 concurrency:
   group: family-deals-worker-${{ github.run_id }}
   cancel-in-progress: false
