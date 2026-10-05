@@ -441,3 +441,5 @@ export default {
 };
 
 // Production source branch retains the full Movie GM API surface.
+
+// Scheduled batch can claim prior free-capacity delays directly.
