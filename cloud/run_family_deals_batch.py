@@ -99,14 +99,15 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
         try:
             snapshot = await asyncio.wait_for(run_v5_page(page, base_url, job["criteria"]), timeout=600)
             result = normalize_v5_snapshot(snapshot, job["criteria"], job["id"])
-        except Exception:
+        except Exception as exc:
             if lost.is_set():
                 raise RuntimeError("Job lease was lost; failure will not be submitted")
-            await asyncio.to_thread(
+            response = await asyncio.to_thread(
                 api.post,
-                f"/api/v1/internal/jobs/{job['id']}/failure",
+                f"/api/v1/internal/jobs/{job["id"]}/failure",
                 {"claim_id": job["claim_id"], "category": "execution"},
             )
+            print(f"Family Deals job {job["id"]} execution error: {type(exc).__name__}; failure response={response}")
             return {"outcome": "ERROR", "candidate_count": 0}
         if lost.is_set():
             raise RuntimeError("Job lease was lost; result will not be submitted")
@@ -121,7 +122,7 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
             )
         if lost.is_set():
             raise RuntimeError("Job lease was lost; result will not be submitted")
-        await asyncio.to_thread(
+        response = await asyncio.to_thread(
             api.post,
             path + "/complete",
             {
@@ -131,6 +132,7 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
                 "coverage": result["coverage"],
             },
         )
+        print(f"Family Deals job {job["id"]} completed: outcome={result["outcome"]}; candidates={len(result["results"])}; completion response={response}")
         return {"outcome": result["outcome"], "candidate_count": len(result["results"])}
     finally:
         stopped.set()
