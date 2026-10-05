@@ -91,7 +91,7 @@ export async function dispatchPending(env, at = new Date()) {
     reserved = await env.DB.prepare(`UPDATE dispatch_gate SET
         utc_day=?, runs_today=CASE WHEN utc_day=? THEN runs_today+1 ELSE 1 END,
         next_allowed_at=?, updated_at=?
-      WHERE id=1 AND (utc_day<>? OR runs_today<?)`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, stamp, day, limit).run();
+      WHERE id=1 AND (utc_day<>? OR runs_today<?)`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, day, limit).run();
   } catch (error) {
     console.error("Family Deals dispatch gate reservation failed", error instanceof Error ? error.message : "unknown error");
     return "dispatch_db_gate";
