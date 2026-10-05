@@ -81,7 +81,7 @@ test("disabled dispatch never contacts GitHub; failed dispatch stays queued with
   env.DISPATCH_ENABLED = "false";
   assert.equal(await dispatchPending(env), "not_connected");
   env.DISPATCH_ENABLED = "true";
-  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "dispatch_error");
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "dispatch_network");
   assert.equal(calls, 1);
   assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id='j'").get().status, "QUEUED");
   assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 1);
