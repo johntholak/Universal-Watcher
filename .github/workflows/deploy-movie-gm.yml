@@ -2,6 +2,9 @@ name: Deploy Movie GM production
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -12,6 +15,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Deploy Family Deals production'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
