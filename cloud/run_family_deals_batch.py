@@ -60,8 +60,23 @@ class WorkerAPI:
             with urlopen(request, timeout=30) as response:
                 return json.load(response)
         except HTTPError as exc:
-            # Never print headers, request bodies, criteria or credentials.
-            raise RuntimeError(f"Worker API rejected {path.rsplit('/', 1)[-1]} with HTTP {exc.code}") from None
+            # Print only non-sensitive edge diagnostics. Never print headers that can
+            # contain credentials, request bodies, criteria or the Authorization value.
+            body = ""
+            try:
+                body = exc.read().decode("utf-8", errors="replace").strip()
+            except Exception:
+                pass
+            response_headers = getattr(exc, "headers", None)
+            server = response_headers.get("Server", "") if response_headers else ""
+            cf_ray = response_headers.get("CF-Ray", "") if response_headers else ""
+            content_type = response_headers.get("Content-Type", "") if response_headers else ""
+            detail = f"; server={server}; cf_ray={cf_ray}; content_type={content_type}"
+            if body:
+                detail += f"; body={body[:500]}"
+            raise RuntimeError(
+                f"Worker API rejected {path.rsplit('/', 1)[-1]} with HTTP {exc.code}{detail}"
+            ) from None
         except URLError:
             raise RuntimeError("Worker API temporarily unreachable") from None
 
