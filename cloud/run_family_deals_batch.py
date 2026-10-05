@@ -53,9 +53,21 @@ class WorkerAPI:
         self.secret = secret
 
     def post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        request = Request(self.base + path, data=json.dumps(payload).encode("utf-8"),
-                          headers={"Authorization": "Bearer " + self.secret,
-                                   "Content-Type": "application/json"}, method="POST")
+        request = Request(
+            self.base + path,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": "Bearer " + self.secret,
+                "Content-Type": "application/json",
+                # Cloudflare Browser Integrity Check can reject the default
+                # Python/urllib signature with HTTP 403 / error 1010.
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+            method="POST",
+        )
         try:
             with urlopen(request, timeout=30) as response:
                 return json.load(response)
