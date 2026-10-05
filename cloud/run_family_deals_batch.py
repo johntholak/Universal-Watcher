@@ -59,12 +59,9 @@ class WorkerAPI:
             headers={
                 "Authorization": "Bearer " + self.secret,
                 "Content-Type": "application/json",
-                # Cloudflare Browser Integrity Check can reject the default
-                # Python/urllib signature with HTTP 403 / error 1010.
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                              "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
-                "Accept": "application/json, text/plain, */*",
+                "Accept": "application/json",
                 "Accept-Language": "en-US,en;q=0.9",
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
             },
             method="POST",
         )
@@ -72,22 +69,9 @@ class WorkerAPI:
             with urlopen(request, timeout=30) as response:
                 return json.load(response)
         except HTTPError as exc:
-            # Print only non-sensitive edge diagnostics. Never print headers that can
-            # contain credentials, request bodies, criteria or the Authorization value.
-            body = ""
-            try:
-                body = exc.read().decode("utf-8", errors="replace").strip()
-            except Exception:
-                pass
-            response_headers = getattr(exc, "headers", None)
-            server = response_headers.get("Server", "") if response_headers else ""
-            cf_ray = response_headers.get("CF-Ray", "") if response_headers else ""
-            content_type = response_headers.get("Content-Type", "") if response_headers else ""
-            detail = f"; server={server}; cf_ray={cf_ray}; content_type={content_type}"
-            if body:
-                detail += f"; body={body[:500]}"
+            # Never print headers, request bodies, criteria or credentials.
             raise RuntimeError(
-                f"Worker API rejected {path.rsplit('/', 1)[-1]} with HTTP {exc.code}{detail}"
+                f"Worker API rejected {path.rsplit('/', 1)[-1]} with HTTP {exc.code}"
             ) from None
         except URLError:
             raise RuntimeError("Worker API temporarily unreachable") from None
@@ -118,8 +102,11 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
         except Exception:
             if lost.is_set():
                 raise RuntimeError("Job lease was lost; failure will not be submitted")
-            await asyncio.to_thread(api.post, f"/api/v1/internal/jobs/{job['id']}/failure",
-                                    {"claim_id": job["claim_id"], "category": "execution"})
+            await asyncio.to_thread(
+                api.post,
+                f"/api/v1/internal/jobs/{job['id']}/failure",
+                {"claim_id": job["claim_id"], "category": "execution"},
+            )
             return {"outcome": "ERROR", "candidate_count": 0}
         if lost.is_set():
             raise RuntimeError("Job lease was lost; result will not be submitted")
@@ -127,13 +114,23 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
         for offset in range(0, len(result["results"]), 5):
             if lost.is_set():
                 raise RuntimeError("Job lease was lost; result will not be submitted")
-            await asyncio.to_thread(api.post, path + "/results",
-                                    {"claim_id": job["claim_id"], "items": result["results"][offset:offset + 5]})
+            await asyncio.to_thread(
+                api.post,
+                path + "/results",
+                {"claim_id": job["claim_id"], "items": result["results"][offset:offset + 5]},
+            )
         if lost.is_set():
             raise RuntimeError("Job lease was lost; result will not be submitted")
-        await asyncio.to_thread(api.post, path + "/complete",
-                                {"claim_id": job["claim_id"], "outcome": result["outcome"],
-                                 "summary": result["summary"], "coverage": result["coverage"]})
+        await asyncio.to_thread(
+            api.post,
+            path + "/complete",
+            {
+                "claim_id": job["claim_id"],
+                "outcome": result["outcome"],
+                "summary": result["summary"],
+                "coverage": result["coverage"],
+            },
+        )
         return {"outcome": result["outcome"], "candidate_count": len(result["results"])}
     finally:
         stopped.set()
@@ -143,8 +140,11 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
 async def run_batch(api: WorkerAPI) -> int:
     from playwright.async_api import async_playwright
 
-    pending = await asyncio.to_thread(api.post, "/api/v1/internal/jobs/claim",
-                                      {"module": "family-deals", "limit": 1})
+    pending = await asyncio.to_thread(
+        api.post,
+        "/api/v1/internal/jobs/claim",
+        {"module": "family-deals", "limit": 1},
+    )
     if not pending.get("jobs"):
         return 0
     handled = 0
@@ -164,8 +164,11 @@ async def run_batch(api: WorkerAPI) -> int:
                         handled += 1
                     finally:
                         await page.close()
-                    pending = await asyncio.to_thread(api.post, "/api/v1/internal/jobs/claim",
-                                                      {"module": "family-deals", "limit": 1})
+                    pending = await asyncio.to_thread(
+                        api.post,
+                        "/api/v1/internal/jobs/claim",
+                        {"module": "family-deals", "limit": 1},
+                    )
             finally:
                 await browser.close()
     return handled
