@@ -12,6 +12,7 @@ permissions:
   contents: read
 
 # One-time production recovery run.
+# Force a production recovery batch after the Family Deals deploy.
 
 concurrency:
   group: family-deals-worker-${{ github.run_id }}
