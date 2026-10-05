@@ -251,7 +251,10 @@ export default {
           const retry = input.category === "execution" && job.attempt_number < 3;
           const outcome = input.category === "provider" ? "UNAVAILABLE" : "ERROR";
           const summary = input.category === "provider" ? "Provider unavailable; no match claim made." : "Execution stopped before verification completed.";
-          const due = new Date(Date.now() + job.attempt_number * 30 * 60 * 1000).toISOString();
+          // Interactive Searches retry immediately. Saved Watches retain bounded backoff.
+          const due = job.search_id
+            ? stamp
+            : new Date(Date.now() + job.attempt_number * 30 * 60 * 1000).toISOString();
           const state = retry ? "RETRYABLE" : "FAILED";
           const statements = [env.DB.prepare(`UPDATE jobs SET status=?,due_at=?,delay_reason=?,claim_id=NULL,lease_expires_at=NULL,updated_at=?
             WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=?`)
@@ -450,11 +453,36 @@ export default {
       let row; try {
         row = await env.DB.prepare(`SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at,
           (SELECT status FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS job_status,
-          (SELECT attempt_number FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS attempt_number
+          (SELECT attempt_number FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS attempt_number,
+          (SELECT due_at FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS due_at,
+          (SELECT delay_reason FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS delay_reason
           FROM searches WHERE id=? AND user_id=?`).bind(match[1], identity.user_id).first();
       }
       catch { return json({ error: "Storage temporarily unavailable" }, 503); }
       if (!row) return json({ error: "Search not found" }, 404);
+
+      // A delayed interactive Search is allowed to retry as soon as its bounded
+      // execution retry is due. Do not make the user wait for the 15-minute Cron.
+      if (row.status === "DELAYED" && row.due_at && Date.parse(row.due_at) <= Date.now()) {
+        const stamp = now();
+        try {
+          await env.DB.batch([
+            env.DB.prepare(`UPDATE jobs SET status='QUEUED',delay_reason=NULL,claim_id=NULL,lease_expires_at=NULL,updated_at=?
+              WHERE search_id=? AND user_id=? AND status='DELAYED' AND due_at<=?`).bind(stamp, match[1], identity.user_id, stamp),
+            env.DB.prepare(`UPDATE searches SET status='QUEUED',updated_at=? WHERE id=? AND user_id=? AND status='DELAYED'`)
+              .bind(stamp, match[1], identity.user_id),
+          ]);
+          await dispatchPending(env);
+          row = await env.DB.prepare(`SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at,
+            (SELECT status FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS job_status,
+            (SELECT attempt_number FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS attempt_number,
+            (SELECT due_at FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS due_at,
+            (SELECT delay_reason FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS delay_reason
+            FROM searches WHERE id=? AND user_id=?`).bind(match[1], identity.user_id).first();
+        } catch (error) {
+          console.error("Family Deals delayed Search retry failed", error instanceof Error ? error.message : "unknown error");
+        }
+      }
       return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
     }
     if (request.method === "POST" && path === "/api/v1/watches") {
