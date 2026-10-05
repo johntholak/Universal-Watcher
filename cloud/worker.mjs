@@ -49,7 +49,7 @@ async function bodyObject(request, maxBytes = MAX_BODY_BYTES) {
 export default {
   async scheduled(_controller, env) {
     if (!requireConfig(env)) return;
-    try { await expireExhaustedJobs(env); await restoreFreeCapacity(env); await queueDueWatches(env); await dispatchPending(env); } catch { /* Next tick retries queued work. */ }
+    try { await expireExhaustedJobs(env); await restoreFreeCapacity(env); await queueDueWatches(env); } catch { /* Next tick retries queued work. */ }
   },
   async fetch(request, env) {
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
@@ -269,7 +269,7 @@ export default {
         console.error("Family Deals dispatch failed", error instanceof Error ? error.message : "unknown error");
         dispatch = "dispatch_error";
       }
-      if (dispatch === "dispatch_error" || dispatch === "not_configured") {
+      if (dispatch === "dispatch_error") {
         const reason = dispatch === "not_configured" ? "worker_dispatch_not_configured" : "worker_dispatch_error";
         try {
           await env.DB.batch([
