@@ -2,6 +2,9 @@ name: Family Deals batch worker
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -12,6 +15,7 @@ concurrency:
 
 jobs:
   batch:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Run Family Deals batch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
