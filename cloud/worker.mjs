@@ -46,6 +46,31 @@ async function bodyObject(request, maxBytes = MAX_BODY_BYTES) {
   return object;
 }
 
+function movieViewerPayload(input) {
+  const viewerId = typeof input.viewer_id === "string" ? input.viewer_id.trim() : "";
+  const displayName = typeof input.display_name === "string" ? input.display_name.trim() : "";
+  if (!viewerId || viewerId.length > 80 || !displayName || displayName.length > 120) throw new Error("Viewer requires an ID and display name");
+  const weight = Number(input.weight ?? 1);
+  if (!Number.isFinite(weight) || weight < 0 || weight > 10) throw new Error("Viewer weight must be between 0 and 10");
+  const list = (value, max, label) => {
+    if (value == null) return [];
+    if (!Array.isArray(value) || value.length > max) throw new Error(label + " must be a list");
+    const values = [...new Set(value.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean))];
+    if (values.some((item) => item.length > 80)) throw new Error(label + " contains an item that is too long");
+    return values;
+  };
+  const preferredGenres = list(input.preferred_genres, 20, "Preferred genres");
+  const dislikedGenres = list(input.disliked_genres, 20, "Disliked genres");
+  const preferredKeywords = list(input.preferred_keywords, 20, "Preferred keywords");
+  const dislikedKeywords = list(input.disliked_keywords, 20, "Disliked keywords");
+  const runtimeMin = input.preferred_runtime_min == null || input.preferred_runtime_min === "" ? null : Number(input.preferred_runtime_min);
+  const runtimeMax = input.preferred_runtime_max == null || input.preferred_runtime_max === "" ? null : Number(input.preferred_runtime_max);
+  if ((runtimeMin != null && (!Number.isInteger(runtimeMin) || runtimeMin < 1 || runtimeMin > 600)) ||
+      (runtimeMax != null && (!Number.isInteger(runtimeMax) || runtimeMax < 1 || runtimeMax > 600))) throw new Error("Preferred runtime must be between 1 and 600 minutes");
+  if (runtimeMin != null && runtimeMax != null && runtimeMin > runtimeMax) throw new Error("Preferred runtime minimum cannot exceed maximum");
+  return { viewerId, displayName, weight, preferredGenres, dislikedGenres, preferredKeywords, dislikedKeywords, runtimeMin, runtimeMax };
+}
+
 export default {
   async scheduled(_controller, env) {
     if (!requireConfig(env)) return;
@@ -55,8 +80,19 @@ export default {
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
     const url = new URL(request.url);
     const path = url.pathname;
-    if (!path.startsWith("/api/v1/")) return json({ error: "Not found" }, 404);
-    if (request.method === "GET" && path === "/api/v1/system/status") return json({ state: "preview", execution: "not_connected" });
+    const legacyMovieSearch = path === "/api/movies/search";
+    if (!path.startsWith("/api/v1/") && !legacyMovieSearch) {
+      if (request.method === "GET" && env.ASSETS) {
+        const asset = await env.ASSETS.fetch(request);
+        const headers = new Headers(asset.headers);
+        if (path === "/" || path.endsWith(".html") || path.endsWith(".js") || path.endsWith(".css")) {
+          headers.set("Cache-Control", "no-store");
+        }
+        return new Response(asset.body, { status: asset.status, statusText: asset.statusText, headers });
+      }
+      return json({ error: "Not found" }, 404);
+    }
+    if (request.method === "GET" && path === "/api/v1/system/status") return json({ state: "production", execution: env.DISPATCH_ENABLED === "true" && typeof env.GITHUB_DISPATCH_TOKEN === "string" && env.GITHUB_DISPATCH_TOKEN.length >= 20 ? "connected" : "not_connected" });
 
     if (request.method === "POST" && path === "/api/v1/session") {
       if (!sameOrigin(request)) return json({ error: "Invalid origin" }, 403);
@@ -66,8 +102,7 @@ export default {
       const value = encode(new TextEncoder().encode(JSON.stringify({ user_id: "private-beta", exp: expires, nonce: crypto.randomUUID() })));
       const token = `${value}.${encode(await hmac(env.SESSION_KEY, value))}`;
       const stamp = now();
-      try { await env.DB.prepare("INSERT OR IGNORE INTO users(id,created_at) VALUES (?,?)").bind("private-beta", stamp).run(); }
-      catch { return json({ error: "Storage temporarily unavailable" }, 503); }
+      try { await env.DB.prepare("INSERT OR IGNORE INTO users(id,created_at) VALUES (?,?)").bind("private-beta", stamp).run(); } catch { /* Demo session remains usable for read-only Movie GM searches. */ }
       return json({ authenticated: true, csrf_token: await csrf(env, token) }, 200, { "Set-Cookie": `${COOKIE}=${token}; Path=/; Max-Age=${SESSION_SECONDS}; HttpOnly; Secure; SameSite=Strict` });
     }
 
@@ -216,7 +251,10 @@ export default {
           const retry = input.category === "execution" && job.attempt_number < 3;
           const outcome = input.category === "provider" ? "UNAVAILABLE" : "ERROR";
           const summary = input.category === "provider" ? "Provider unavailable; no match claim made." : "Execution stopped before verification completed.";
-          const due = new Date(Date.now() + job.attempt_number * 30 * 60 * 1000).toISOString();
+          // Interactive Searches retry immediately. Saved Watches retain bounded backoff.
+          const due = job.search_id
+            ? stamp
+            : new Date(Date.now() + job.attempt_number * 30 * 60 * 1000).toISOString();
           const state = retry ? "RETRYABLE" : "FAILED";
           const statements = [env.DB.prepare(`UPDATE jobs SET status=?,due_at=?,delay_reason=?,claim_id=NULL,lease_expires_at=NULL,updated_at=?
             WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=?`)
@@ -248,9 +286,124 @@ export default {
     }
 
     const identity = await session(request, env);
+    if (!identity && request.method === "GET" && path === "/api/v1/session") {
+      const expires = Date.now() + SESSION_SECONDS * 1000;
+      const value = encode(new TextEncoder().encode(JSON.stringify({ user_id: "private-beta", exp: expires, nonce: crypto.randomUUID() })));
+      const token = value + "." + encode(await hmac(env.SESSION_KEY, value));
+      const stamp = now();
+      try { await env.DB.prepare("INSERT OR IGNORE INTO users(id,created_at) VALUES (?,?)").bind("private-beta", stamp).run(); }
+      catch { return json({ error: "Storage temporarily unavailable" }, 503); }
+      return json({ authenticated: true, csrf_token: await csrf(env, token) }, 200, { "Set-Cookie": COOKIE + "=" + token + "; Path=/; Max-Age=" + SESSION_SECONDS + "; HttpOnly; Secure; SameSite=Strict" });
+    }
     if (!identity) return json({ error: "Authentication required" }, 401);
     if (request.method === "GET" && path === "/api/v1/session") return json({ authenticated: true, csrf_token: await csrf(env, identity.token) });
     if (request.method !== "GET" && (!sameOrigin(request) || !equal(request.headers.get("X-CSRF-Token") || "", await csrf(env, identity.token)))) return json({ error: "Invalid request token or origin" }, 403);
+
+    if ((path === "/api/v1/movies/search" || path === "/api/movies/search") && request.method === "GET") {
+      if (!env.MOVIE_GM) return json({ error: "Movie GM service is not connected" }, 503);
+      const mode = url.searchParams.get("mode") || "everyone";
+      const query = (url.searchParams.get("query") || "").trim();
+      if (!["everyone", "kids", "tonight"].includes(mode)) return json({ error: "Unsupported Movie GM mode" }, 400);
+      if (query.length > 200) return json({ error: "Query is too long" }, 400);
+      try {
+        const downstream = await env.MOVIE_GM.fetch(new Request("https://movie-gm.internal/internal/movie-gm/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: identity.user_id, mode, query }),
+        }));
+        const payload = await downstream.json();
+        return json(payload, downstream.status);
+      } catch {
+        return json({ error: "Movie GM service is temporarily unavailable" }, 503);
+      }
+    }
+
+    if (path === "/api/v1/movies/viewers") {
+      if (request.method === "GET") {
+        try {
+          const rows = await env.DB.prepare(`SELECT viewer_id,display_name,weight,preferred_genres_json,disliked_genres_json,preferred_keywords_json,disliked_keywords_json,preferred_runtime_min,preferred_runtime_max,created_at,updated_at
+            FROM movie_viewers WHERE user_id=? ORDER BY created_at,viewer_id`).bind(identity.user_id).all();
+          return json({ viewers: (rows.results || []).map((row) => ({
+            viewer_id: row.viewer_id, display_name: row.display_name, weight: Number(row.weight),
+            preferred_genres: JSON.parse(row.preferred_genres_json || "[]"),
+            disliked_genres: JSON.parse(row.disliked_genres_json || "[]"),
+            preferred_keywords: JSON.parse(row.preferred_keywords_json || "[]"),
+            disliked_keywords: JSON.parse(row.disliked_keywords_json || "[]"),
+            preferred_runtime_min: row.preferred_runtime_min, preferred_runtime_max: row.preferred_runtime_max,
+            created_at: row.created_at, updated_at: row.updated_at
+          })) });
+        } catch { return json({ error: "Movie GM household profiles unavailable" }, 503); }
+      }
+      if (request.method === "POST" || request.method === "PUT") {
+        let input; try { input = await bodyObject(request); } catch (error) { return json({ error: error.message || "Invalid request" }, 400); }
+        let viewer; try { viewer = movieViewerPayload(input); } catch (error) { return json({ error: error.message }, 400); }
+        const stamp = now();
+        try {
+          const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM movie_viewers WHERE user_id=?").bind(identity.user_id).first();
+          const exists = await env.DB.prepare("SELECT viewer_id,created_at FROM movie_viewers WHERE user_id=? AND viewer_id=?").bind(identity.user_id, viewer.viewerId).first();
+          if (!exists && Number(count?.total || 0) >= 8) return json({ error: "Movie GM supports up to 8 household profiles" }, 400);
+          await env.DB.prepare(`INSERT INTO movie_viewers
+            (viewer_id,user_id,display_name,weight,preferred_genres_json,disliked_genres_json,preferred_keywords_json,disliked_keywords_json,preferred_runtime_min,preferred_runtime_max,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(user_id,viewer_id) DO UPDATE SET display_name=excluded.display_name,weight=excluded.weight,
+              preferred_genres_json=excluded.preferred_genres_json,disliked_genres_json=excluded.disliked_genres_json,
+              preferred_keywords_json=excluded.preferred_keywords_json,disliked_keywords_json=excluded.disliked_keywords_json,
+              preferred_runtime_min=excluded.preferred_runtime_min,preferred_runtime_max=excluded.preferred_runtime_max,updated_at=excluded.updated_at`)
+            .bind(viewer.viewerId, identity.user_id, viewer.displayName, viewer.weight,
+              JSON.stringify(viewer.preferredGenres), JSON.stringify(viewer.dislikedGenres),
+              JSON.stringify(viewer.preferredKeywords), JSON.stringify(viewer.dislikedKeywords),
+              viewer.runtimeMin, viewer.runtimeMax, exists?.created_at || stamp, stamp).run();
+          return json({ saved: true, viewer: { viewer_id: viewer.viewerId, display_name: viewer.displayName, weight: viewer.weight,
+            preferred_genres: viewer.preferredGenres, disliked_genres: viewer.dislikedGenres,
+            preferred_keywords: viewer.preferredKeywords, disliked_keywords: viewer.dislikedKeywords,
+            preferred_runtime_min: viewer.runtimeMin, preferred_runtime_max: viewer.runtimeMax } }, exists ? 200 : 201);
+        } catch { return json({ error: "Movie GM household profile storage unavailable" }, 503); }
+      }
+    }
+    const viewerMatch = /^\/api\/v1\/movies\/viewers\/([^/]+)$/.exec(path);
+    if (viewerMatch && request.method === "DELETE") {
+      try {
+        const viewerId = decodeURIComponent(viewerMatch[1]);
+        const result = await env.DB.prepare("DELETE FROM movie_viewers WHERE user_id=? AND viewer_id=?").bind(identity.user_id, viewerId).run();
+        return result.meta?.changes ? json({ deleted: true }) : json({ error: "Viewer not found" }, 404);
+      } catch { return json({ error: "Movie GM household profile deletion unavailable" }, 503); }
+    }
+
+    if (path === "/api/v1/movies/feedback") {
+      if (request.method === "GET") {
+        try {
+          const rows = await env.DB.prepare("SELECT title,rating,watched,genres_json,created_at FROM movie_feedback WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 200").bind(identity.user_id).all();
+          const preferred = new Map(), disliked = new Map();
+          for (const row of rows.results || []) {
+            if (!["loved", "liked", "disliked"].includes(row.rating)) continue;
+            const target = row.rating === "disliked" ? disliked : preferred;
+            for (const genre of JSON.parse(row.genres_json || "[]")) target.set(genre, (target.get(genre) || 0) + 1);
+          }
+          const top = (map) => [...map.entries()].sort((a,b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0,8).map(([genre]) => genre);
+          const evidence = (rows.results || []).filter((row) => row.rating !== "fine").length;
+          return json({
+            evidence_count: evidence,
+            preferred_genres: top(preferred),
+            disliked_genres: top(disliked),
+            feedback: rows.results || []
+          });
+        } catch { return json({ error: "Movie GM feedback unavailable" }, 503); }
+      }
+      if (request.method === "POST") {
+        let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
+        const title = typeof input.title === "string" ? input.title.trim() : "";
+        const rating = typeof input.rating === "string" ? input.rating.casefold?.() || input.rating.toLowerCase() : "";
+        const genres = Array.isArray(input.genres) ? [...new Set(input.genres.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean))].slice(0,20) : [];
+        if (!title || title.length > 300 || !["loved","liked","fine","disliked"].includes(rating)) return json({ error: "Movie feedback requires a title and valid rating" }, 400);
+        if (JSON.stringify(genres).length > 2048) return json({ error: "Movie feedback genres are too large" }, 400);
+        const stamp = now();
+        try {
+          await env.DB.prepare("INSERT INTO movie_feedback(id,user_id,title_key,title,rating,watched,genres_json,created_at) VALUES (?,?,?,?,?,?,?,?)")
+            .bind(crypto.randomUUID(), identity.user_id, title.toLowerCase().replace(/\s+/g," ").trim(), title, rating, rating === "disliked" ? 0 : 1, JSON.stringify(genres), stamp).run();
+          return json({ saved: true, rating, title });
+        } catch { return json({ error: "Movie GM feedback storage unavailable" }, 503); }
+      }
+    }
 
     if (request.method === "POST" && path === "/api/v1/searches") {
       let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
@@ -269,12 +422,24 @@ export default {
         console.error("Family Deals dispatch failed", error instanceof Error ? error.message : "unknown error");
         dispatch = "dispatch_error";
       }
-      if (dispatch === "dispatch_error") {
-        const reason = dispatch === "not_configured" ? "worker_dispatch_not_configured" : "worker_dispatch_error";
+      if (dispatch.startsWith("dispatch_") || dispatch === "not_configured") {
+        const reason = dispatch === "not_configured" ? "worker_dispatch_not_configured" :
+          dispatch === "dispatch_unauthorized" ? "worker_dispatch_unauthorized" :
+          dispatch === "dispatch_forbidden" ? "worker_dispatch_forbidden" :
+          dispatch === "dispatch_not_found" ? "worker_dispatch_not_found" :
+          dispatch === "dispatch_invalid" ? "worker_dispatch_invalid" :
+          dispatch === "dispatch_network" ? "worker_dispatch_network" :
+          dispatch === "dispatch_db_pending" ? "worker_dispatch_db_pending" :
+          dispatch === "dispatch_db_gate" ? "worker_dispatch_db_gate" :
+          dispatch === "dispatch_db_gate_read" ? "worker_dispatch_db_gate_read" :
+          dispatch === "dispatch_db_delay" ? "worker_dispatch_db_delay" :
+          dispatch.startsWith("dispatch_http_") ? `worker_${dispatch}` : "worker_dispatch_error";
         try {
           await env.DB.batch([
-            env.DB.prepare("UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?,completed_at=? WHERE id=? AND user_id=? AND status='QUEUED'").bind(stamp, stamp, id, identity.user_id),
-            env.DB.prepare("UPDATE jobs SET status='FAILED',delay_reason=?,updated_at=? WHERE id=? AND user_id=? AND status='QUEUED'").bind(reason, stamp, jobId, identity.user_id),
+            env.DB.prepare("UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?,completed_at=? WHERE id=? AND user_id=? AND status='QUEUED'")
+              .bind(stamp, stamp, id, identity.user_id),
+            env.DB.prepare("UPDATE jobs SET status='FAILED',delay_reason=?,updated_at=? WHERE id=? AND user_id=? AND status='QUEUED'")
+              .bind(reason, stamp, jobId, identity.user_id),
           ]);
         } catch (error) {
           console.error("Family Deals dispatch failure could not be persisted", error instanceof Error ? error.message : "unknown error");
@@ -285,9 +450,39 @@ export default {
     }
     const match = /^\/api\/v1\/searches\/([0-9a-f-]{36})$/.exec(path);
     if (request.method === "GET" && match) {
-      let row; try { row = await env.DB.prepare("SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at FROM searches WHERE id=? AND user_id=?").bind(match[1], identity.user_id).first(); }
+      let row; try {
+        row = await env.DB.prepare(`SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at,
+          (SELECT status FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS job_status,
+          (SELECT attempt_number FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS attempt_number,
+          (SELECT due_at FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS due_at,
+          (SELECT delay_reason FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS delay_reason
+          FROM searches WHERE id=? AND user_id=?`).bind(match[1], identity.user_id).first();
+      }
       catch { return json({ error: "Storage temporarily unavailable" }, 503); }
       if (!row) return json({ error: "Search not found" }, 404);
+
+      // A delayed interactive Search is allowed to retry as soon as its bounded
+      // execution retry is due. Do not make the user wait for the 15-minute Cron.
+      if (row.status === "DELAYED" && row.due_at && Date.parse(row.due_at) <= Date.now()) {
+        const stamp = now();
+        try {
+          await env.DB.batch([
+            env.DB.prepare(`UPDATE jobs SET status='QUEUED',delay_reason=NULL,claim_id=NULL,lease_expires_at=NULL,updated_at=?
+              WHERE search_id=? AND user_id=? AND status='DELAYED' AND due_at<=?`).bind(stamp, match[1], identity.user_id, stamp),
+            env.DB.prepare(`UPDATE searches SET status='QUEUED',updated_at=? WHERE id=? AND user_id=? AND status='DELAYED'`)
+              .bind(stamp, match[1], identity.user_id),
+          ]);
+          await dispatchPending(env);
+          row = await env.DB.prepare(`SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at,
+            (SELECT status FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS job_status,
+            (SELECT attempt_number FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS attempt_number,
+            (SELECT due_at FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS due_at,
+            (SELECT delay_reason FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS delay_reason
+            FROM searches WHERE id=? AND user_id=?`).bind(match[1], identity.user_id).first();
+        } catch (error) {
+          console.error("Family Deals delayed Search retry failed", error instanceof Error ? error.message : "unknown error");
+        }
+      }
       return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
     }
     if (request.method === "POST" && path === "/api/v1/watches") {
@@ -436,6 +631,7 @@ export default {
         return json({ ...publicRow, details: details_json ? JSON.parse(details_json) : null, coverage: coverage_json ? JSON.parse(coverage_json) : null, evidence: evidence.results || [] });
       } catch { return json({ error: "Result query unavailable" }, 503); }
     }
+    if (env.ASSETS) return env.ASSETS.fetch(request);
     return json({ error: "Route not implemented" }, 404);
   },
 };
