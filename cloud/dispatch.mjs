@@ -90,13 +90,15 @@ export async function dispatchPending(env, at = new Date()) {
     reserved = await env.DB.prepare(`UPDATE dispatch_gate SET
         utc_day=?, runs_today=CASE WHEN utc_day=? THEN runs_today+1 ELSE 1 END,
         next_allowed_at=?, updated_at=?
-      WHERE id=1 AND next_allowed_at<=? AND (utc_day<>? OR runs_today<?)
-      RETURNING runs_today`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, stamp, day, limit).first();
+      WHERE id=1 AND next_allowed_at<=? AND (utc_day<>? OR runs_today<?)`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, stamp, day, limit).run();
   } catch (error) {
     console.error("Family Deals dispatch gate reservation failed", error instanceof Error ? error.message : "unknown error");
     return "dispatch_db_gate";
   }
-  if (!reserved) {
+  // D1 exposes affected-row count as meta.changes. The local Node SQLite
+  // adapter exposes changes directly, so accept either shape.
+  const reservedChanges = Number(reserved?.meta?.changes ?? reserved?.changes ?? 0);
+  if (reservedChanges !== 1) {
     let gate;
     try {
       gate = await env.DB.prepare("SELECT utc_day,runs_today FROM dispatch_gate WHERE id=1").bind().first();
