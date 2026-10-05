@@ -66,8 +66,9 @@ async function delayForFreeCapacity(env, at) {
 
 export async function dispatchPending(env, at = new Date()) {
   if (env.DISPATCH_ENABLED !== "true") return "not_connected";
-  const limit = Number(env.DISPATCH_DAILY_LIMIT);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100 || typeof env.GITHUB_DISPATCH_TOKEN !== "string" || env.GITHUB_DISPATCH_TOKEN.length < 20) return "not_configured";
+  const configuredLimit = Number(env.DISPATCH_DAILY_LIMIT);
+  const limit = Number.isInteger(configuredLimit) && configuredLimit >= 10 && configuredLimit <= 100 ? configuredLimit : 10;
+  if (typeof env.GITHUB_DISPATCH_TOKEN !== "string" || env.GITHUB_DISPATCH_TOKEN.length < 20) return "not_configured";
   const stamp = at.toISOString();
   const day = stamp.slice(0, 10);
   const pending = await env.DB.prepare(`SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
