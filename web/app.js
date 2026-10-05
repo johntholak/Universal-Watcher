@@ -163,8 +163,12 @@
       body = "The worker reported a failure. This is not a no-match result.";
       icon = "!";
     } else if (status === "DELAYED") {
-      heading = "Family Deals search is delayed";
-      body = "The free execution allowance is temporarily full. Universal Watcher will retry when capacity is available.";
+      heading = "Family Deals search is retrying";
+      body = search.delay_reason === "execution"
+        ? "The worker hit an execution error before verification completed. Universal Watcher will retry this one-time Search automatically."
+        : search.delay_reason === "free_capacity"
+          ? "The worker capacity limit was reached. Universal Watcher will retry this one-time Search automatically."
+          : "The Search is temporarily delayed and will retry automatically.";
     } else if (status === "RUNNING") {
       heading = "Family Deals search is running";
       body = "The cloud worker is actively checking restaurants and official sources. No Mac or local computer is required.";
@@ -192,7 +196,7 @@
         renderResults();
       }
       renderFamilySearchState(status, search, results);
-      if (!["COMPLETED", "FAILED", "DELAYED"].includes(status) && familyDealsState.pollCount < 240) {
+      if (!["COMPLETED", "FAILED"].includes(status) && familyDealsState.pollCount < 240) {
         familyDealsState.pollCount += 1;
         familyDealsState.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 5000);
       }
