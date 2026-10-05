@@ -189,3 +189,5 @@ if __name__ == "__main__":
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(1)
+
+# Recovery run: inspect the next claimed Family Deals job outcome.
