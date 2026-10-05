@@ -112,3 +112,5 @@ export async function dispatchPending(env, at = new Date()) {
 }
 
 // Scheduled Family Deals worker owns execution; dispatch is optional.
+
+// Recovery run: process the current Family Deals queue now.
