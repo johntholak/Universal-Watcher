@@ -16,7 +16,10 @@ function environment() {
   const DB = {
     prepare(sql) { return { bind(...args) { return { sql, args,
       async first() { return sqlite.prepare(sql).get(...args) || null; },
-      async run() { return sqlite.prepare(sql).run(...args); },
+      async run() {
+        const result = sqlite.prepare(sql).run(...args);
+        return { success: true, meta: { changes: Number(result.changes ?? 0) } };
+      },
     }; } }; },
     async batch(statements) {
       sqlite.exec("BEGIN");
