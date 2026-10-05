@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
 
+# Production deploy trigger for the synced Family Deals worker.
+
 concurrency:
   group: movie-gm-production
   cancel-in-progress: false
