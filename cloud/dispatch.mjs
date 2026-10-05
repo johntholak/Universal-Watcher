@@ -1,6 +1,8 @@
 // A fixed workflow and an atomic D1 gate keep dispatch bounded. No criteria leave D1.
 const WORKFLOW_URL = "https://api.github.com/repos/johntholak/Universal-Watcher/actions/workflows/family-deals-worker.yml/dispatches";
-// Searches dispatch immediately. The gate only prevents accidental rapid-fire dispatches.
+// Searches are interactive. The daily allowance gates recurring Watch execution,
+// while a one-time Search is dispatched immediately so the user is not told to
+// wait for background capacity after explicitly requesting a scan.
 const COOLDOWN_MS = 60 * 1000;
 
 export async function expireExhaustedJobs(env, stamp = new Date().toISOString()) {
@@ -33,11 +35,13 @@ export async function restoreFreeCapacity(env, at = new Date()) {
   if (env.DISPATCH_ENABLED !== "true") return;
   const stamp = at.toISOString();
   await env.DB.batch([
+    // A one-time Search should never remain parked behind the Watch allowance.
+    // Recurring Watch jobs retain the normal free-capacity delay until their due time.
     env.DB.prepare(`UPDATE jobs SET status='QUEUED',delay_reason=NULL,updated_at=?
-      WHERE status='DELAYED' AND delay_reason='free_capacity' AND due_at<=?
-        AND (watch_id IS NULL OR EXISTS (SELECT 1 FROM watches w WHERE w.id=watch_id
-          AND w.status IN ('ACTIVE','FOUND','DELAYED')))`)
-      .bind(stamp, stamp),
+      WHERE status='DELAYED' AND module='family-deals'
+        AND ((search_id IS NOT NULL) OR (delay_reason='free_capacity' AND due_at<=?))
+        AND (watch_id IS NULL OR search_id IS NOT NULL OR EXISTS (SELECT 1 FROM watches w WHERE w.id=watch_id
+          AND w.status IN ('ACTIVE','FOUND','DELAYED')))`).bind(stamp, stamp),
     env.DB.prepare(`UPDATE searches SET status='QUEUED',updated_at=? WHERE status='DELAYED'
       AND EXISTS (SELECT 1 FROM jobs j WHERE j.search_id=searches.id AND j.status='QUEUED')`).bind(stamp),
     env.DB.prepare(`UPDATE watches SET status='ACTIVE',updated_at=? WHERE status='DELAYED'
@@ -53,6 +57,7 @@ async function delayForFreeCapacity(env, at) {
         claim_id=NULL,lease_expires_at=NULL,updated_at=? WHERE module='family-deals'
       AND ((status IN ('QUEUED','RETRYABLE') AND due_at<=?)
         OR (status IN ('CLAIMED','RUNNING') AND lease_expires_at<?))
+      AND search_id IS NULL
       AND (watch_id IS NULL OR EXISTS (SELECT 1 FROM watches w WHERE w.id=watch_id
         AND w.status IN ('ACTIVE','FOUND')))`)
       .bind(reset, stamp, stamp, stamp),
@@ -73,7 +78,7 @@ export async function dispatchPending(env, at = new Date()) {
   const day = stamp.slice(0, 10);
   let pending;
   try {
-    pending = await env.DB.prepare(`SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
+    pending = await env.DB.prepare(`SELECT j.id,j.search_id,j.watch_id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
       WHERE j.module='family-deals' AND j.attempt_number<3 AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?)
         OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
         AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
@@ -84,39 +89,41 @@ export async function dispatchPending(env, at = new Date()) {
   }
   if (!pending) return "idle";
 
-  // Count the reservation before contacting GitHub. An ambiguous network failure
-  // must not let retries exceed the configured free-run allowance.
-  let reserved;
-  try {
-    reserved = await env.DB.prepare(`UPDATE dispatch_gate SET
-        utc_day=?, runs_today=CASE WHEN utc_day=? THEN runs_today+1 ELSE 1 END,
-        next_allowed_at=?, updated_at=?
-      WHERE id=1 AND (utc_day<>? OR runs_today<?)`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, day, limit).run();
-  } catch (error) {
-    console.error("Family Deals dispatch gate reservation failed", error instanceof Error ? error.message : "unknown error");
-    return "dispatch_db_gate";
-  }
-  // D1 exposes affected-row count as meta.changes. The local Node SQLite
-  // adapter exposes changes directly, so accept either shape.
-  const reservedChanges = Number(reserved?.meta?.changes ?? reserved?.changes ?? 0);
-  if (reservedChanges !== 1) {
-    let gate;
+  // Interactive one-time Searches are not subject to the recurring Watch
+  // allowance. The user explicitly requested this execution.
+  const interactiveSearch = pending.search_id !== null && pending.search_id !== undefined;
+
+  if (!interactiveSearch) {
+    let reserved;
     try {
-      gate = await env.DB.prepare("SELECT utc_day,runs_today FROM dispatch_gate WHERE id=1").bind().first();
+      reserved = await env.DB.prepare(`UPDATE dispatch_gate SET
+          utc_day=?, runs_today=CASE WHEN utc_day=? THEN runs_today+1 ELSE 1 END,
+          next_allowed_at=?, updated_at=?
+        WHERE id=1 AND (utc_day<>? OR runs_today<?)`).bind(day, day, new Date(at.getTime() + COOLDOWN_MS).toISOString(), stamp, day, limit).run();
     } catch (error) {
-      console.error("Family Deals dispatch gate read failed", error instanceof Error ? error.message : "unknown error");
-      return "dispatch_db_gate_read";
+      console.error("Family Deals dispatch gate reservation failed", error instanceof Error ? error.message : "unknown error");
+      return "dispatch_db_gate";
     }
-    if (gate?.utc_day === day && gate.runs_today >= limit) {
+    const reservedChanges = Number(reserved?.meta?.changes ?? reserved?.changes ?? 0);
+    if (reservedChanges !== 1) {
+      let gate;
       try {
-        await delayForFreeCapacity(env, at);
+        gate = await env.DB.prepare("SELECT utc_day,runs_today FROM dispatch_gate WHERE id=1").bind().first();
       } catch (error) {
-        console.error("Family Deals dispatch capacity delay failed", error instanceof Error ? error.message : "unknown error");
-        return "dispatch_db_delay";
+        console.error("Family Deals dispatch gate read failed", error instanceof Error ? error.message : "unknown error");
+        return "dispatch_db_gate_read";
       }
-      return "free_capacity";
+      if (gate?.utc_day === day && gate.runs_today >= limit) {
+        try {
+          await delayForFreeCapacity(env, at);
+        } catch (error) {
+          console.error("Family Deals dispatch capacity delay failed", error instanceof Error ? error.message : "unknown error");
+          return "dispatch_db_delay";
+        }
+        return "free_capacity";
+      }
+      return "deferred";
     }
-    return "deferred";
   }
 
   try {
