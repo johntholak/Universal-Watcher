@@ -33,10 +33,10 @@ export async function restoreFreeCapacity(env, at = new Date()) {
   const stamp = at.toISOString();
   await env.DB.batch([
     env.DB.prepare(`UPDATE jobs SET status='QUEUED',delay_reason=NULL,updated_at=?
-      WHERE status='DELAYED' AND delay_reason='free_capacity' AND due_at<=?
+      WHERE status='DELAYED' AND delay_reason='free_capacity'
         AND (watch_id IS NULL OR EXISTS (SELECT 1 FROM watches w WHERE w.id=watch_id
           AND w.status IN ('ACTIVE','FOUND','DELAYED')))`)
-      .bind(stamp, stamp),
+      .bind(stamp),
     env.DB.prepare(`UPDATE searches SET status='QUEUED',updated_at=? WHERE status='DELAYED'
       AND EXISTS (SELECT 1 FROM jobs j WHERE j.search_id=searches.id AND j.status='QUEUED')`).bind(stamp),
     env.DB.prepare(`UPDATE watches SET status='ACTIVE',updated_at=? WHERE status='DELAYED'
