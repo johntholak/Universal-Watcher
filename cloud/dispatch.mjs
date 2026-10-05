@@ -110,3 +110,5 @@ export async function dispatchPending(env, at = new Date()) {
     return "dispatch_error";
   }
 }
+
+// Scheduled Family Deals worker owns execution; dispatch is optional.
