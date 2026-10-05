@@ -121,7 +121,7 @@ export default {
             WHERE j.module=? AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
               OR (w.status='DELAYED' AND j.status IN ('RETRYABLE','CLAIMED','RUNNING')))
               AND j.attempt_number<3
-              AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?) OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
+              AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?) OR (j.status='DELAYED' AND j.delay_reason='free_capacity') OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
             ORDER BY j.due_at,j.id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, module, stamp, stamp, limit).all();
           const jobs = [];
           for (const row of claimed.results || []) {
