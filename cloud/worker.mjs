@@ -439,3 +439,5 @@ export default {
     return json({ error: "Route not implemented" }, 404);
   },
 };
+
+// Production source branch retains the full Movie GM API surface.
