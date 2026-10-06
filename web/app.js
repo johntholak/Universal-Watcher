@@ -473,9 +473,26 @@
   updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); movieApi.bootstrapPromise = bootstrapMovieApi(); movieApi.bootstrapPromise.then(() => {
     setFamilyBanner(movieApi.production);
     hydrateMovieGMSettings();
-    if (movieApi.production && familyDealsState.searchId) {
-      selectView("family-deals");
-      pollFamilySearch(familyDealsState.searchId);
+    if (movieApi.production) {
+      if (familyDealsState.searchId) {
+        selectView("family-deals");
+        pollFamilySearch(familyDealsState.searchId);
+      } else {
+        try {
+          const latestResponse = await movieApiFetch("/api/searches/latest?module=family-deals");
+          if (latestResponse.ok) {
+            const latest = await latestResponse.json();
+            if (latest?.id) {
+              familyDealsState.searchId = latest.id;
+              localStorage.setItem("uw.familyDeals.searchId", latest.id);
+              selectView("family-deals");
+              pollFamilySearch(latest.id);
+            }
+          }
+        } catch (_error) {
+          // No prior Search or a temporary status read failure. The new Search flow remains available.
+        }
+      }
     }
   });
   const initialView = new URLSearchParams(window.location.search).get("view"); if (initialView) selectView(initialView);
