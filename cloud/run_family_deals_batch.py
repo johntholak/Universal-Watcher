@@ -151,7 +151,7 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
                 "coverage": result["coverage"],
             },
         )
-        print(f"Family Deals job {job['id']} completed: outcome={result['outcome']}; candidates={len(result['results'])}; completion response={response}")
+        print(f"Family Deals job {job['id']} completed: outcome={result['outcome']}; candidates={len(result['results'])}; coverage={json.dumps(result['coverage'], separators=(',', ':'))}; completion response={response}")
         return {"outcome": result["outcome"], "candidate_count": len(result["results"])}
     finally:
         stopped.set()
