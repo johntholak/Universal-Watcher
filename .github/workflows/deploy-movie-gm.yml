@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: movie-gm-deploy
+          ref: ea737b6c1eca6aee4533eb9fa6fcc8f01641eeee
 
       - name: Validate deployment inputs
         shell: bash
