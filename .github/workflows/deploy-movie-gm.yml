@@ -10,6 +10,7 @@ permissions:
   contents: read
 
 # Production deploy trigger for the synced Family Deals worker.
+# Temporary pin for the verified Family Deals search-recovery deployment.
 
 concurrency:
   group: movie-gm-production
