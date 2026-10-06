@@ -947,6 +947,7 @@ def run_verification_job(job_id: str, payload: dict[str, Any]) -> None:
             "classReason": r.get("classReason", ""),
             "address": r.get("address", ""),
             "website": u,
+            "source_direct": bool(r.get("website")),
             "price": best.get("price"),
             "listed_price": best.get("listed_price"),
             "price_mode": best.get("price_mode", "package"),
