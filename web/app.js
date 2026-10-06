@@ -470,7 +470,7 @@
   byId("gm-viewer-form").addEventListener("submit", saveMovieGMViewer);
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); runFamilyDealsSearch(); });
-  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); movieApi.bootstrapPromise = bootstrapMovieApi(); movieApi.bootstrapPromise.then(() => {
+  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); movieApi.bootstrapPromise = bootstrapMovieApi(); movieApi.bootstrapPromise.then(async () => {
     setFamilyBanner(movieApi.production);
     hydrateMovieGMSettings();
     if (movieApi.production) {
