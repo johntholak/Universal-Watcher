@@ -10,7 +10,6 @@ permissions:
   contents: read
 
 # Production deploy trigger for the synced Family Deals worker.
-# Temporary pin for the verified Family Deals search-recovery deployment.
 
 concurrency:
   group: movie-gm-production
@@ -35,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ea737b6c1eca6aee4533eb9fa6fcc8f01641eeee
+          ref: movie-gm-deploy
 
       - name: Validate deployment inputs
         shell: bash
