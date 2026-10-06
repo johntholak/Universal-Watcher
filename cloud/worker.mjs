@@ -461,6 +461,22 @@ export default {
       }
       return json({ id, module: "family-deals", status: "QUEUED", dispatch, created_at: stamp }, 202);
     }
+    if (request.method === "GET" && path === "/api/v1/searches/latest") {
+      const module = url.searchParams.get("module") || "family-deals";
+      if (module !== "family-deals") return json({ error: "Search module is not available" }, 400);
+      try {
+        const row = await env.DB.prepare(`SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at,
+          (SELECT status FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS job_status,
+          (SELECT attempt_number FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS attempt_number,
+          (SELECT due_at FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS due_at,
+          (SELECT delay_reason FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS delay_reason
+          FROM searches WHERE module=? AND user_id=? ORDER BY created_at DESC,id DESC LIMIT 1`).bind(module, identity.user_id).first();
+        if (!row) return json({ error: "No Family Deals Search found" }, 404);
+        return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
+      } catch {
+        return json({ error: "Search query unavailable" }, 503);
+      }
+    }
     const match = /^\/api\/v1\/searches\/([0-9a-f-]{36})$/.exec(path);
     if (request.method === "GET" && match) {
       let row; try {
