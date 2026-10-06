@@ -73,6 +73,19 @@ export default {
 
     if (path.startsWith("/api/v1/internal/")) {
       if (!(await workerAuthorized(request, env))) return json({ error: "Worker authentication required" }, 401);
+      if (request.method === "GET" && path === "/api/v1/internal/jobs/state") {
+        try {
+          const counts = await env.DB.prepare(`SELECT status,delay_reason,count(*) AS count
+            FROM jobs WHERE module='family-deals' GROUP BY status,delay_reason ORDER BY status,delay_reason`).all();
+          const recent = await env.DB.prepare(`SELECT id,status,delay_reason,attempt_number,due_at,updated_at,search_id,watch_id
+            FROM jobs WHERE module='family-deals' ORDER BY updated_at DESC,id DESC LIMIT 10`).all();
+          const searches = await env.DB.prepare(`SELECT id,status,last_outcome,updated_at,completed_at
+            FROM searches WHERE module='family-deals' ORDER BY updated_at DESC,id DESC LIMIT 10`).all();
+          return json({ counts: counts.results || [], recent_jobs: recent.results || [], recent_searches: searches.results || [] });
+        } catch {
+          return json({ error: "Worker state unavailable" }, 503);
+        }
+      }
       if (request.method === "POST" && path === "/api/v1/internal/jobs/claim") {
         let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
         const limit = input.limit ?? 10;
