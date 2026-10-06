@@ -98,11 +98,14 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
         source = _https(record.get("source_url") or record.get("website"))
         restaurant_class = str(record.get("restaurantClass") or "unknown")
         direct_source = bool(record.get("source_direct"))
-        location_verified = direct_source and restaurant_class != "unknown"
-        if not location_verified:
-            name_tokens = [t for t in re.findall(r"[a-z0-9]+", name.lower()) if len(t) >= 3]
-            evidence_low = evidence.lower()
-            location_verified = len(name_tokens) >= 2 and all(t in evidence_low for t in name_tokens[:3])
+        name_tokens = [t for t in re.findall(r"[a-z0-9]+", name.lower()) if len(t) >= 3]
+        evidence_low = evidence.lower()
+        name_match = len(name_tokens) >= 2 and all(t in evidence_low for t in name_tokens[:3])
+        address_tokens = [t for t in re.findall(r"[a-z0-9]+", str(record.get("address") or "").lower()) if len(t) >= 3]
+        address_match = len(address_tokens) >= 2 and all(t in evidence_low for t in address_tokens[:3])
+        # An independent restaurant's own discovered website is location-specific enough.
+        # Chains and local groups still need the evidence itself to identify the location.
+        location_verified = (restaurant_class == "independent" and direct_source) or name_match or address_match
         if not evidence or record.get("price") is None or not record.get("capacity_verified"):
             omitted_candidates += 1
             continue
