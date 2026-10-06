@@ -52,6 +52,25 @@ class WorkerAPI:
         self.base = base.rstrip("/")
         self.secret = secret
 
+    def get(self, path: str) -> dict[str, Any]:
+        request = Request(
+            self.base + path,
+            headers={
+                "Authorization": "Bearer " + self.secret,
+                "Accept": "application/json",
+                "Accept-Language": "en-US,en;q=0.9",
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+            },
+            method="GET",
+        )
+        try:
+            with urlopen(request, timeout=30) as response:
+                return json.load(response)
+        except HTTPError as exc:
+            raise RuntimeError(f"Worker API rejected state check with HTTP {exc.code}") from None
+        except URLError:
+            raise RuntimeError("Worker API temporarily unreachable") from None
+
     def post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = Request(
             self.base + path,
@@ -142,6 +161,8 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
 async def run_batch(api: WorkerAPI) -> int:
     from playwright.async_api import async_playwright
 
+    state = await asyncio.to_thread(api.get, "/api/v1/internal/jobs/state")
+    print("Family Deals state:", json.dumps(state, separators=(",", ":")))
     pending = await asyncio.to_thread(
         api.post,
         "/api/v1/internal/jobs/claim",
