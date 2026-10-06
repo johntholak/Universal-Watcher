@@ -10,6 +10,7 @@ permissions:
   contents: read
 
 # Production deploy trigger for the synced Family Deals worker.
+# Family Deals production deploy trigger.
 
 concurrency:
   group: movie-gm-production
