@@ -458,3 +458,4 @@ export default {
 // Scheduled batch can claim prior free-capacity delays directly.
 // Production deployment trigger: Family Deals capacity recovery.
 // Deploy Family Deals production.
+// Protected state diagnostics are intentionally limited to aggregate job/search lifecycle data.
