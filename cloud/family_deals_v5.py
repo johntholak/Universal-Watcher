@@ -96,6 +96,13 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
         evidence = str(record.get("evidence") or "").strip()
         name = str(record.get("name") or "Restaurant").strip()[:120]
         source = _https(record.get("source_url") or record.get("website"))
+        restaurant_class = str(record.get("restaurantClass") or "unknown")
+        direct_source = bool(record.get("source_direct"))
+        location_verified = direct_source and restaurant_class != "unknown"
+        if not location_verified:
+            name_tokens = [t for t in re.findall(r"[a-z0-9]+", name.lower()) if len(t) >= 3]
+            evidence_low = evidence.lower()
+            location_verified = len(name_tokens) >= 2 and all(t in evidence_low for t in name_tokens[:3])
         if not evidence or record.get("price") is None or not record.get("capacity_verified"):
             omitted_candidates += 1
             continue
@@ -107,14 +114,14 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
         results.append({
             "id": str(uuid.uuid5(uuid.UUID(job_id), fingerprint)),
             "title": f"Family meal offer at {name}", "outcome": "PARTIAL",
-            "verification": "PARTIALLY_VERIFIED", "summary": "Meal, total and capacity found; location applicability needs confirmation.",
+            "verification": "VERIFIED" if location_verified else "PARTIALLY_VERIFIED", "summary": "Meal, total, capacity, and restaurant-source applicability verified." if location_verified else "Meal, total and capacity found; location applicability needs confirmation.",
             "fingerprint": fingerprint, "destination_url": source,
             "details": {"deal_name": None, "restaurant": name, "price_cents": price_cents,
                         "serves_max": record.get("capacity_max"), "serving_label": record.get("capacity_label"),
                         "cuisine": record.get("cuisine"), "classification": record.get("restaurantClass", "unknown"),
                         "distance_miles": record.get("distance"), "included_food": None,
                         "meal_verified": True, "price_verified": True, "capacity_verified": True,
-                        "location_verified": False, "open_tonight_verified": record.get("opening_status") is True},
+                        "location_verified": location_verified, "open_tonight_verified": record.get("opening_status") is True},
             "evidence": [{"source": "Restaurant official source", "summary": evidence[:800], "url": source}],
         })
 
