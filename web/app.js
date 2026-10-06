@@ -1,7 +1,7 @@
 (() => {
   const moduleLabels = { movies: "Seat Finder", "movie-gm": "Streaming GM", "family-deals": "Family Deals" };
   const state = { watches: [], results: [] };
-  const familyDealsState = { searchId: "", pollTimer: null, pollCount: 0 };
+  const familyDealsState = { searchId: localStorage.getItem("uw.familyDeals.searchId") || "", pollTimer: null, pollCount: 0 };
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
@@ -184,9 +184,17 @@
 
   async function pollFamilySearch(searchId) {
     if (familyDealsState.pollTimer) window.clearTimeout(familyDealsState.pollTimer);
+    familyDealsState.searchId = searchId;
+    localStorage.setItem("uw.familyDeals.searchId", searchId);
     try {
       const response = await movieApiFetch("/api/searches/" + encodeURIComponent(searchId));
-      if (!response.ok) throw new Error("Could not read Family Deals search status");
+      if (!response.ok) {
+        let detail = "";
+        try { const data = await response.json(); detail = data.error ? ": " + data.error : ""; } catch {}
+        if (response.status === 401) throw new Error("Your Universal Watcher session expired. Refresh the page to reconnect.");
+        if (response.status === 404) throw new Error("That Family Deals Search could not be found.");
+        throw new Error("Could not read Family Deals search status (" + response.status + ")" + detail);
+      }
       const search = await response.json();
       const status = search.status === "QUEUED" && ["CLAIMED", "RUNNING"].includes(search.job_status) ? "RUNNING" : (search.status || "QUEUED");
       let results = [];
@@ -196,18 +204,28 @@
         renderResults();
       }
       renderFamilySearchState(status, search, results);
+      if (["COMPLETED", "FAILED"].includes(status)) {
+        localStorage.removeItem("uw.familyDeals.searchId");
+        familyDealsState.searchId = "";
+      }
       if (!["COMPLETED", "FAILED"].includes(status) && familyDealsState.pollCount < 240) {
         familyDealsState.pollCount += 1;
         familyDealsState.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 5000);
       }
       if (status === "COMPLETED") showToast("Family Deals search finished.");
     } catch (error) {
-      renderFamilySearchState("QUEUED", { status: "QUEUED" }, []);
+      const message = error.message || "Family Deals status could not be read.";
+      const panel = byId("deal-preview-result");
+      if (panel) {
+        panel.hidden = false;
+        panel.innerHTML = '<div class="family-search-status"><div class="result-state-icon">!</div><div><p class="eyebrow">STATUS CHECK</p><h2>Family Deals status could not be read</h2><p>' + escapeHtml(message) + '</p><small>The Search ID is saved, so Universal Watcher will resume checking it after the connection is restored.</small></div></div>';
+        panel.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       if (familyDealsState.pollCount < 240) {
         familyDealsState.pollCount += 1;
         familyDealsState.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 7000);
       } else {
-        showToast(error.message || "Family Deals status could not be read.");
+        showToast(message);
       }
     }
   }
@@ -227,6 +245,7 @@
       if (!response.ok) throw new Error(data.error || "Family Deals search could not be queued");
       familyDealsState.searchId = data.id;
       familyDealsState.pollCount = 0;
+      localStorage.setItem("uw.familyDeals.searchId", data.id);
       renderFamilySearchState(data.status || "QUEUED", data, []);
       await pollFamilySearch(data.id);
     } catch (error) {
@@ -451,5 +470,13 @@
   byId("gm-viewer-form").addEventListener("submit", saveMovieGMViewer);
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); runFamilyDealsSearch(); });
-  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); movieApi.bootstrapPromise = bootstrapMovieApi(); movieApi.bootstrapPromise.then(() => { setFamilyBanner(movieApi.production); hydrateMovieGMSettings(); }); const initialView = new URLSearchParams(window.location.search).get("view"); if (initialView) selectView(initialView);
+  updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate(); movieApi.bootstrapPromise = bootstrapMovieApi(); movieApi.bootstrapPromise.then(() => {
+    setFamilyBanner(movieApi.production);
+    hydrateMovieGMSettings();
+    if (movieApi.production && familyDealsState.searchId) {
+      selectView("family-deals");
+      pollFamilySearch(familyDealsState.searchId);
+    }
+  });
+  const initialView = new URLSearchParams(window.location.search).get("view"); if (initialView) selectView(initialView);
 })();
