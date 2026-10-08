@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 # Production deploy trigger for the synced Family Deals worker.
-# Frontend cache version bumped on movie-gm-deploy for Family Deals recovery.
+# Verified-match outcome handling corrected on movie-gm-deploy.
 
 concurrency:
   group: movie-gm-production
