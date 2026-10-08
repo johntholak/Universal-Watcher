@@ -92,6 +92,9 @@ jobs:
           cp -R modules/free-movie-search cloud/free_movie_search
           touch cloud/free_movie_search/__init__.py
 
+      - name: Run Family Deals regression tests
+        run: python -m unittest cloud/test_family_deals_v5.py
+
       - name: Deploy Movie GM Python Worker
         run: npx --yes wrangler@4 deploy --config movie-gm-wrangler.toml
 
