@@ -135,7 +135,7 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
         })
 
     complete = checked == selected and not unavailable and not unresolved
-    state = "complete" if complete else "partial"
+    state = "complete" if complete and not partial_count and not omitted_candidates else "partial"
     coverage = {"state": state, "discovered": selected, "checked": checked,
                 "unavailable": unavailable, "unresolved": unresolved,
                 "verified_matches": verified_count, "partial_candidates": partial_count,
