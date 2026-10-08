@@ -70,7 +70,7 @@ def _https(url: Any) -> str | None:
 
 
 def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], job_id: str) -> dict[str, Any]:
-    """Keep V5 candidates distinct from a location-verified deal."""
+    """Keep V5 candidates distinct from location-verified deals."""
     job = snapshot.get("verification") or {}
     selected = max(0, int(snapshot.get("selected_restaurants") or 0))
     error = snapshot.get("error")
@@ -89,6 +89,8 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
 
     candidates = job.get("matches") or []
     results = []
+    verified_count = 0
+    partial_count = 0
     omitted_candidates = 0
     for record in candidates:
         # V5 confirms meal/price/capacity, but a generic official domain does not
@@ -114,6 +116,10 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
             omitted_candidates += 1
             continue
         fingerprint = hashlib.sha256(json.dumps([name, source, price_cents, record.get("capacity_label"), evidence], ensure_ascii=False).encode()).hexdigest()
+        if location_verified:
+            verified_count += 1
+        else:
+            partial_count += 1
         results.append({
             "id": str(uuid.uuid5(uuid.UUID(job_id), fingerprint)),
             "title": f"Family meal offer at {name}", "outcome": "MATCH" if location_verified else "PARTIAL",
@@ -129,12 +135,21 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
         })
 
     complete = checked == selected and not unavailable and not unresolved
-    state = "complete" if complete and not results and not omitted_candidates else "partial"
+    state = "complete" if complete else "partial"
     coverage = {"state": state, "discovered": selected, "checked": checked,
-                "unavailable": unavailable, "unresolved": unresolved}
-    if results or not complete or omitted_candidates:
+                "unavailable": unavailable, "unresolved": unresolved,
+                "verified_matches": verified_count, "partial_candidates": partial_count,
+                "omitted_candidates": omitted_candidates}
+    if verified_count:
+        if partial_count or not complete or omitted_candidates:
+            outcome = "PARTIAL"
+            summary = f"{verified_count} verified family deal(s) found; {partial_count} additional candidate(s) still need location confirmation."
+        else:
+            outcome = "MATCH"
+            summary = f"{verified_count} verified family deal(s) found."
+    elif partial_count or not complete or omitted_candidates:
         outcome = "PARTIAL"
-        summary = f"{len(results)} meal candidates need location confirmation; {checked} of {selected} restaurants checked; {omitted_candidates} candidates could not be carried forward."
+        summary = f"No fully verified family deals yet; {partial_count} candidate(s) still need location confirmation."
     else:
         outcome = "NO_MATCH"
         summary = f"No qualifying family meal found among {checked} checked restaurants."
