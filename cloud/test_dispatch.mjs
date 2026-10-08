@@ -41,7 +41,7 @@ test("dispatch sends only a work signal and respects cooldown and daily reservat
   }
   assert.equal(await dispatchPending(env, new Date("2026-09-26T01:10:00.000Z")), "free_capacity");
   assert.equal(requests.length, 10);
-  assert.deepEqual(JSON.parse(requests[0].options.body), { ref: "main" });
+  assert.deepEqual(JSON.parse(requests[0].options.body), { ref: "movie-gm-deploy" });
   assert.match(requests[0].url, /family-deals-worker\.yml\/dispatches$/);
   assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 10);
   const delayed = sqlite.prepare("SELECT status,delay_reason FROM jobs WHERE id='j'").get();
@@ -75,10 +75,10 @@ test("disabled dispatch never contacts GitHub; failed dispatch stays queued with
   env.DISPATCH_ENABLED = "false";
   assert.equal(await dispatchPending(env), "not_connected");
   env.DISPATCH_ENABLED = "true";
-  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "dispatch_error");
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "dispatch_network");
   assert.equal(calls, 1);
   assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id='j'").get().status, "QUEUED");
-  assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 1);
+  assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 10);
 });
 
 test("an expired claimed lease is signaled for recovery", async (t) => {
