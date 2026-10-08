@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 # Production deploy trigger for the synced Family Deals worker.
-# Verified-match outcome handling corrected on movie-gm-deploy.
+# Family Deals verified-match regression test added.
 
 concurrency:
   group: movie-gm-production
