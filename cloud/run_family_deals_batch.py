@@ -176,10 +176,8 @@ async def run_batch(api: WorkerAPI) -> int:
             browser = await playwright.chromium.launch(headless=True)
             try:
                 context = await browser.new_context()
-                for _ in range(10):
-                    jobs = pending.get("jobs") or []
-                    if not jobs:
-                        break
+                jobs = pending.get("jobs") or []
+                if jobs:
                     job = jobs[0]
                     page = await context.new_page()
                     try:
@@ -187,11 +185,6 @@ async def run_batch(api: WorkerAPI) -> int:
                         handled += 1
                     finally:
                         await page.close()
-                    pending = await asyncio.to_thread(
-                        api.post,
-                        "/api/v1/internal/jobs/claim",
-                        {"module": "family-deals", "limit": 1},
-                    )
             finally:
                 await browser.close()
     return handled
