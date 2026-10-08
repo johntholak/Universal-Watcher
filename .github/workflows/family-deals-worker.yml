@@ -8,6 +8,7 @@ permissions:
 
 # Family Deals is on-demand only. One user search claims one job and runs once.
 # The API dispatches this workflow when a user starts a Family Deals search.
+# Deploy Family Deals production with the on-demand worker behavior.
 
 concurrency:
   group: family-deals-worker-${{ github.run_id }}
