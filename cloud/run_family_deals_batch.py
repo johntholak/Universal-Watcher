@@ -116,7 +116,7 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
     renewal = asyncio.create_task(heartbeat(api, job, stopped, lost))
     try:
         try:
-            snapshot = await asyncio.wait_for(run_v5_page(page, base_url, job["criteria"]), timeout=600)
+            snapshot = await asyncio.wait_for(run_v5_page(page, base_url, job["criteria"]), timeout=420)
             result = normalize_v5_snapshot(snapshot, job["criteria"], job["id"])
         except Exception as exc:
             if lost.is_set():
