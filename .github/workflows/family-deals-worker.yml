@@ -2,18 +2,12 @@ name: Family Deals batch worker
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '*/5 * * * *'
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
 
-# One-time production recovery run.
-# Coverage diagnostics enabled for this recovery batch.
-# Force a production recovery batch after the Family Deals deploy.
+# Family Deals is on-demand only. One user search claims one job and runs once.
+# The API dispatches this workflow when a user starts a Family Deals search.
 
 concurrency:
   group: family-deals-worker-${{ github.run_id }}
@@ -23,7 +17,7 @@ jobs:
   batch:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Run Family Deals batch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
