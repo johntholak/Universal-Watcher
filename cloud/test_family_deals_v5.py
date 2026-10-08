@@ -46,6 +46,25 @@ class FamilyDealsV5BridgeTests(unittest.TestCase):
         self.assertEqual(configured["cuisines"], ["italian", "bbq"])
         self.assertIn("runHunt()", page.operations[2][1])
 
+    def test_verified_candidate_promotes_to_match_when_coverage_is_complete(self):
+        snapshot = {"radius_discovered": 1, "selected_restaurants": 1,
+                    "discovery_completed": True, "error": None,
+                    "verification": {"status": "done", "restaurants_checked": 1,
+                                     "restaurants_unavailable": 0, "restaurants_unresolved": 0,
+                                     "matches": [{"name": "Example Pizza", "price": 49.99,
+                                                  "capacity_verified": True, "capacity_max": 8,
+                                                  "capacity_label": "4-8", "opening_status": True,
+                                                  "source_direct": True,
+                                                  "restaurantClass": "independent",
+                                                  "source_url": "https://example.com/menu",
+                                                  "evidence": "Family meal for 4-8 | $49.99"}]}}
+        result = bridge.normalize_v5_snapshot(snapshot, CRITERIA, JOB_ID)
+        self.assertEqual(result["outcome"], "MATCH")
+        self.assertEqual(result["coverage"]["verified_matches"], 1)
+        self.assertEqual(result["coverage"]["partial_candidates"], 0)
+        self.assertEqual(result["results"][0]["outcome"], "MATCH")
+        self.assertTrue(result["results"][0]["details"]["location_verified"])
+
     def test_location_unknown_downgrades_candidate_and_preserves_evidence(self):
         snapshot = {"radius_discovered": 697, "selected_restaurants": 1,
                     "discovery_completed": True, "error": None,
