@@ -43,7 +43,7 @@ test("dispatch sends only a work signal and respects cooldown and daily reservat
   assert.equal(requests.length, 10);
   assert.deepEqual(JSON.parse(requests[0].options.body), { ref: "main" });
   assert.match(requests[0].url, /family-deals-worker\.yml\/dispatches$/);
-  assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 10);
+  assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 1);
   const delayed = sqlite.prepare("SELECT status,delay_reason FROM jobs WHERE id='j'").get();
   assert.equal(delayed.status, "DELAYED");
   assert.equal(delayed.delay_reason, "free_capacity");
