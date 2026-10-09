@@ -141,7 +141,7 @@ export default {
             !new Set(["partial", "unavailable"]).has(coverage.state) ||
             !["discovered", "checked", "unavailable", "unresolved"].every((key) => Number.isSafeInteger(coverage[key]) && coverage[key] >= 0) ||
             coverage.checked + coverage.unavailable + coverage.unresolved > coverage.discovered ||
-            (input.summary != null && !shortText(input.summary, 800))) {
+            (input.summary != null && (typeof input.summary !== "string" || input.summary.length > 800))) {
           return json({ error: "Invalid progressive coverage" }, 400);
         }
         const stamp = now();
