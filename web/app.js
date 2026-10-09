@@ -141,8 +141,9 @@
 
   async function loadFamilyResults(searchId) {
     const results = new Map();
+    const seenCursors = new Set();
     let cursor = null;
-    for (let page = 0; page < 1000; page += 1) {
+    while (true) {
       const params = new URLSearchParams({ search_id: searchId, limit: "50" });
       if (cursor && cursor.before && cursor.before_id) {
         params.set("before", cursor.before);
@@ -156,8 +157,10 @@
       }
       cursor = data.next_cursor || null;
       if (!cursor) return [...results.values()];
+      const cursorKey = cursor.before + "|" + cursor.before_id;
+      if (seenCursors.has(cursorKey)) throw new Error("Family Deals result pagination repeated a cursor.");
+      seenCursors.add(cursorKey);
     }
-    throw new Error("Family Deals result pagination exceeded its safety limit.");
   }
 
   function renderFamilySearchState(status, search, results) {
