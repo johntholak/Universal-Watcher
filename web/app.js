@@ -140,10 +140,24 @@
   }
 
   async function loadFamilyResults(searchId) {
-    const response = await movieApiFetch("/api/results?search_id=" + encodeURIComponent(searchId) + "&limit=50");
-    if (!response.ok) return null;
-    const data = await response.json();
-    return Array.isArray(data.results) ? data.results : [];
+    const results = new Map();
+    let cursor = null;
+    for (let page = 0; page < 1000; page += 1) {
+      const params = new URLSearchParams({ search_id: searchId, limit: "50" });
+      if (cursor && cursor.before && cursor.before_id) {
+        params.set("before", cursor.before);
+        params.set("before_id", cursor.before_id);
+      }
+      const response = await movieApiFetch("/api/results?" + params.toString());
+      if (!response.ok) return null;
+      const data = await response.json();
+      for (const item of (Array.isArray(data.results) ? data.results : [])) {
+        if (item && item.id) results.set(item.id, item);
+      }
+      cursor = data.next_cursor || null;
+      if (!cursor) return [...results.values()];
+    }
+    throw new Error("Family Deals result pagination exceeded its safety limit.");
   }
 
   function renderFamilySearchState(status, search, results) {
@@ -170,8 +184,12 @@
           ? "The worker capacity limit was reached. Universal Watcher will retry this one-time Search automatically."
           : "The Search is temporarily delayed and will retry automatically.";
     } else if (status === "RUNNING") {
-      heading = "Family Deals search is running";
-      body = "The cloud worker is actively checking restaurants and official sources. No Mac or local computer is required.";
+      heading = results.length
+        ? results.length + " candidate" + (results.length === 1 ? "" : "s") + " found so far"
+        : "Family Deals search is running";
+      body = results.length
+        ? "New candidates will appear as official sources finish checking. Results remain provisional until the full search and coverage check are complete."
+        : "The cloud worker is checking restaurants and official sources. The first candidates will appear here as soon as their evidence is checked.";
     } else if (status === "QUEUED") {
       heading = "Family Deals search queued";
       body = "Your search is queued for the cloud worker. No Mac or local computer is required.";
@@ -198,7 +216,7 @@
       const search = await response.json();
       const status = search.status === "QUEUED" && ["CLAIMED", "RUNNING"].includes(search.job_status) ? "RUNNING" : (search.status || "QUEUED");
       let results = [];
-      if (status === "COMPLETED") {
+      if (["RUNNING", "COMPLETED"].includes(status)) {
         results = await loadFamilyResults(searchId) || [];
         state.results = results.map((item) => ({ ...item, module: "family-deals", reason: item.summary }));
         renderResults();
@@ -208,9 +226,9 @@
         localStorage.removeItem("uw.familyDeals.searchId");
         familyDealsState.searchId = "";
       }
-      if (!["COMPLETED", "FAILED"].includes(status) && familyDealsState.pollCount < 240) {
+      if (!["COMPLETED", "FAILED"].includes(status) && familyDealsState.pollCount < 400) {
         familyDealsState.pollCount += 1;
-        familyDealsState.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 5000);
+        familyDealsState.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 3000);
       }
       if (status === "COMPLETED") showToast("Family Deals search finished.");
     } catch (error) {
