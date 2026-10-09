@@ -24,8 +24,8 @@ TYPE_TO_V5 = {"any": "any", "independent_local": "indie_local",
               "independent": "independent", "chains": "chains"}
 
 
-async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any]) -> dict[str, Any]:
-    """Run the complete V5 browser flow. Callers should renew the job lease concurrently."""
+async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any], on_progress: Any = None) -> dict[str, Any]:
+    """Run V5 while optionally publishing snapshots as verified evidence arrives."""
     if criteria.get("schema_version") != 1 or criteria.get("restaurant_type") not in TYPE_TO_V5:
         raise ValueError("Unsupported Family Deals criteria")
     if any(c not in CUISINE_TO_V5 for c in criteria.get("cuisines", [])):
@@ -55,14 +55,34 @@ async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any]) -> dic
         "restaurant_type": TYPE_TO_V5[criteria["restaurant_type"]],
         "cuisines": [CUISINE_TO_V5[c] for c in criteria.get("cuisines", [])],
     })
-    await page.evaluate("runHunt()")
-    return await page.evaluate("""() => ({
-      radius_discovered: state.allRestaurants.length,
-      selected_restaurants: state.restaurants.length,
-      verification: state.verification,
-      error: document.querySelector('#results .error')?.textContent || null,
-      discovery_completed: !document.querySelector('#results .error'),
-    })""")
+    await page.evaluate("""() => {
+      window.__uwHuntFinished = false;
+      window.__uwHuntPromise = Promise.resolve().then(() => runHunt()).finally(() => { window.__uwHuntFinished = true; });
+      return true;
+    }""")
+    last_signature = None
+    while True:
+        snapshot = await page.evaluate("""() => {
+          const verification = state.verification;
+          const selected = state.restaurants.length;
+          return {
+            radius_discovered: state.allRestaurants.length,
+            selected_restaurants: selected,
+            verification,
+            error: document.querySelector('#results .error')?.textContent || null,
+            discovery_completed: window.__uwHuntFinished === true || (selected > 0 && !!verification),
+            hunt_finished: window.__uwHuntFinished === true,
+          };
+        }""")
+        verification = snapshot.get("verification") or {}
+        if on_progress and snapshot.get("discovery_completed") and verification.get("status") in ("resolving", "checking", "done"):
+            signature = (verification.get("status"), verification.get("sources_checked"), len(verification.get("matches") or []))
+            if signature != last_signature:
+                await on_progress(snapshot)
+                last_signature = signature
+        if snapshot.get("hunt_finished"):
+            return snapshot
+        await asyncio.sleep(0.8)
 
 
 def _https(url: Any) -> str | None:
