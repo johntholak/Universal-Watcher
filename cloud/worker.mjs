@@ -60,7 +60,10 @@ export default {
     }
     if (!path.startsWith("/api/v1/")) return json({ error: "Not found" }, 404);
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
-    if (request.method === "GET" && path === "/api/v1/system/status") return json({ state: "preview", execution: "not_connected" });
+    if (request.method === "GET" && path === "/api/v1/system/status") {
+      const dispatchReady = env.DISPATCH_ENABLED === "true" && typeof env.GITHUB_DISPATCH_TOKEN === "string" && env.GITHUB_DISPATCH_TOKEN.length >= 20;
+      return json({ state: "configured", dispatch: dispatchReady ? "ready" : "not_connected", scheduled_checks: false });
+    }
 
     if (request.method === "POST" && path === "/api/v1/session") {
       if (!sameOrigin(request)) return json({ error: "Invalid origin" }, 403);
