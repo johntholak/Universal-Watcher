@@ -91,15 +91,14 @@
   }
   async function fetchAllSearchResults(searchId) {
     const results = [], seen = new Set();
-    let cursor = null, pages = 0;
+    let cursor = null;
     do {
       const query = new URLSearchParams({ search_id: searchId, limit: "50" });
       if (cursor) { query.set("before", cursor.before); query.set("before_id", cursor.before_id); }
       const data = await apiRequest(`/api/v1/results?${query}`);
       for (const result of data.results || []) if (!seen.has(result.id)) { seen.add(result.id); results.push(result); }
       cursor = data.next_cursor || null;
-      pages++;
-    } while (cursor && pages < 100);
+    } while (cursor);
     await Promise.all(results.map(async (result) => {
       if (state.resultDetails[result.id]) { Object.assign(result, state.resultDetails[result.id]); return; }
       try {
