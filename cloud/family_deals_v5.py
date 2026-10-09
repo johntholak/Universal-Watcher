@@ -94,7 +94,9 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
     job = snapshot.get("verification") or {}
     selected = max(0, int(snapshot.get("selected_restaurants") or 0))
     error = snapshot.get("error")
-    if error or not snapshot.get("discovery_completed") or (selected and job.get("status") != "done"):
+    verification_status = job.get("status")
+    progressive = verification_status in ("resolving", "checking") and snapshot.get("discovery_completed")
+    if error or not snapshot.get("discovery_completed") or (selected and verification_status != "done" and not progressive):
         return {"outcome": "UNAVAILABLE", "summary": "Restaurant discovery or verification could not finish.",
                 "coverage": {"state": "unavailable", "discovered": selected, "checked": 0,
                              "unavailable": selected, "unresolved": 0}, "results": []}
@@ -102,7 +104,8 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
     checked = max(0, int(job.get("restaurants_checked") or 0)) if selected else 0
     unavailable = max(0, int(job.get("restaurants_unavailable") or 0)) if selected else 0
     unresolved = max(0, int(job.get("restaurants_unresolved") or 0)) if selected else 0
-    if checked + unavailable + unresolved != selected:
+    coverage_valid = (checked + unavailable + unresolved <= selected) if progressive else (checked + unavailable + unresolved == selected)
+    if not coverage_valid:
         return {"outcome": "UNAVAILABLE", "summary": "Restaurant coverage counts did not reconcile.",
                 "coverage": {"state": "unavailable", "discovered": selected, "checked": 0,
                              "unavailable": selected, "unresolved": 0}, "results": []}
@@ -148,11 +151,14 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
             "evidence": [{"source": "Restaurant official source", "summary": evidence[:800], "url": source}],
         })
 
-    complete = checked == selected and not unavailable and not unresolved
+    complete = not progressive and checked == selected and not unavailable and not unresolved
     state = "complete" if complete and not results and not omitted_candidates else "partial"
     coverage = {"state": state, "discovered": selected, "checked": checked,
                 "unavailable": unavailable, "unresolved": unresolved}
-    if results or not complete or omitted_candidates:
+    if progressive:
+        outcome = "PARTIAL"
+        summary = f"{len(results)} verified or partially verified meal candidates so far; {checked} of {selected} restaurants checked. More sources are still being checked."
+    elif results or not complete or omitted_candidates:
         outcome = "PARTIAL"
         summary = f"{len(results)} meal candidates need location confirmation; {checked} of {selected} restaurants checked; {omitted_candidates} candidates could not be carried forward."
     else:
