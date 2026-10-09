@@ -47,6 +47,9 @@ validated in the later Movies adapter milestone.
 
 Every completed execution has `outcome` from `MATCH`, `NO_MATCH`, `PARTIAL`,
 `UNAVAILABLE`, `ERROR`, a summary, coverage counts and provider state.
+Coverage separates `radius_discovered` (restaurants found inside the requested
+radius before filters) from `discovered` (the verification set after filters).
+The checked, unavailable and unresolved counts describe that verification set.
 `NO_MATCH` requires sufficient successful coverage. A blocked source, failed
 seat inventory, or partial scan never becomes a complete negative result.
 
