@@ -130,6 +130,12 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
                     {"claim_id": job["claim_id"], "items": chunk},
                 )
                 published_ids.update(item["id"] for item in chunk)
+            if job.get("search_id"):
+                await asyncio.to_thread(
+                    api.post,
+                    f"/api/v1/internal/jobs/{job['id']}/progress",
+                    {"claim_id": job["claim_id"], "coverage": partial["coverage"], "summary": partial["summary"]},
+                )
 
         try:
             snapshot = await asyncio.wait_for(
