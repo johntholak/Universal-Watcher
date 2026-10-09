@@ -142,7 +142,7 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
             "title": f"Family meal offer at {name}", "outcome": "MATCH" if location_verified else "PARTIAL",
             "verification": "VERIFIED" if location_verified else "PARTIALLY_VERIFIED", "summary": "Meal, total, capacity, and restaurant-source applicability verified." if location_verified else "Meal, total and capacity found; location applicability needs confirmation.",
             "fingerprint": fingerprint, "destination_url": source,
-            "details": {"deal_name": None, "restaurant": name, "price_cents": price_cents,
+            "details": {"deal_name": "Officially listed family meal", "restaurant": name, "price_cents": price_cents,
                         "serves_max": record.get("capacity_max"), "serving_label": record.get("capacity_label"),
                         "cuisine": record.get("cuisine"), "classification": record.get("restaurantClass", "unknown"),
                         "distance_miles": record.get("distance"), "included_food": None,
