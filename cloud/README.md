@@ -52,9 +52,12 @@ third leases are finalized by Cron, including a Watch history event and a
 paused Watch; provider failures are `UNAVAILABLE` without automatic retry.
 No exception text or source payload is sent to the failure route. These are
 offline-tested policies, not a live provider acceptance claim.
-Result chunks remain hidden from user reads until successful finalization;
-failure reports or expired-lease reclamation clear a job's old unfinalized
-chunks before another attempt.
+Evidence-backed result chunks are readable to the owning user while a job is
+`CLAIMED` or `RUNNING`, so a connected client can show candidates before the full
+radius check finishes. Search status reports `RUNNING` during execution. These
+early candidates must remain visibly provisional until final outcome and coverage
+are known. Failure reports or expired-lease reclamation clear a job's old chunks
+before another attempt.
 
 Dispatch is enabled only when `DISPATCH_ENABLED=true`, a Cloudflare secret
 `GITHUB_DISPATCH_TOKEN` with permission to dispatch this repository's workflow,

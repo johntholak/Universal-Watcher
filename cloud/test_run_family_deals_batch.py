@@ -36,6 +36,19 @@ class FakePage:
                                                   "evidence": "Family meal for seven $45"}]}}
 
 
+class ProgressiveFakePage:
+    def __init__(self, snapshots):
+        self.snapshots = list(snapshots)
+
+    async def goto(self, _url, **_kwargs):
+        pass
+
+    async def evaluate(self, script, _argument=None):
+        if "radius_discovered:" in script:
+            return self.snapshots.pop(0)
+        return True
+
+
 class FailingPage(FakePage):
     async def goto(self, _url, **_kwargs):
         raise RuntimeError("Browser execution failed")
@@ -68,6 +81,42 @@ class FamilyBatchRunnerTests(unittest.TestCase):
         self.assertTrue(api.calls[0][0].endswith("/results"))
         self.assertFalse(api.calls[0][1]["items"][0]["details"]["location_verified"])
         self.assertEqual(api.calls[1][1]["outcome"], "PARTIAL")
+
+    def test_job_uploads_progressive_results_once_before_final_completion(self):
+        criteria = {"schema_version": 1, "location": "91304", "radius_miles": 2,
+                    "party_size": 7, "max_total_price": 50, "cuisines": [],
+                    "restaurant_type": "any", "open_tonight": True}
+        first = {"name": "First Pizza", "price": 45, "capacity_verified": True,
+                 "capacity_max": 7, "capacity_label": "7", "opening_status": True,
+                 "restaurantClass": "independent", "source_direct": True,
+                 "source_url": "https://example.com/first",
+                 "evidence": "Family meal for seven $45"}
+        second = {"name": "Second Pizza", "price": 40, "capacity_verified": True,
+                  "capacity_max": 7, "capacity_label": "7", "opening_status": True,
+                  "restaurantClass": "independent", "source_direct": True,
+                  "source_url": "https://example.com/second",
+                  "evidence": "Family meal for seven $40"}
+        active = {"radius_discovered": 2, "selected_restaurants": 2,
+                  "discovery_completed": True, "hunt_finished": False, "error": None,
+                  "verification": {"status": "checking", "restaurants_checked": 1,
+                                   "restaurants_unavailable": 0, "restaurants_unresolved": 0,
+                                   "sources_checked": 1, "matches": [first]}}
+        final = {"radius_discovered": 2, "selected_restaurants": 2,
+                 "discovery_completed": True, "hunt_finished": True, "error": None,
+                 "verification": {"status": "done", "restaurants_checked": 2,
+                                  "restaurants_unavailable": 0, "restaurants_unresolved": 0,
+                                  "sources_checked": 2, "matches": [first, second]}}
+        api = FakeAPI()
+        job = {"id": str(uuid.uuid4()), "claim_id": str(uuid.uuid4()), "criteria": criteria}
+        response = asyncio.run(runner.execute_job(
+            api, ProgressiveFakePage([active, final]), "http://127.0.0.1:9999/", job))
+        self.assertEqual(response["candidate_count"], 2)
+        self.assertEqual(len(api.calls), 3)
+        self.assertTrue(api.calls[0][0].endswith("/results"))
+        self.assertEqual([x["title"] for x in api.calls[0][1]["items"]], ["Family meal offer at First Pizza"])
+        self.assertTrue(api.calls[1][0].endswith("/results"))
+        self.assertEqual([x["title"] for x in api.calls[1][1]["items"]], ["Family meal offer at Second Pizza"])
+        self.assertTrue(api.calls[2][0].endswith("/complete"))
 
     def test_execution_failure_requests_bounded_retry_without_false_result(self):
         api = FakeAPI()

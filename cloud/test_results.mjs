@@ -60,9 +60,11 @@ test("chunked results survive duplicate delivery and have no global match cap", 
     }
     assert.equal(sqlite.prepare("SELECT count(*) AS n FROM results").get().n, 12);
     assert.equal(sqlite.prepare("SELECT count(*) AS n FROM result_evidence").get().n, 12);
-    const hidden = await worker.fetch(request(`/api/v1/results?search_id=${searchId}`, "GET", null, { Cookie: cookie }), env);
-    assert.equal((await hidden.json()).results.length, 0);
-    assert.equal((await worker.fetch(request(`/api/v1/results/${items[0].id}`, "GET", null, { Cookie: cookie }), env)).status, 404);
+    const progressive = await worker.fetch(request(`/api/v1/results?search_id=${searchId}`, "GET", null, { Cookie: cookie }), env);
+    assert.equal((await progressive.json()).results.length, 12);
+    assert.equal((await worker.fetch(request(`/api/v1/results/${items[0].id}`, "GET", null, { Cookie: cookie }), env)).status, 200);
+    const runningSearch = await worker.fetch(request(`/api/v1/searches/${searchId}`, "GET", null, { Cookie: cookie }), env);
+    assert.equal((await runningSearch.json()).status, "RUNNING");
     const conflict = await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/results`, "POST", { claim_id: job.claim_id, items: [{ ...items[0], title: "Changed title" }] }, headers), env);
     assert.equal(conflict.status, 409);
     assert.equal(sqlite.prepare("SELECT title FROM results WHERE id=?").get(items[0].id).title, "Meal 0");

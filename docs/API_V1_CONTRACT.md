@@ -21,15 +21,15 @@ errors. Timestamps are UTC ISO 8601 strings.
 | Method | Path | Behavior |
 | --- | --- | --- |
 | POST | `/api/v1/searches` | Validate module/criteria, atomically create Search plus queued Job, signal immediate dispatch. Return `202` with Search ID and `QUEUED` state. Dispatch failure leaves retriable queued work. |
-| GET | `/api/v1/searches/:id` | Return state, coverage, last outcome, and result links. |
+| GET | `/api/v1/searches/:id` | Return state, coverage, last outcome, and active job status. Reports `RUNNING` once claimed, before finalization. |
 | POST | `/api/v1/watches` | Save the exact criteria from a completed Search (`search_id`), including module and schema version. Set `ACTIVE` and schedule next check after 24 hours. |
 | GET | `/api/v1/watches` | List user Watches with last and next check, coverage, provider state and match state. |
 | GET | `/api/v1/watches/:id` | Watch, current results and meaningful history. |
 | PATCH | `/api/v1/watches/:id` | Pause, resume, stop, keep watching, or `edit_from_search` with a new completed owned `search_id`. Edits preserve previous criteria versions and refuse pending/running Watch jobs. |
 | POST | `/api/v1/watches/:id/check` | Queue an immediate check with per-Watch deduplication and capacity guard. |
 | DELETE | `/api/v1/watches/:id` | Stop/soft-delete user-facing Watch without erasing its result audit trail. |
-| GET | `/api/v1/results` | Cursor-paginated results filtered by Search/Watch. |
-| GET | `/api/v1/results/:id` | One result and its compact evidence. |
+| GET | `/api/v1/results` | Cursor-paginated results filtered by Search/Watch. Evidence-backed Search candidates are readable during `CLAIMED`/`RUNNING` and remain provisional until final coverage is known. |
+| GET | `/api/v1/results/:id` | One result and its compact evidence, including candidates from an active Search. |
 | GET | `/api/v1/system/status` | Safe public health/capacity status, no secrets or internal diagnostics. |
 
 The first implementation should accept Family Deals criteria from the approved
