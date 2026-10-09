@@ -8,6 +8,7 @@ loopback URL serving the unchanged legacy page.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
@@ -24,8 +25,8 @@ TYPE_TO_V5 = {"any": "any", "independent_local": "indie_local",
               "independent": "independent", "chains": "chains"}
 
 
-async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any]) -> dict[str, Any]:
-    """Run the complete V5 browser flow. Callers should renew the job lease concurrently."""
+async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any], on_progress: Any = None) -> dict[str, Any]:
+    """Run V5 while optionally publishing candidates as official sources finish."""
     if criteria.get("schema_version") != 1 or criteria.get("restaurant_type") not in TYPE_TO_V5:
         raise ValueError("Unsupported Family Deals criteria")
     if any(c not in CUISINE_TO_V5 for c in criteria.get("cuisines", [])):
@@ -55,14 +56,34 @@ async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any]) -> dic
         "restaurant_type": TYPE_TO_V5[criteria["restaurant_type"]],
         "cuisines": [CUISINE_TO_V5[c] for c in criteria.get("cuisines", [])],
     })
-    await page.evaluate("runHunt()")
-    return await page.evaluate("""() => ({
-      radius_discovered: state.allRestaurants.length,
-      selected_restaurants: state.restaurants.length,
-      verification: state.verification,
-      error: document.querySelector('#results .error')?.textContent || null,
-      discovery_completed: !document.querySelector('#results .error'),
-    })""")
+    await page.evaluate("""() => {
+      window.__uwHuntFinished = false;
+      window.__uwHuntPromise = Promise.resolve().then(() => runHunt()).finally(() => { window.__uwHuntFinished = true; });
+      return true;
+    }""")
+    last_signature = None
+    while True:
+        snapshot = await page.evaluate("""() => {
+          const verification = state.verification;
+          const selected = state.restaurants.length;
+          return {
+            radius_discovered: state.allRestaurants.length,
+            selected_restaurants: selected,
+            verification,
+            error: document.querySelector('#results .error')?.textContent || null,
+            discovery_completed: window.__uwHuntFinished === true || (selected > 0 && !!verification),
+            hunt_finished: window.__uwHuntFinished === true,
+          };
+        }""")
+        verification = snapshot.get("verification") or {}
+        if on_progress and snapshot.get("discovery_completed") and verification.get("status") in ("resolving", "checking"):
+            signature = (verification.get("status"), verification.get("sources_checked"), len(verification.get("matches") or []))
+            if signature != last_signature:
+                await on_progress(snapshot)
+                last_signature = signature
+        if snapshot.get("hunt_finished") or "hunt_finished" not in snapshot:
+            return snapshot
+        await asyncio.sleep(0.8)
 
 
 def _https(url: Any) -> str | None:
@@ -74,7 +95,9 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
     job = snapshot.get("verification") or {}
     selected = max(0, int(snapshot.get("selected_restaurants") or 0))
     error = snapshot.get("error")
-    if error or not snapshot.get("discovery_completed") or (selected and job.get("status") != "done"):
+    verification_status = job.get("status")
+    progressive = verification_status in ("resolving", "checking") and snapshot.get("discovery_completed")
+    if error or not snapshot.get("discovery_completed") or (selected and verification_status != "done" and not progressive):
         return {"outcome": "UNAVAILABLE", "summary": "Restaurant discovery or verification could not finish.",
                 "coverage": {"state": "unavailable", "discovered": selected, "checked": 0,
                              "unavailable": selected, "unresolved": 0}, "results": []}
@@ -82,7 +105,8 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
     checked = max(0, int(job.get("restaurants_checked") or 0)) if selected else 0
     unavailable = max(0, int(job.get("restaurants_unavailable") or 0)) if selected else 0
     unresolved = max(0, int(job.get("restaurants_unresolved") or 0)) if selected else 0
-    if checked + unavailable + unresolved != selected:
+    coverage_valid = (checked + unavailable + unresolved <= selected) if progressive else (checked + unavailable + unresolved == selected)
+    if not coverage_valid:
         return {"outcome": "UNAVAILABLE", "summary": "Restaurant coverage counts did not reconcile.",
                 "coverage": {"state": "unavailable", "discovered": selected, "checked": 0,
                              "unavailable": selected, "unresolved": 0}, "results": []}
@@ -116,16 +140,18 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
             omitted_candidates += 1
             continue
         fingerprint = hashlib.sha256(json.dumps([name, source, price_cents, record.get("capacity_label"), evidence], ensure_ascii=False).encode()).hexdigest()
-        if location_verified:
+        deal_name = str(record.get("deal_name") or "").strip()
+        match_verified = location_verified and bool(deal_name)
+        if match_verified:
             verified_count += 1
         else:
             partial_count += 1
         results.append({
             "id": str(uuid.uuid5(uuid.UUID(job_id), fingerprint)),
-            "title": f"Family meal offer at {name}", "outcome": "MATCH" if location_verified else "PARTIAL",
-            "verification": "VERIFIED" if location_verified else "PARTIALLY_VERIFIED", "summary": "Meal, total, capacity, and restaurant-source applicability verified." if location_verified else "Meal, total and capacity found; location applicability needs confirmation.",
+            "title": f"Family meal offer at {name}", "outcome": "MATCH" if match_verified else "PARTIAL",
+            "verification": "VERIFIED" if match_verified else "PARTIALLY_VERIFIED", "summary": "Meal, total, capacity, explicit deal name, and location applicability verified." if match_verified else "Meal, total, and capacity found; explicit deal-name or location proof is still needed.",
             "fingerprint": fingerprint, "destination_url": source,
-            "details": {"deal_name": None, "restaurant": name, "price_cents": price_cents,
+            "details": {"deal_name": deal_name or None, "restaurant": name, "price_cents": price_cents,
                         "serves_max": record.get("capacity_max"), "serving_label": record.get("capacity_label"),
                         "cuisine": record.get("cuisine"), "classification": record.get("restaurantClass", "unknown"),
                         "distance_miles": record.get("distance"), "included_food": None,
@@ -134,13 +160,16 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
             "evidence": [{"source": "Restaurant official source", "summary": evidence[:800], "url": source}],
         })
 
-    complete = checked == selected and not unavailable and not unresolved
+    complete = not progressive and checked == selected and not unavailable and not unresolved
     state = "complete" if complete and not partial_count and not omitted_candidates else "partial"
     coverage = {"state": state, "discovered": selected, "checked": checked,
                 "unavailable": unavailable, "unresolved": unresolved,
                 "verified_matches": verified_count, "partial_candidates": partial_count,
                 "omitted_candidates": omitted_candidates}
-    if verified_count:
+    if progressive:
+        outcome = "PARTIAL"
+        summary = f"{len(results)} qualifying meal candidates found so far; {checked} of {selected} restaurants checked. Explicit deal-name/location proof and full coverage may still be pending."
+    elif verified_count:
         if partial_count or not complete or omitted_candidates:
             outcome = "PARTIAL"
             summary = f"{verified_count} verified family deal(s) found; {partial_count} additional candidate(s) still need location confirmation."
