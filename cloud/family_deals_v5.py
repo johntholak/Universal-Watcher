@@ -75,12 +75,12 @@ async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any], on_pro
           };
         }""")
         verification = snapshot.get("verification") or {}
-        if on_progress and snapshot.get("discovery_completed") and verification.get("status") in ("resolving", "checking", "done"):
+        if on_progress and snapshot.get("discovery_completed") and verification.get("status") in ("resolving", "checking"):
             signature = (verification.get("status"), verification.get("sources_checked"), len(verification.get("matches") or []))
             if signature != last_signature:
                 await on_progress(snapshot)
                 last_signature = signature
-        if snapshot.get("hunt_finished"):
+        if snapshot.get("hunt_finished") or "hunt_finished" not in snapshot:
             return snapshot
         await asyncio.sleep(0.8)
 
