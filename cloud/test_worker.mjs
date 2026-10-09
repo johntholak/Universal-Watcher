@@ -81,6 +81,9 @@ test("system status reports configured on-demand mode without claiming a recurri
 
 test("session denies wrong secret and origin; cookie is secure", async () => {
   const { env } = environment();
+  const unauthenticated = await worker.fetch(request("/api/v1/session"), env);
+  assert.equal(unauthenticated.status, 401);
+  assert.equal(unauthenticated.headers.get("Set-Cookie"), null);
   assert.equal((await worker.fetch(request("/api/v1/session", "POST", { access_secret: "wrong" }), env)).status, 401);
   assert.equal((await worker.fetch(request("/api/v1/session", "POST", { access_secret: env.ACCESS_SECRET }, { Origin: "https://attacker.example" }), env)).status, 403);
   const { cookie } = await login(env);
