@@ -3,6 +3,9 @@ name = "universal-watcher-api"
 main = "worker.mjs"
 compatibility_date = "2026-09-26"
 
+[triggers]
+crons = []
+
 [[d1_databases]]
 binding = "DB"
 database_name = "universal-watcher"

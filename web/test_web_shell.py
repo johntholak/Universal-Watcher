@@ -6,6 +6,10 @@ WEB_ROOT = Path(__file__).parent
 
 
 class WebShellTests(unittest.TestCase):
+    def test_worker_deployment_explicitly_removes_recurring_cron_triggers(self):
+        config = (WEB_ROOT.parent / "cloud" / "wrangler.example.toml").read_text(encoding="utf-8")
+        self.assertRegex(config, r"(?m)^\[triggers\]\s*\ncrons\s*=\s*\[\s*\]")
+
     def test_shell_assets_exist(self):
         self.assertTrue((WEB_ROOT / "index.html").is_file())
         self.assertTrue((WEB_ROOT / "styles.css").is_file())

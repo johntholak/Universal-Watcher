@@ -10,7 +10,7 @@ slice, separately authenticated bounded job claims and lease heartbeat, chunked
 result intake, live coverage progress, finalization, and paginated result reads. Result chunks are at
 most five records each to keep an invocation bounded; there is no overall
 result limit. Stable IDs and payload digests make duplicate delivery safe.
-This is offline code until the dedicated API deployment workflow is run. The browser UI and API share one origin through the Worker static-assets binding. A user Search signals one fixed GitHub workflow run, which claims one job and exits. There is no recurring Cron trigger. Dispatch is bounded by a one-minute cooldown and daily run limit. `wrangler.example.toml` remains a deployment template with a D1 placeholder. No restaurant source is contacted by the API itself. `docs/API_V1_CONTRACT.md` defines the route shapes.
+This repository branch is reviewed and CI-tested; production deployment remains separately gated. The browser UI and API share one origin through the Worker static-assets binding. A user Search signals one fixed GitHub workflow run, which claims one job and exits. `wrangler.example.toml` explicitly sets `crons = []`, so deployment removes recurring Worker triggers. Dispatch is bounded by a one-minute cooldown and daily run limit. The template has a D1 placeholder. No restaurant source is contacted by the API itself. `docs/API_V1_CONTRACT.md` defines the route shapes.
 No credential or database ID is stored here.
 
 The schema retains exact versioned criteria in compact JSON, separates one-time
@@ -95,7 +95,7 @@ only after these repository Actions secrets exist:
 
 The workflow applies D1 migrations, deploys the app and API from the same Worker origin,
 sets private session and dispatch secrets, then smoke-tests the homepage and session.
-The Worker has no Cron trigger. Each browser Search signals the fixed batch workflow,
+The Worker configuration explicitly removes Cron triggers. Each browser Search signals the fixed batch workflow,
 which claims one job and exits. The UI reports disabled dispatch as not connected and
 does not claim that the queued Search ran. Permanently invalid dispatch is recorded
 as a failed Search. Temporary network and capacity states remain visible and retry

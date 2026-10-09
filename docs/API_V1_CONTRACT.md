@@ -1,11 +1,11 @@
 # Universal Watcher `/api/v1` contract
 
-**Status:** The API and browser integration are implemented but remain offline
-until the manual production deployment workflow is run and its smoke tests pass.
+**Status:** The API and browser integration are implemented. Production
+acceptance remains incomplete until the manual deployment workflow and smoke tests pass.
 The Worker supports private sessions, one-time Family Deals Search, guarded
 on-demand dispatch, progressive result and coverage reads, and Watch lifecycle
 routes. The browser uses the same-origin API from `web/app.js`. The deployment
-template has no Cron trigger. Notifications remain planned.
+template explicitly sets an empty Cron schedule. Notifications remain planned.
 
 ## Public requests
 
@@ -76,7 +76,7 @@ and log no credentials or private criteria.
 | POST | `/api/v1/internal/jobs/:id/complete` | Idempotently finalize Search or Watch with outcome/coverage. Incomplete coverage cannot become `NO_MATCH`; Watch history records meaningful changes only. |
 | POST | `/api/v1/internal/jobs/:id/failure` | Record `execution` versus `provider` failure. Execution gets bounded backoff (three claims); provider failure stays unavailable. Circuit state remains future work. |
 
-There is no Cron trigger in the current on-demand deployment. A user Search
+The Worker configuration explicitly removes Cron triggers. A user Search
 signals one fixed GitHub Actions workflow with `ref: main` and the target `job_id`.
 The runner claims only that job and exits. No criteria or secrets go in the workflow
 dispatch payload. Dispatch has a bounded daily allowance and cooldown; exhausted
