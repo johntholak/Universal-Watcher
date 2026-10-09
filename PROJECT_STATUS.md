@@ -6,7 +6,7 @@
 
 ## October 9 Family Deals live-search checkpoint
 
-- PR #29 (`family-deals-live-search-ui`) is open against `main`. GitHub confirms branch head `82961941a2d24dfff5cfc39423abb8225456cc23`; pull request CI run 339 passed. The deployed Worker still needs the reviewed changes before its credential-free session behavior is corrected.
+- PR #29 (`family-deals-live-search-ui`) is open against `main`. GitHub confirms branch head `8954f0fd13fb36e92e4d7e18461b472d19ee9f44`; push CI run 340 and pull request CI run 341 passed. The deployed Worker still needs the reviewed changes before its credential-free session behavior is corrected.
 - The API ties each dispatch and claim to one job ID, publishes provisional coverage/results, and uses cursor pagination without a global result cap. Session reads require the signed cookie; cookie-authenticated mutations require same-origin and CSRF checks. Worker deployment configuration explicitly removes Cron triggers.
 - Temporary GitHub `429` and `5xx` dispatch responses now remain retryable rather than marking the Search failed. Result cards show API-provided cuisine, classification, distance, included items, and observation time, with unknown values labeled as unknown.
 - Local verification passed: 28 Node tests across criteria, dispatch, failures, results, Watches, and Worker; 37 Family Deals and web Python tests; JavaScript syntax checks; and `git diff --check`. No production deployment or provider search was run.
