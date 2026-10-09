@@ -1,6 +1,6 @@
 (() => {
   const moduleLabels = { movies: "Movies", "family-deals": "Family Deals" };
-  const state = { watches: [], results: [], csrfToken: "", currentSearchId: "", pollTimer: null, pollCount: 0 };
+  const state = { watches: [], results: [], resultDetails: {}, csrfToken: "", currentSearchId: "", pollTimer: null, pollCount: 0 };
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
@@ -100,6 +100,14 @@
       cursor = data.next_cursor || null;
       pages++;
     } while (cursor && pages < 100);
+    await Promise.all(results.map(async (result) => {
+      if (state.resultDetails[result.id]) { Object.assign(result, state.resultDetails[result.id]); return; }
+      try {
+        const detail = await apiRequest(`/api/v1/results/${encodeURIComponent(result.id)}`);
+        state.resultDetails[result.id] = detail;
+        Object.assign(result, detail);
+      } catch { /* A provisional row can briefly precede its evidence record. */ }
+    }));
     return results;
   }
   function renderSearchProgress(search, results) {
