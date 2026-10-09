@@ -77,3 +77,25 @@ node --test cloud/test_*.mjs
 Do not run a remote D1 migration or deploy until live adapter acceptance and the private beta
 auth, zero-cost account setup and quota behavior are reviewable together. The
 site and API must share an origin for the strict cookie and CSRF checks.
+
+
+## On-demand production deployment
+
+Run the manual GitHub Actions workflow **Deploy Universal Watcher Family Deals API**
+only after these repository Actions secrets exist:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+- `UW_D1_DATABASE_NAME`
+- `UW_D1_DATABASE_ID`
+- `UW_ACCESS_SECRET` (at least 32 characters)
+- `UW_SESSION_KEY` (at least 32 characters)
+- `UW_WORKER_SECRET` (at least 32 characters)
+- `UW_API_BASE` (the HTTPS API Worker origin used by the batch runner)
+- `UW_GITHUB_DISPATCH_TOKEN` (a GitHub token scoped to this repository with Actions: read/write permission)
+
+The workflow applies D1 migrations, deploys the app and API from the same Worker origin,
+sets private session and dispatch secrets, then smoke-tests the homepage and session.
+The Worker has no Cron trigger. Each browser Search signals the fixed batch workflow,
+which claims one job and exits. Failed dispatch is recorded as a failed Search instead
+of leaving a hidden queued job behind.
