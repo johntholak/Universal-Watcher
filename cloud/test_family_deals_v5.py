@@ -93,7 +93,7 @@ class FamilyDealsV5BridgeTests(unittest.TestCase):
         self.assertEqual(len(result["results"]), 1)
         self.assertEqual(result["results"][0]["outcome"], "PARTIAL")
         self.assertIsNone(result["results"][0]["details"]["deal_name"])
-        self.assertIn("still being checked", result["summary"])
+        self.assertIn("found so far", result["summary"])
 
     def test_unmappable_candidate_never_becomes_no_match(self):
         snapshot = {"radius_discovered": 1, "selected_restaurants": 1,
