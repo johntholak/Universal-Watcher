@@ -160,10 +160,10 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
                 "unavailable": unavailable, "unresolved": unresolved}
     if progressive:
         outcome = "PARTIAL"
-        summary = f"{len(results)} verified or partially verified meal candidates so far; {checked} of {selected} restaurants checked. More sources are still being checked."
+        summary = f"{len(results)} qualifying meal candidates found so far; {checked} of {selected} restaurants checked. Explicit deal-name/location proof and full coverage may still be pending."
     elif results or not complete or omitted_candidates:
         outcome = "PARTIAL"
-        summary = f"{len(results)} meal candidates need location confirmation; {checked} of {selected} restaurants checked; {omitted_candidates} candidates could not be carried forward."
+        summary = f"{len(results)} meal candidates need explicit deal-name or location confirmation; {checked} of {selected} restaurants checked; {omitted_candidates} candidates could not be carried forward."
     else:
         outcome = "NO_MATCH"
         summary = f"No qualifying family meal found among {checked} checked restaurants."
