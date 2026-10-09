@@ -1,6 +1,6 @@
 (() => {
   const moduleLabels = { movies: "Movies", "family-deals": "Family Deals" };
-  const state = { watches: [], results: [] };
+  const state = { watches: [], results: [], csrfToken: "", currentSearchId: "", pollTimer: null, pollCount: 0 };
   const byId = (id) => document.getElementById(id);
   const all = (selector) => [...document.querySelectorAll(selector)];
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
@@ -39,12 +39,132 @@
     byId("deal-summary-location").textContent = c.location || "Add a location";
     byId("deal-summary-radius").textContent = `${c.radius_miles || "?"} miles`;
     byId("deal-summary-party").textContent = `${c.party_size} people`;
-    byId("deal-summary-budget").textContent = byId("deal-budget").value ? `$${c.max_total_price.toFixed(2)} total` : "Add a maximum";
+    byId("deal-summary-budget").textContent = byId("deal-budget").value ? `${c.max_total_price.toFixed(2)} total` : "Add a maximum";
     const names = all('input[name="deal-cuisine"]:checked').map((input) => input.parentElement.textContent.trim());
     byId("deal-summary-cuisine").textContent = names.join(", ") || "Any cuisine";
     byId("deal-summary-type").textContent = restaurantTypes[c.restaurant_type];
     byId("deal-summary-hours").textContent = c.open_tonight ? "Open tonight, if verified" : "Any availability";
   }
+  async function apiRequest(path, options = {}) {
+    const headers = { ...(options.body ? { "Content-Type": "application/json" } : {}), ...(options.headers || {}) };
+    if (state.csrfToken && options.method && options.method !== "GET") headers["X-CSRF-Token"] = state.csrfToken;
+    const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options, headers });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+    return data;
+  }
+  function setAuthMessage(message) { const el = byId("deal-auth-message"); if (el) el.textContent = message; }
+  function setConnected(connected) {
+    byId("deal-access-secret").disabled = connected;
+    byId("deal-auth-form").querySelector('button[type="submit"]').textContent = connected ? "Connected" : "Connect";
+    setAuthMessage(connected ? "Connected securely. Ready for a one-time search." : "Not connected.");
+  }
+  async function connectDealSession(secret = "") {
+    if (secret) {
+      const data = await apiRequest("/api/v1/session", { method: "POST", body: JSON.stringify({ access_secret: secret }) });
+      state.csrfToken = data.csrf_token || "";
+    } else {
+      const data = await apiRequest("/api/v1/session");
+      state.csrfToken = data.csrf_token || "";
+    }
+    setConnected(true);
+  }
+  function renderLiveDealResults(results, provisional) {
+    const panel = byId("deal-preview-result");
+    panel.hidden = false;
+    const cards = results.map((r) => {
+      const d = r.details || {};
+      const evidence = (r.evidence || []).map((e) => {
+        const source = escapeHtml(e.source || "Source");
+        const summary = escapeHtml(e.summary || "");
+        const url = typeof e.source_url === "string" && /^https:\/\//i.test(e.source_url) ? e.source_url : "";
+        return `<li>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${source}</a>` : source}: ${summary}</li>`;
+      }).join("");
+      const price = Number.isInteger(d.price_cents) ? `${(d.price_cents / 100).toFixed(2)} total` : "Total price not verified";
+      const serves = d.serves_max ? `Serves up to ${escapeHtml(d.serves_max)}` : "Serving capacity not verified";
+      const restaurant = escapeHtml(d.restaurant || r.title || "Meal deal");
+      const dealName = escapeHtml(d.deal_name || r.title || "Meal deal");
+      const destination = typeof r.destination_url === "string" && /^https:\/\//i.test(r.destination_url) ? r.destination_url : "";
+      return `<article class="watch-item"><span class="result-badge result-${escapeHtml(r.outcome)}">${escapeHtml(r.outcome)}</span><div><strong>${dealName}</strong><small>${restaurant} · ${price} · ${serves}</small><p>${escapeHtml(r.summary || "")}</p>${evidence ? `<ul>${evidence}</ul>` : ""}${destination ? `<a href="${escapeHtml(destination)}" target="_blank" rel="noopener noreferrer">View deal source</a>` : ""}</div></article>`;
+    }).join("");
+    panel.innerHTML = `<div class="result-state-icon">${provisional ? "◷" : "✓"}</div><div><p class="eyebrow">${provisional ? "PROVISIONAL RESULTS" : "SEARCH RESULTS"}</p><h2>${results.length ? `${results.length} candidate${results.length === 1 ? "" : "s"} found` : "No candidates published yet"}</h2><p>${provisional ? "These are early candidates, not a final result. Keep this page open while full-radius coverage is checked." : "Search finished. Coverage and verification status determine whether the result is a confirmed match or an incomplete search."}</p></div><div class="full-list">${cards || "<p>No candidate results have arrived yet.</p>"}</div>`;
+  }
+  async function fetchAllSearchResults(searchId) {
+    const results = [], seen = new Set();
+    let cursor = null, pages = 0;
+    do {
+      const query = new URLSearchParams({ search_id: searchId, limit: "50" });
+      if (cursor) { query.set("before", cursor.before); query.set("before_id", cursor.before_id); }
+      const data = await apiRequest(`/api/v1/results?${query}`);
+      for (const result of data.results || []) if (!seen.has(result.id)) { seen.add(result.id); results.push(result); }
+      cursor = data.next_cursor || null;
+      pages++;
+    } while (cursor && pages < 100);
+    return results;
+  }
+  function renderSearchProgress(search, results) {
+    const panel = byId("deal-preview-result");
+    const coverage = search.coverage || {};
+    const coverageLine = `Coverage: ${coverage.checked ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`;
+    const statusText = ({ QUEUED: "Search queued", RUNNING: "Checking the full radius", COMPLETED: search.last_outcome || "Search completed", FAILED: "Search failed", DELAYED: "Search delayed" })[search.status] || search.status;
+    renderLiveDealResults(results, ["QUEUED", "RUNNING"].includes(search.status));
+    const summary = document.createElement("p");
+    summary.textContent = `${statusText}. ${coverageLine}.`;
+    panel.prepend(summary);
+    if (search.status === "COMPLETED" || search.status === "FAILED" || search.status === "DELAYED") {
+      window.clearTimeout(state.pollTimer); state.pollTimer = null;
+    }
+  }
+  async function pollFamilySearch(searchId) {
+    if (state.currentSearchId !== searchId || state.pollCount >= 120) return;
+    state.pollCount++;
+    try {
+      const [search, results] = await Promise.all([
+        apiRequest(`/api/v1/searches/${encodeURIComponent(searchId)}`),
+        fetchAllSearchResults(searchId)
+      ]);
+      renderSearchProgress(search, results);
+      if (["QUEUED", "RUNNING"].includes(search.status)) state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 2500);
+    } catch (error) {
+      showToast(error.message || "Could not refresh search progress.");
+      state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 5000);
+    }
+  }
+  async function submitFamilyDealsSearch() {
+    const form = byId("deal-search-form");
+    if (!form.reportValidity()) return;
+    if (!state.csrfToken) {
+      byId("deal-auth-panel").scrollIntoView({ behavior: "smooth", block: "center" });
+      setAuthMessage("Connect first, then run your one-time search.");
+      byId("deal-access-secret").focus();
+      return;
+    }
+    const criteria = dealCriteria();
+    if (!criteria.location || !Number.isFinite(criteria.max_total_price) || criteria.max_total_price <= 0) {
+      showToast("Enter a location and a maximum total price.");
+      return;
+    }
+    try {
+      window.clearTimeout(state.pollTimer);
+      state.currentSearchId = ""; state.pollCount = 0;
+      const created = await apiRequest("/api/v1/searches", { method: "POST", body: JSON.stringify({ module: "family-deals", criteria }) });
+      state.currentSearchId = created.id;
+      const panel = byId("deal-preview-result"); panel.hidden = false;
+      panel.innerHTML = `<div class="result-state-icon">◷</div><div><p class="eyebrow">ONE-TIME SEARCH</p><h2>Search ${escapeHtml(created.status || "queued")}</h2><p>Search ID: ${escapeHtml(created.id)}. Worker dispatch: ${escapeHtml(created.dispatch || "unknown")}.</p></div>`;
+      if (created.dispatch === "signaled" || created.dispatch === "idle") {
+        pollFamilySearch(created.id);
+      } else {
+        const detail = document.createElement("p");
+        detail.textContent = "The search is saved, but the execution worker has not confirmed a run. No results will be invented. This needs backend dispatch configuration before it can run live.";
+        panel.append(detail);
+      }
+      panel.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (error) {
+      showToast(error.message || "Family Deals search could not be started.");
+      setAuthMessage(error.message || "Connection needs attention.");
+    }
+  }
+
   function showToast(message) {
     const toast = byId("toast"); toast.textContent = message; toast.classList.add("is-visible"); window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 3600);
   }
@@ -113,6 +233,13 @@
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
   });
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
-  byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); showDealPreview(); });
+  byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); submitFamilyDealsSearch(); });
+  byId("deal-auth-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = byId("deal-access-secret");
+    try { await connectDealSession(input.value); input.value = ""; showToast("Connected. Your one-time search is ready."); }
+    catch (error) { setAuthMessage(error.message || "Connection failed."); showToast(error.message || "Connection failed."); }
+  });
+  connectDealSession().catch(() => setConnected(false));
   updateSummary(); updateDealSummary(); renderWatches(); renderResults(); hydrate();
 })();
