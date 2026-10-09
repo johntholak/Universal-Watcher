@@ -111,8 +111,10 @@
   }
   function renderSearchProgress(search, results) {
     const panel = byId("deal-preview-result");
-    const coverage = search.coverage || {};
-    const coverageLine = `Coverage: ${coverage.checked ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`;
+    const coverage = search.coverage;
+    const coverageLine = coverage
+      ? `Coverage: ${coverage.checked ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`
+      : "Coverage summary pending until verification completes";
     const statusText = ({ QUEUED: "Search queued", RUNNING: "Checking the full radius", COMPLETED: search.last_outcome || "Search completed", FAILED: "Search failed", DELAYED: "Search delayed" })[search.status] || search.status;
     renderLiveDealResults(results, ["QUEUED", "RUNNING"].includes(search.status));
     const summary = document.createElement("p");
@@ -125,7 +127,24 @@
     }
   }
   async function pollFamilySearch(searchId) {
-    if (state.currentSearchId !== searchId || state.pollCount >= 120) return;
+    if (state.currentSearchId !== searchId) return;
+    if (state.pollCount >= 240) {
+      const panel = byId("deal-preview-result");
+      if (panel && !panel.querySelector("[data-poll-limit-note]")) {
+        const note = document.createElement("p");
+        note.dataset.pollLimitNote = "true";
+        note.textContent = "This search is taking longer than expected. Automatic refresh has paused, but the search has not been marked as failed.";
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "button button-outline";
+        retry.dataset.resumeFamilySearch = "true";
+        retry.textContent = "Check status again";
+        note.append(" ", retry);
+        panel.append(note);
+      }
+      state.pollTimer = null;
+      return;
+    }
     state.pollCount++;
     try {
       const [search, results] = await Promise.all([
@@ -246,6 +265,10 @@
       navigator.geolocation.getCurrentPosition(({ coords }) => { byId("deal-location").value = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`; updateDealSummary(); }, () => showToast("Location access was unavailable. Enter an address or ZIP instead."), { timeout: 10000, maximumAge: 300000 });
     }
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
+    if (event.target.closest("[data-resume-family-search]") && state.currentSearchId) {
+      state.pollCount = 0;
+      pollFamilySearch(state.currentSearchId);
+    }
   });
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); submitFamilyDealsSearch(); });
