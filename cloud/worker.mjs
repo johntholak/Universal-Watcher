@@ -513,7 +513,8 @@ export default {
           console.error("Family Deals delayed Search retry failed", error instanceof Error ? error.message : "unknown error");
         }
       }
-      return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
+      const status = row.status === "QUEUED" && ["CLAIMED", "RUNNING"].includes(row.job_status) ? "RUNNING" : row.status;
+      return json({ ...row, status, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
     }
     if (request.method === "POST" && path === "/api/v1/watches") {
       let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
