@@ -7,7 +7,7 @@ then `0004_watch_criteria_versions.sql` for criterion-version history.
 `worker.mjs` has a
 private-beta session route, a Family Deals one-time Search queue/retrieval
 slice, separately authenticated bounded job claims and lease heartbeat, chunked
-result intake, finalization, and paginated result reads. Result chunks are at
+result intake, live coverage progress, finalization, and paginated result reads. Result chunks are at
 most five records each to keep an invocation bounded; there is no overall
 result limit. Stable IDs and payload digests make duplicate delivery safe.
 This is offline code until the dedicated API deployment workflow is run. The browser UI and API share one origin through the Worker static-assets binding. A user Search signals one fixed GitHub workflow run, which claims one job and exits. There is no recurring Cron trigger. Dispatch is bounded by a one-minute cooldown and daily run limit. `wrangler.example.toml` remains a deployment template with a D1 placeholder. No restaurant source is contacted by the API itself. `docs/API_V1_CONTRACT.md` defines the route shapes.
@@ -46,8 +46,8 @@ third leases are finalized by Cron, including a Watch history event and a
 paused Watch; provider failures are `UNAVAILABLE` without automatic retry.
 No exception text or source payload is sent to the failure route. These are
 offline-tested policies, not a live provider acceptance claim.
-Evidence-backed result chunks are readable to the owning user while a job is
-`CLAIMED` or `RUNNING`, so a connected client can show candidates before the full
+Evidence-backed result chunks and checked/unavailable/unresolved coverage snapshots are readable to the owning user while a job is
+`CLAIMED` or `RUNNING`, so a connected client can show candidates and honest progress before the full
 radius check finishes. Search status reports `RUNNING` during execution. These
 early candidates must remain visibly provisional until final outcome and coverage
 are known. Failure reports or expired-lease reclamation clear a job's old chunks
