@@ -1,12 +1,13 @@
 # Universal Watcher `/api/v1` contract
 
-**Status:** Offline D1 migration and partial Worker API. Session creation,
-Family Deals Search creation/lookup, guarded dispatch, Watch creation/list/detail,
-Check Now and lifecycle, internal bounded claims and lease heartbeat, chunked
-result intake, Search/Watch finalization and paginated result reads exist in
-`cloud/worker.mjs`, but no route is deployed or wired to the browser. Dispatch
-is disabled by default; notifications remain planned. The current
-`/api/*` endpoints in `web/server.py` are local, in-memory previews.
+**Status:** The Worker API and same-origin browser wiring are implemented on
+the isolated `movie-gm-deploy` release branch, including Family Deals Search
+creation/lookup, guarded dispatch, Watch lifecycle, bounded claims, chunked
+result intake, finalization, and paginated result reads. This branch still
+requires CI, deployment review, and live adapter acceptance before release.
+Dispatch remains disabled unless its required secrets and quota gate are
+configured; notifications remain planned. The `/api/*` endpoints in
+`web/server.py` are local, in-memory previews.
 
 ## Public requests
 
@@ -21,15 +22,15 @@ errors. Timestamps are UTC ISO 8601 strings.
 | Method | Path | Behavior |
 | --- | --- | --- |
 | POST | `/api/v1/searches` | Validate module/criteria, atomically create Search plus queued Job, signal immediate dispatch. Return `202` with Search ID and `QUEUED` state. Dispatch failure leaves retriable queued work. |
-| GET | `/api/v1/searches/:id` | Return state, coverage, last outcome, and result links. |
+| GET | `/api/v1/searches/:id` | Return state, coverage, last outcome, and active job status. Reports `RUNNING` once claimed, before finalization. |
 | POST | `/api/v1/watches` | Save the exact criteria from a completed Search (`search_id`), including module and schema version. Set `ACTIVE` and schedule next check after 24 hours. |
 | GET | `/api/v1/watches` | List user Watches with last and next check, coverage, provider state and match state. |
 | GET | `/api/v1/watches/:id` | Watch, current results and meaningful history. |
 | PATCH | `/api/v1/watches/:id` | Pause, resume, stop, keep watching, or `edit_from_search` with a new completed owned `search_id`. Edits preserve previous criteria versions and refuse pending/running Watch jobs. |
 | POST | `/api/v1/watches/:id/check` | Queue an immediate check with per-Watch deduplication and capacity guard. |
 | DELETE | `/api/v1/watches/:id` | Stop/soft-delete user-facing Watch without erasing its result audit trail. |
-| GET | `/api/v1/results` | Cursor-paginated results filtered by Search/Watch. |
-| GET | `/api/v1/results/:id` | One result and its compact evidence. |
+| GET | `/api/v1/results` | Cursor-paginated results filtered by Search/Watch. Evidence-backed Family Deals Search candidates are readable during `CLAIMED`/`RUNNING` and remain provisional until final coverage is known. |
+| GET | `/api/v1/results/:id` | One result and its compact evidence, including candidates from an active Family Deals Search. |
 | GET | `/api/v1/system/status` | Safe public health/capacity status, no secrets or internal diagnostics. |
 
 The first implementation should accept Family Deals criteria from the approved
