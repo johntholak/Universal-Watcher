@@ -824,7 +824,7 @@ def build_candidate_sets(prepared: list[dict[str, Any]], source_results: dict[st
             "cuisine": r.get("cuisine", ""), "restaurantClass": r.get("restaurantClass", "unknown"),
             "classReason": r.get("classReason", ""), "address": r.get("address", ""),
             "website": u, "source_direct": bool(r.get("website")),
-            "price": best.get("price"), "listed_price": best.get("listed_price"),
+            "deal_name": best.get("deal_name"), "price": best.get("price"), "listed_price": best.get("listed_price"),
             "price_mode": best.get("price_mode", "package"), "capacity": best.get("capacity"),
             "capacity_min": best.get("capacity_min"), "capacity_max": best.get("capacity_max"),
             "capacity_label": best.get("capacity_label", ""),
