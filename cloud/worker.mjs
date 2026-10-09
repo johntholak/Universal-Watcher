@@ -434,7 +434,7 @@ export default {
       if (before) { cursorClause = " AND (created_at < ? OR (created_at = ? AND id < ?))"; args.push(before, before, beforeId); }
       try {
         const rows = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results
-          WHERE user_id=? AND ${column}=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND (j.status IN ('CLAIMED','RUNNING') OR (j.status='COMPLETED' AND j.final_digest IS NOT NULL)))
+          WHERE user_id=? AND ${column}=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND ((j.search_id IS NOT NULL AND j.module='family-deals' AND j.status IN ('CLAIMED','RUNNING')) OR (j.status='COMPLETED' AND j.final_digest IS NOT NULL)))
           ${cursorClause} ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...args, limit + 1).all();
         const page = (rows.results || []).slice(0, limit);
         const last = page.at(-1);
@@ -445,7 +445,7 @@ export default {
     if (request.method === "GET" && resultMatch) {
       try {
         const row = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results
-          WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND (j.status IN ('CLAIMED','RUNNING') OR (j.status='COMPLETED' AND j.final_digest IS NOT NULL)))`).bind(resultMatch[1], identity.user_id).first();
+          WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND ((j.search_id IS NOT NULL AND j.module='family-deals' AND j.status IN ('CLAIMED','RUNNING')) OR (j.status='COMPLETED' AND j.final_digest IS NOT NULL)))`).bind(resultMatch[1], identity.user_id).first();
         if (!row) return json({ error: "Result not found" }, 404);
         const evidence = await env.DB.prepare("SELECT source,source_url,summary,captured_at FROM result_evidence WHERE result_id=? AND user_id=? ORDER BY id").bind(row.id, identity.user_id).all();
         const { details_json, coverage_json, ...publicRow } = row;
