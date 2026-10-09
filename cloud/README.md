@@ -7,7 +7,7 @@ then `0004_watch_criteria_versions.sql` for criterion-version history.
 `worker.mjs` has a
 private-beta session route, a Family Deals one-time Search queue/retrieval
 slice, separately authenticated bounded job claims and lease heartbeat, chunked
-result intake, finalization, and paginated result reads. Result chunks are at
+result intake, live coverage progress, finalization, and paginated result reads. Result chunks are at
 most five records each to keep an invocation bounded; there is no overall
 result limit. Stable IDs and payload digests make duplicate delivery safe.
 This is offline code until the dedicated API deployment workflow is run. The browser UI and API share one origin through the Worker static-assets binding. A user Search signals one fixed GitHub workflow run, which claims one job and exits. There is no recurring Cron trigger. Dispatch is bounded by a one-minute cooldown and daily run limit. `wrangler.example.toml` remains a deployment template with a D1 placeholder. No restaurant source is contacted by the API itself. `docs/API_V1_CONTRACT.md` defines the route shapes.
@@ -46,8 +46,8 @@ third leases are finalized by Cron, including a Watch history event and a
 paused Watch; provider failures are `UNAVAILABLE` without automatic retry.
 No exception text or source payload is sent to the failure route. These are
 offline-tested policies, not a live provider acceptance claim.
-Evidence-backed result chunks are readable to the owning user while a job is
-`CLAIMED` or `RUNNING`, so a connected client can show candidates before the full
+Evidence-backed result chunks and checked/unavailable/unresolved coverage snapshots are readable to the owning user while a job is
+`CLAIMED` or `RUNNING`, so a connected client can show candidates and honest progress before the full
 radius check finishes. Search status reports `RUNNING` during execution. These
 early candidates must remain visibly provisional until final outcome and coverage
 are known. Failure reports or expired-lease reclamation clear a job's old chunks
@@ -58,14 +58,13 @@ Dispatch is enabled only when `DISPATCH_ENABLED=true`, a Cloudflare secret
 and an integer `DISPATCH_DAILY_LIMIT` (1–100) are configured. Set that limit
 only after calculating a conservative allowance from the account's free Actions
 balance and the 120-minute workflow timeout. The D1 gate reserves one run
-before contacting GitHub, limits signals to one per 15 minutes and retains
-ambiguous failures as reservations. When the configured daily allowance is
-exhausted, due jobs and their Searches/Watches become `DELAYED` with reason
-`free_capacity`; Cron requeues them after the next UTC reset. A temporary
-dispatch failure stays queued for a later tick, including reclaimable expired
-leases. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria from
-D1 through the authenticated API. The dispatch limit is local to this Worker;
-it cannot see other repositories' use of the same account's Actions balance.
+before contacting GitHub and retains ambiguous failures as reservations.
+When the daily allowance is exhausted, the one-time Search is delayed with an
+explicit capacity state. While the browser continues polling, it retries dispatch
+after the due time. The current deployment has no Cron trigger. Dispatch carries
+`{ "ref": "main", "inputs": { "job_id": "…" } }`; the runner claims only that job's
+criteria from D1 through the authenticated API. The dispatch limit is local to this
+Worker and cannot see other repositories' use of the same account's Actions balance.
 
 Run the offline migration test from the repository root:
 
@@ -77,3 +76,27 @@ node --test cloud/test_*.mjs
 Do not run a remote D1 migration or deploy until live adapter acceptance and the private beta
 auth, zero-cost account setup and quota behavior are reviewable together. The
 site and API must share an origin for the strict cookie and CSRF checks.
+
+
+## On-demand production deployment
+
+Run the manual GitHub Actions workflow **Deploy Universal Watcher Family Deals API**
+only after these repository Actions secrets exist:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+- `UW_D1_DATABASE_NAME`
+- `UW_D1_DATABASE_ID`
+- `UW_ACCESS_SECRET` (at least 32 characters)
+- `UW_SESSION_KEY` (at least 32 characters)
+- `UW_WORKER_SECRET` (at least 32 characters)
+- `UW_API_BASE` (the HTTPS API Worker origin used by the batch runner)
+- `UW_GITHUB_DISPATCH_TOKEN` (a GitHub token scoped to this repository with Actions: read/write permission)
+
+The workflow applies D1 migrations, deploys the app and API from the same Worker origin,
+sets private session and dispatch secrets, then smoke-tests the homepage and session.
+The Worker has no Cron trigger. Each browser Search signals the fixed batch workflow,
+which claims one job and exits. The UI reports disabled dispatch as not connected and
+does not claim that the queued Search ran. Permanently invalid dispatch is recorded
+as a failed Search. Temporary network and capacity states remain visible and retry
+only while the user polls that Search.

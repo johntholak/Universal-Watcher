@@ -90,20 +90,19 @@
     panel.innerHTML = `<div class="result-state-icon">${provisional ? "◷" : "✓"}</div><div><p class="eyebrow">${provisional ? "PROVISIONAL RESULTS" : "SEARCH RESULTS"}</p><h2>${results.length ? `${results.length} candidate${results.length === 1 ? "" : "s"} found` : "No candidates published yet"}</h2><p>${provisional ? "These are early candidates, not a final result. Keep this page open while full-radius coverage is checked." : "Search finished. Coverage and verification status determine whether the result is a confirmed match or an incomplete search."}</p></div><div class="full-list">${cards || "<p>No candidate results have arrived yet.</p>"}</div>`;
   }
   async function fetchAllSearchResults(searchId) {
-    const results = [], seen = new Set();
+    const results = [], seen = new Set(), cursors = new Set();
     let cursor = null;
-    const seenCursors = new Set();
     do {
       const query = new URLSearchParams({ search_id: searchId, limit: "50" });
-      if (cursor) {
-        const key = `${cursor.before}\u0000${cursor.before_id}`;
-        if (seenCursors.has(key)) throw new Error("Results pagination returned a repeated cursor.");
-        seenCursors.add(key);
-        query.set("before", cursor.before); query.set("before_id", cursor.before_id);
-      }
+      if (cursor) { query.set("before", cursor.before); query.set("before_id", cursor.before_id); }
       const data = await apiRequest(`/api/v1/results?${query}`);
       for (const result of data.results || []) if (!seen.has(result.id)) { seen.add(result.id); results.push(result); }
       cursor = data.next_cursor || null;
+      if (cursor) {
+        const key = `${cursor.before}|${cursor.before_id}`;
+        if (cursors.has(key)) throw new Error("Results pagination returned a repeated cursor.");
+        cursors.add(key);
+      }
     } while (cursor);
     await Promise.all(results.map(async (result) => {
       if (state.resultDetails[result.id]) { Object.assign(result, state.resultDetails[result.id]); return; }
@@ -117,15 +116,19 @@
   }
   function renderSearchProgress(search, results) {
     const panel = byId("deal-preview-result");
-    const coverage = search.coverage || {};
-    const coverageLine = `Coverage: ${coverage.checked ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`;
+    const coverage = search.coverage;
+    const coverageLine = coverage
+      ? `Radius: ${coverage.radius_discovered ?? "unknown"} restaurants discovered · Verification: ${coverage.checked ?? 0} of ${coverage.discovered ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`
+      : "Coverage summary pending until verification completes";
     const statusText = ({ QUEUED: "Search queued", RUNNING: "Checking the full radius", COMPLETED: search.last_outcome || "Search completed", FAILED: "Search failed", DELAYED: "Search delayed" })[search.status] || search.status;
-    renderLiveDealResults(results, search.status !== "COMPLETED");
+    renderLiveDealResults(results, ["QUEUED", "RUNNING", "DELAYED"].includes(search.status));
     const summary = document.createElement("p");
     summary.textContent = `${statusText}. ${coverageLine}.`;
     panel.prepend(summary);
     if (search.status === "COMPLETED" || search.status === "FAILED") {
       window.clearTimeout(state.pollTimer); state.pollTimer = null;
+      state.currentSearchId = "";
+      byId("deal-search-form").querySelector('button[type="submit"]').disabled = false;
     }
   }
   async function pollFamilySearch(searchId) {
@@ -148,6 +151,8 @@
   }
   async function submitFamilyDealsSearch() {
     const form = byId("deal-search-form");
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (state.currentSearchId) { showToast("Your current Family Deals search is still running."); return; }
     if (!form.reportValidity()) return;
     if (!state.csrfToken) {
       byId("deal-auth-panel").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -161,21 +166,25 @@
       return;
     }
     try {
+      submitButton.disabled = true;
       window.clearTimeout(state.pollTimer);
       state.currentSearchId = ""; state.pollCount = 0;
       const created = await apiRequest("/api/v1/searches", { method: "POST", body: JSON.stringify({ module: "family-deals", criteria }) });
       state.currentSearchId = created.id;
       const panel = byId("deal-preview-result"); panel.hidden = false;
       panel.innerHTML = `<div class="result-state-icon">◷</div><div><p class="eyebrow">ONE-TIME SEARCH</p><h2>Search ${escapeHtml(created.status || "queued")}</h2><p>Search ID: ${escapeHtml(created.id)}. Worker dispatch: ${escapeHtml(created.dispatch || "unknown")}.</p></div>`;
-      if (["signaled", "idle", "deferred", "free_capacity", "dispatch_network"].includes(created.dispatch)) {
+      if (["signaled", "idle", "deferred", "free_capacity", "dispatch_network", "not_connected"].includes(created.dispatch)) {
         pollFamilySearch(created.id);
       } else {
+        state.currentSearchId = "";
+        submitButton.disabled = false;
         const detail = document.createElement("p");
         detail.textContent = "The search is saved, but the execution worker has not confirmed a run. No results will be invented. This needs backend dispatch configuration before it can run live.";
         panel.append(detail);
       }
       panel.scrollIntoView({ behavior: "smooth", block: "center" });
     } catch (error) {
+      submitButton.disabled = false;
       showToast(error.message || "Family Deals search could not be started.");
       setAuthMessage(error.message || "Connection needs attention.");
     }

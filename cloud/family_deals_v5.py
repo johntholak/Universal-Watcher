@@ -77,7 +77,14 @@ async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any], on_pro
         }""")
         verification = snapshot.get("verification") or {}
         if on_progress and snapshot.get("discovery_completed") and verification.get("status") in ("resolving", "checking"):
-            signature = (verification.get("status"), verification.get("sources_checked"), len(verification.get("matches") or []))
+            signature = (
+                verification.get("status"),
+                verification.get("restaurants_checked"),
+                verification.get("restaurants_unavailable"),
+                verification.get("restaurants_unresolved"),
+                verification.get("sources_checked"),
+                hashlib.sha256(json.dumps(verification.get("matches") or [], sort_keys=True, default=str).encode()).hexdigest(),
+            )
             if signature != last_signature:
                 await on_progress(snapshot)
                 last_signature = signature
@@ -99,8 +106,9 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
     progressive = verification_status in ("resolving", "checking") and snapshot.get("discovery_completed")
     if error or not snapshot.get("discovery_completed") or (selected and verification_status != "done" and not progressive):
         return {"outcome": "UNAVAILABLE", "summary": "Restaurant discovery or verification could not finish.",
-                "coverage": {"state": "unavailable", "discovered": selected, "checked": 0,
-                             "unavailable": selected, "unresolved": 0}, "results": []}
+                "coverage": {"state": "unavailable", "radius_discovered": max(0, int(snapshot.get("radius_discovered") or 0)),
+                             "discovered": selected, "checked": 0, "unavailable": selected, "unresolved": 0},
+                "radius_discovered": max(0, int(snapshot.get("radius_discovered") or 0)), "results": []}
 
     checked = max(0, int(job.get("restaurants_checked") or 0)) if selected else 0
     unavailable = max(0, int(job.get("restaurants_unavailable") or 0)) if selected else 0
@@ -108,8 +116,9 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
     coverage_valid = (checked + unavailable + unresolved <= selected) if progressive else (checked + unavailable + unresolved == selected)
     if not coverage_valid:
         return {"outcome": "UNAVAILABLE", "summary": "Restaurant coverage counts did not reconcile.",
-                "coverage": {"state": "unavailable", "discovered": selected, "checked": 0,
-                             "unavailable": selected, "unresolved": 0}, "results": []}
+                "coverage": {"state": "unavailable", "radius_discovered": max(0, int(snapshot.get("radius_discovered") or 0)),
+                             "discovered": selected, "checked": 0, "unavailable": selected, "unresolved": 0},
+                "radius_discovered": max(0, int(snapshot.get("radius_discovered") or 0)), "results": []}
 
     candidates = job.get("matches") or []
     results = []
@@ -156,8 +165,9 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
 
     complete = not progressive and checked == selected and not unavailable and not unresolved
     state = "complete" if complete and not results and not omitted_candidates else "partial"
-    coverage = {"state": state, "discovered": selected, "checked": checked,
-                "unavailable": unavailable, "unresolved": unresolved}
+    radius_discovered = max(0, int(snapshot.get("radius_discovered") or 0))
+    coverage = {"state": state, "radius_discovered": radius_discovered, "discovered": selected,
+                "checked": checked, "unavailable": unavailable, "unresolved": unresolved}
     if progressive:
         outcome = "PARTIAL"
         summary = f"{len(results)} qualifying meal candidates found so far; {checked} of {selected} restaurants checked. Explicit deal-name/location proof and full coverage may still be pending."

@@ -121,11 +121,15 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
             if lost.is_set():
                 raise RuntimeError("Job lease was lost; progressive results will not be submitted")
             partial = normalize_v5_snapshot(snapshot, job["criteria"], job["id"])
-            await asyncio.to_thread(
-                api.post,
-                f"/api/v1/internal/jobs/{job['id']}/progress",
-                {"claim_id": job["claim_id"], "coverage": partial["coverage"]},
-            )
+            try:
+                await asyncio.to_thread(
+                    api.post,
+                    f"/api/v1/internal/jobs/{job['id']}/progress",
+                    {"claim_id": job["claim_id"], "coverage": partial["coverage"], "summary": partial["summary"]},
+                )
+            except Exception as exc:
+                # Early coverage is useful, but a transient reporting failure must not abort the scan.
+                print(f"Family Deals progress update skipped: {type(exc).__name__}")
             pending = [item for item in partial["results"] if item["id"] not in published_ids]
             path = f"/api/v1/internal/jobs/{job['id']}/results"
             for offset in range(0, len(pending), 5):
@@ -135,7 +139,6 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
                     {"claim_id": job["claim_id"], "items": chunk},
                 )
                 published_ids.update(item["id"] for item in chunk)
-
         try:
             snapshot = await asyncio.wait_for(
                 run_v5_page(page, base_url, job["criteria"], on_progress=publish_progress),

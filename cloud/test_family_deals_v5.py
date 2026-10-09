@@ -88,8 +88,8 @@ class FamilyDealsV5BridgeTests(unittest.TestCase):
                                                   "evidence": "Family meal for 4-8 | $49.99"}]}}
         result = bridge.normalize_v5_snapshot(snapshot, CRITERIA, JOB_ID)
         self.assertEqual(result["outcome"], "PARTIAL")
-        self.assertEqual(result["coverage"], {"state": "partial", "discovered": 3,
-                                               "checked": 1, "unavailable": 0, "unresolved": 1})
+        self.assertEqual(result["coverage"], {"state": "partial", "radius_discovered": 20,
+                                               "discovered": 3, "checked": 1, "unavailable": 0, "unresolved": 1})
         self.assertEqual(len(result["results"]), 1)
         self.assertEqual(result["results"][0]["outcome"], "PARTIAL")
         self.assertIsNone(result["results"][0]["details"]["deal_name"])

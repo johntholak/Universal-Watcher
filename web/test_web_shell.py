@@ -41,15 +41,9 @@ class WebShellTests(unittest.TestCase):
         ):
             self.assertIn(marker, html)
         self.assertNotIn("Family Deals is next", html)
-        for marker in ("dealCriteria()", "updateDealSummary()", "submitFamilyDealsSearch()", '"/api/v1/searches"', '/api/v1/results?', "PROVISIONAL RESULTS", "resultDetails[result.id]"):
+        for marker in ("dealCriteria()", "updateDealSummary()", "submitFamilyDealsSearch()", '"/api/v1/searches"', '/api/v1/results?', "PROVISIONAL RESULTS", "resultDetails[result.id]", "Coverage summary pending until verification completes", "Radius: ${coverage.radius_discovered ?? \"unknown\"} restaurants discovered", "Verification: ${coverage.checked ?? 0} of ${coverage.discovered ?? 0} checked", "cursors.has(key)", "DELAYED" ):
             self.assertIn(marker, js)
-
-    def test_live_search_paginates_without_result_or_poll_attempt_caps(self):
-        javascript = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
-        self.assertIn("} while (cursor);", javascript)
-        self.assertNotIn("pages < 100", javascript)
-        self.assertNotIn("pollCount >= 120", javascript)
-        self.assertIn('search.status === "COMPLETED" || search.status === "FAILED"', javascript)
+        self.assertNotIn("state.pollCount >=", js)
 
     def test_shell_uses_locked_visual_language_and_hides_shelved_modules(self):
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")

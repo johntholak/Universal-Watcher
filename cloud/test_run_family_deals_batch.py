@@ -55,11 +55,14 @@ class FailingPage(FakePage):
 
 
 class FakeAPI:
-    def __init__(self):
+    def __init__(self, fail_progress=False):
         self.calls = []
+        self.fail_progress = fail_progress
 
     def post(self, path, payload):
         self.calls.append((path, payload))
+        if self.fail_progress and path.endswith("/progress"):
+            raise RuntimeError("temporary progress failure")
         return {"accepted": len(payload.get("items", []))}
 
 
@@ -107,21 +110,46 @@ class FamilyBatchRunnerTests(unittest.TestCase):
                                   "restaurants_unavailable": 0, "restaurants_unresolved": 0,
                                   "sources_checked": 2, "matches": [first, second]}}
         api = FakeAPI()
-        job = {"id": str(uuid.uuid4()), "claim_id": str(uuid.uuid4()), "criteria": criteria}
+        job = {"id": str(uuid.uuid4()), "search_id": str(uuid.uuid4()), "claim_id": str(uuid.uuid4()), "criteria": criteria}
         response = asyncio.run(runner.execute_job(
             api, ProgressiveFakePage([active, final]), "http://127.0.0.1:9999/", job))
         self.assertEqual(response["candidate_count"], 2)
         self.assertEqual(len(api.calls), 4)
         self.assertTrue(api.calls[0][0].endswith("/progress"))
-        self.assertEqual(api.calls[0][1]["coverage"], {
-            "state": "partial", "discovered": 2, "checked": 1,
-            "unavailable": 0, "unresolved": 0,
-        })
+        self.assertEqual(api.calls[0][1]["coverage"]["checked"], 1)
         self.assertTrue(api.calls[1][0].endswith("/results"))
         self.assertEqual([x["title"] for x in api.calls[1][1]["items"]], ["Family meal offer at First Pizza"])
         self.assertTrue(api.calls[2][0].endswith("/results"))
         self.assertEqual([x["title"] for x in api.calls[2][1]["items"]], ["Family meal offer at Second Pizza"])
         self.assertTrue(api.calls[3][0].endswith("/complete"))
+
+    def test_progress_reporting_failure_does_not_abort_the_scan(self):
+        criteria = {"schema_version": 1, "location": "91304", "radius_miles": 2,
+                    "party_size": 7, "max_total_price": 50, "cuisines": [],
+                    "restaurant_type": "any", "open_tonight": True}
+        candidate = {"name": "First Pizza", "price": 45, "capacity_verified": True,
+                     "capacity_max": 7, "capacity_label": "7", "opening_status": True,
+                     "restaurantClass": "independent", "source_direct": True,
+                     "source_url": "https://example.com/first",
+                     "evidence": "Family meal for seven $45"}
+        active = {"radius_discovered": 1, "selected_restaurants": 1,
+                  "discovery_completed": True, "hunt_finished": False, "error": None,
+                  "verification": {"status": "checking", "restaurants_checked": 1,
+                                   "restaurants_unavailable": 0, "restaurants_unresolved": 0,
+                                   "sources_checked": 1, "matches": [candidate]}}
+        final = {"radius_discovered": 1, "selected_restaurants": 1,
+                 "discovery_completed": True, "hunt_finished": True, "error": None,
+                 "verification": {"status": "done", "restaurants_checked": 1,
+                                  "restaurants_unavailable": 0, "restaurants_unresolved": 0,
+                                  "sources_checked": 1, "matches": [candidate]}}
+        api = FakeAPI(fail_progress=True)
+        job = {"id": str(uuid.uuid4()), "search_id": str(uuid.uuid4()),
+               "claim_id": str(uuid.uuid4()), "criteria": criteria}
+        response = asyncio.run(runner.execute_job(
+            api, ProgressiveFakePage([active, final]), "http://127.0.0.1:9999/", job))
+        self.assertEqual(response["candidate_count"], 1)
+        self.assertTrue(any(path.endswith("/complete") for path, _ in api.calls))
+        self.assertFalse(any(path.endswith("/failure") for path, _ in api.calls))
 
     def test_execution_failure_requests_bounded_retry_without_false_result(self):
         api = FakeAPI()

@@ -22,6 +22,7 @@ jobs:
       ACCESS_SECRET: ${{ secrets.UW_ACCESS_SECRET }}
       SESSION_KEY: ${{ secrets.UW_SESSION_KEY }}
       WORKER_SECRET: ${{ secrets.UW_WORKER_SECRET }}
+      UW_API_BASE: ${{ secrets.UW_API_BASE }}
       GITHUB_DISPATCH_TOKEN: ${{ secrets.UW_GITHUB_DISPATCH_TOKEN }}
 
     steps:
@@ -35,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN UW_D1_DATABASE_NAME UW_D1_DATABASE_ID ACCESS_SECRET SESSION_KEY WORKER_SECRET GITHUB_DISPATCH_TOKEN; do
+          for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN UW_D1_DATABASE_NAME UW_D1_DATABASE_ID ACCESS_SECRET SESSION_KEY WORKER_SECRET UW_API_BASE GITHUB_DISPATCH_TOKEN; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing GitHub Actions secret for $name"
               exit 1
