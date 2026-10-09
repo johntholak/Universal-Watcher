@@ -47,7 +47,15 @@
       </section>
       <section class="view" data-page="family-deals" aria-labelledby="deals-title">
         <header class="page-header"><span class="page-icon family-glyph">♨</span><div><h1 id="deals-title">Family Deals</h1><p>Find actual nearby meal deals for your whole party, with prices and source evidence.</p></div></header>
-        <div class="offline-banner" role="status"><span>◷</span><div><strong>Local preview — live deal checking is not connected yet</strong><small>Configure a search and save its criteria. No restaurant sources are contacted from this page.</small></div></div>
+        <section class="workflow-card" id="deal-auth-panel" aria-labelledby="deal-auth-title">
+          <header class="workflow-heading"><span>↗</span><div><h2 id="deal-auth-title">Connect to your private search</h2><p>Sign in to run one Family Deals search. Your access key stays in this browser session and is never saved.</p></div></header>
+          <form id="deal-auth-form">
+            <label class="stack-label" for="deal-access-secret">Private access key</label>
+            <div class="input-action-row"><input id="deal-access-secret" type="password" autocomplete="current-password" required minlength="1" aria-label="Private access key"><button class="button button-outline" type="submit">Connect</button></div>
+            <p class="field-note" id="deal-auth-message" role="status">Not connected.</p>
+          </form>
+        </section>
+        <div class="offline-banner" id="deal-live-banner" role="status"><span>◷</span><div><strong>Search runs once when you ask</strong><small>No recurring search is started by this form. Results will appear as the worker verifies them.</small></div></div>
         <form id="deal-search-form" class="deal-workspace">
           <div class="deal-columns">
             <article class="workflow-card"><header class="workflow-heading"><span>1</span><div><h2>Where should we look?</h2><p>Search the full selected radius. Coverage will be reported when live checking is connected.</p></div></header>
@@ -66,7 +74,7 @@
               <label class="check-row"><input id="deal-open-tonight" type="checkbox" name="open_tonight"> Open tonight for dinner only</label><p class="field-note">Unknown classification or hours will be identified as uncertain, never guessed.</p>
             </article>
           </div>
-          <aside class="search-summary deal-summary" aria-labelledby="deal-summary-title"><header><h2 id="deal-summary-title">Your Family Deals Search</h2><button type="button" data-focus-deal>✎ Edit</button></header><dl><div><dt>Near</dt><dd id="deal-summary-location">Add a location</dd></div><div><dt>Radius</dt><dd id="deal-summary-radius">7 miles</dd></div><div><dt>Party</dt><dd id="deal-summary-party">4 people</dd></div><div><dt>Total budget</dt><dd id="deal-summary-budget">Add a maximum</dd></div><div><dt>Cuisine</dt><dd id="deal-summary-cuisine">Any cuisine</dd></div><div><dt>Restaurants</dt><dd id="deal-summary-type">Any</dd></div><div><dt>Dinner</dt><dd id="deal-summary-hours">Any availability</dd></div></dl><button class="button button-primary button-wide" type="submit">⌕ &nbsp; Find Family Deals</button><button class="button button-watch button-wide" type="button" data-save-deal-watch>♧ &nbsp; Save this Search</button><p>Saved searches in this preview are local drafts. Checks and alerts are not running yet.</p></aside>
+          <aside class="search-summary deal-summary" aria-labelledby="deal-summary-title"><header><h2 id="deal-summary-title">Your Family Deals Search</h2><button type="button" data-focus-deal>✎ Edit</button></header><dl><div><dt>Near</dt><dd id="deal-summary-location">Add a location</dd></div><div><dt>Radius</dt><dd id="deal-summary-radius">7 miles</dd></div><div><dt>Party</dt><dd id="deal-summary-party">4 people</dd></div><div><dt>Total budget</dt><dd id="deal-summary-budget">Add a maximum</dd></div><div><dt>Cuisine</dt><dd id="deal-summary-cuisine">Any cuisine</dd></div><div><dt>Restaurants</dt><dd id="deal-summary-type">Any</dd></div><div><dt>Dinner</dt><dd id="deal-summary-hours">Any availability</dd></div></dl><button class="button button-primary button-wide" type="submit">⌕ &nbsp; Find Family Deals</button><p>One-time search only. Nothing runs again unless you start another search.</p></aside>
         </form>
         <section id="deal-preview-result" class="preview-result" hidden aria-live="polite"></section>
       </section>
