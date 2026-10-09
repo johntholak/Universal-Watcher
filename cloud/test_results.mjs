@@ -44,6 +44,17 @@ test("chunked results survive duplicate delivery and have no global match cap", 
     assert.equal(claim.status, 200);
     const job = (await claim.json()).jobs[0];
     assert.deepEqual(job.criteria, criteria);
+    const progressCoverage = { state: "partial", discovered: 12, checked: 3, unavailable: 1, unresolved: 2 };
+    const progressResponse = await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/progress`, "POST", {
+      claim_id: job.claim_id, coverage: progressCoverage, summary: "3 checked so far",
+    }, headers), env);
+    assert.equal(progressResponse.status, 200, await progressResponse.text());
+    const activeProgress = await worker.fetch(request(`/api/v1/searches/${searchId}`, "GET", null, { Cookie: cookie }), env);
+    assert.deepEqual((await activeProgress.json()).coverage, progressCoverage);
+    const invalidProgress = await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/progress`, "POST", {
+      claim_id: job.claim_id, coverage: { ...progressCoverage, checked: 20 },
+    }, headers), env);
+    assert.equal(invalidProgress.status, 400);
     const items = Array.from({ length: 12 }, (_, i) => ({
       id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
       title: `Meal ${i}`, outcome: "MATCH", verification: "VERIFIED", summary: "Official menu",
