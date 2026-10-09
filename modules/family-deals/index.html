@@ -357,6 +357,7 @@ function renderDiscoveryComplete(cached=false){
 }
 
 function renderVerificationProgress(job){
+  state.verification=job;
   const rs=state.restaurants;
   const resolving=job.status==='queued'||job.status==='resolving';
   const doneSources=Number(job.sources_checked||0), totalSources=Number(job.sources_total||0);

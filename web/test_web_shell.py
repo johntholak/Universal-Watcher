@@ -43,6 +43,15 @@ class WebShellTests(unittest.TestCase):
         for marker in ("dealCriteria()", "updateDealSummary()", "runFamilyDealsSearch()", 'createDraft("family-deals")', "Family Deals live checking is not connected"):
             self.assertIn(marker, js)
 
+    def test_family_deals_publishes_candidates_during_search_without_result_cap(self):
+        javascript = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        self.assertIn('if (["RUNNING", "COMPLETED"].includes(status))', javascript)
+        self.assertIn("data.next_cursor", javascript)
+        self.assertIn("seenCursors", javascript)
+        self.assertIn("found so far", javascript)
+        self.assertIn("Results remain provisional until the full search and coverage check are complete.", javascript)
+        self.assertNotIn("page < 1000", javascript)
+
     def test_shell_uses_locked_visual_language_and_hides_shelved_modules(self):
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         css = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")

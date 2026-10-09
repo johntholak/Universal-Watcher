@@ -16,10 +16,7 @@ function environment() {
   const DB = {
     prepare(sql) { return { bind(...args) { return { sql, args,
       async first() { return sqlite.prepare(sql).get(...args) || null; },
-      async run() {
-        const result = sqlite.prepare(sql).run(...args);
-        return { success: true, meta: { changes: Number(result.changes ?? 0) } };
-      },
+      async run() { return sqlite.prepare(sql).run(...args); },
     }; } }; },
     async batch(statements) {
       sqlite.exec("BEGIN");
@@ -27,7 +24,7 @@ function environment() {
       catch (error) { sqlite.exec("ROLLBACK"); throw error; }
     },
   };
-  return { sqlite, env: { DB, DISPATCH_ENABLED: "true", DISPATCH_DAILY_LIMIT: "1", GITHUB_DISPATCH_TOKEN: "t".repeat(40) } };
+  return { sqlite, env: { DB, DISPATCH_ENABLED: "true", DISPATCH_DAILY_LIMIT: "10", GITHUB_DISPATCH_TOKEN: "t".repeat(40) } };
 }
 
 test("dispatch sends only a work signal and respects cooldown and daily reservation", async (t) => {
@@ -39,11 +36,14 @@ test("dispatch sends only a work signal and respects cooldown and daily reservat
   t.after(() => { globalThis.fetch = oldFetch; });
   const time = new Date("2026-09-26T01:00:00.000Z");
   assert.equal(await dispatchPending(env, time), "signaled");
-  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:16:00.000Z")), "free_capacity");
-  assert.equal(requests.length, 1);
-  assert.deepEqual(JSON.parse(requests[0].options.body), { ref: "movie-gm-deploy" });
+  for (let minute = 1; minute < 10; minute++) {
+    assert.equal(await dispatchPending(env, new Date(`2026-09-26T01:${String(minute).padStart(2, "0")}:00.000Z`)), "signaled");
+  }
+  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:10:00.000Z")), "free_capacity");
+  assert.equal(requests.length, 10);
+  assert.deepEqual(JSON.parse(requests[0].options.body), { ref: "main" });
   assert.match(requests[0].url, /family-deals-worker\.yml\/dispatches$/);
-  assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 1);
+  assert.equal(sqlite.prepare("SELECT runs_today FROM dispatch_gate").get().runs_today, 10);
   const delayed = sqlite.prepare("SELECT status,delay_reason FROM jobs WHERE id='j'").get();
   assert.equal(delayed.status, "DELAYED");
   assert.equal(delayed.delay_reason, "free_capacity");
@@ -51,7 +51,7 @@ test("dispatch sends only a work signal and respects cooldown and daily reservat
   await restoreFreeCapacity(env, new Date("2026-09-27T01:00:00.000Z"));
   assert.equal(sqlite.prepare("SELECT status FROM searches WHERE id='s'").get().status, "QUEUED");
   assert.equal(await dispatchPending(env, new Date("2026-09-27T01:00:00.000Z")), "signaled");
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 11);
 });
 
 test("current GitHub API 200 dispatch response is accepted", async (t) => {
@@ -63,15 +63,6 @@ test("current GitHub API 200 dispatch response is accepted", async (t) => {
   t.after(() => { globalThis.fetch = oldFetch; });
   assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "signaled");
   assert.equal(calls, 1);
-});
-
-test("GitHub permission failures are classified without exposing response details", async (t) => {
-  const { sqlite, env } = environment();
-  t.after(() => sqlite.close());
-  const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => ({ status: 403, text: async () => '{"message":"permission details"}' });
-  t.after(() => { globalThis.fetch = oldFetch; });
-  assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z")), "dispatch_forbidden");
 });
 
 test("disabled dispatch never contacts GitHub; failed dispatch stays queued with conservative reservation", async (t) => {

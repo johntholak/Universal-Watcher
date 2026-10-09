@@ -54,7 +54,7 @@ class FamilyDealsV5BridgeTests(unittest.TestCase):
                                      "matches": [{"name": "Example Pizza", "price": 49.99,
                                                   "capacity_verified": True, "capacity_max": 8,
                                                   "capacity_label": "4-8", "opening_status": True,
-                                                  "source_direct": True,
+                                                  "deal_name": "Family meal", "source_direct": True,
                                                   "restaurantClass": "independent",
                                                   "source_url": "https://example.com/menu",
                                                   "evidence": "Family meal for 4-8 | $49.99"}]}}
@@ -64,6 +64,27 @@ class FamilyDealsV5BridgeTests(unittest.TestCase):
         self.assertEqual(result["coverage"]["partial_candidates"], 0)
         self.assertEqual(result["results"][0]["outcome"], "MATCH")
         self.assertTrue(result["results"][0]["details"]["location_verified"])
+
+    def test_progressive_snapshot_returns_provisional_candidates(self):
+        snapshot = {"radius_discovered": 20, "selected_restaurants": 3,
+                    "discovery_completed": True, "error": None,
+                    "verification": {"status": "checking", "restaurants_checked": 1,
+                                     "restaurants_unavailable": 0, "restaurants_unresolved": 1,
+                                     "matches": [{"name": "Example Pizza", "price": 49.99,
+                                                  "capacity_verified": True, "capacity_max": 8,
+                                                  "capacity_label": "4-8", "opening_status": True,
+                                                  "source_direct": True, "restaurantClass": "independent",
+                                                  "source_url": "https://example.com/menu",
+                                                  "evidence": "Family meal for 4-8 | $49.99"}]}}
+        result = bridge.normalize_v5_snapshot(snapshot, CRITERIA, JOB_ID)
+        self.assertEqual(result["outcome"], "PARTIAL")
+        self.assertEqual(result["coverage"]["state"], "partial")
+        self.assertEqual(result["coverage"]["discovered"], 3)
+        self.assertEqual(result["coverage"]["checked"], 1)
+        self.assertEqual(result["coverage"]["unresolved"], 1)
+        self.assertEqual(len(result["results"]), 1)
+        self.assertEqual(result["results"][0]["outcome"], "PARTIAL")
+        self.assertIn("found so far", result["summary"])
 
     def test_location_unknown_downgrades_candidate_and_preserves_evidence(self):
         snapshot = {"radius_discovered": 697, "selected_restaurants": 1,

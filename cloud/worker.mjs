@@ -472,7 +472,8 @@ export default {
           (SELECT delay_reason FROM jobs WHERE search_id=searches.id AND user_id=searches.user_id ORDER BY created_at DESC LIMIT 1) AS delay_reason
           FROM searches WHERE module=? AND user_id=? ORDER BY created_at DESC,id DESC LIMIT 1`).bind(module, identity.user_id).first();
         if (!row) return json({ error: "No Family Deals Search found" }, 404);
-        return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
+        const status = row.status === "QUEUED" && ["CLAIMED", "RUNNING"].includes(row.job_status) ? "RUNNING" : row.status;
+      return json({ ...row, status, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
       } catch {
         return json({ error: "Search query unavailable" }, 503);
       }
@@ -512,7 +513,8 @@ export default {
           console.error("Family Deals delayed Search retry failed", error instanceof Error ? error.message : "unknown error");
         }
       }
-      return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
+      const status = row.status === "QUEUED" && ["CLAIMED", "RUNNING"].includes(row.job_status) ? "RUNNING" : row.status;
+      return json({ ...row, status, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
     }
     if (request.method === "POST" && path === "/api/v1/watches") {
       let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
@@ -642,7 +644,7 @@ export default {
       if (before) { cursorClause = " AND (created_at < ? OR (created_at = ? AND id < ?))"; args.push(before, before, beforeId); }
       try {
         const rows = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results
-          WHERE user_id=? AND ${column}=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND j.status='COMPLETED' AND j.final_digest IS NOT NULL)
+          WHERE user_id=? AND ${column}=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND ((j.search_id IS NOT NULL AND j.module='family-deals' AND j.status IN ('CLAIMED','RUNNING')) OR (j.status='COMPLETED' AND j.final_digest IS NOT NULL)))
           ${cursorClause} ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...args, limit + 1).all();
         const page = (rows.results || []).slice(0, limit);
         const last = page.at(-1);
@@ -653,7 +655,7 @@ export default {
     if (request.method === "GET" && resultMatch) {
       try {
         const row = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results
-          WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND j.status='COMPLETED' AND j.final_digest IS NOT NULL)`).bind(resultMatch[1], identity.user_id).first();
+          WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND ((j.search_id IS NOT NULL AND j.module='family-deals' AND j.status IN ('CLAIMED','RUNNING')) OR (j.status='COMPLETED' AND j.final_digest IS NOT NULL)))`).bind(resultMatch[1], identity.user_id).first();
         if (!row) return json({ error: "Result not found" }, 404);
         const evidence = await env.DB.prepare("SELECT source,source_url,summary,captured_at FROM result_evidence WHERE result_id=? AND user_id=? ORDER BY id").bind(row.id, identity.user_id).all();
         const { details_json, coverage_json, ...publicRow } = row;

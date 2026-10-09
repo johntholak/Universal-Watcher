@@ -797,6 +797,72 @@ def restaurant_coverage(prepared: list[dict[str, Any]], source_results: dict[str
             "restaurants_unresolved": unresolved}
 
 
+def build_candidate_sets(prepared: list[dict[str, Any]], source_results: dict[str, dict[str, Any]], budget: float, open_only: bool) -> dict[str, Any]:
+    """Build candidates only from official sources whose checks have finished."""
+    matches: list[dict[str, Any]] = []
+    needs_hours: list[dict[str, Any]] = []
+    needs_capacity: list[dict[str, Any]] = []
+    no_deal = 0
+    rejection_totals: dict[str, int] = {}
+    for sr in source_results.values():
+        for reason, count in (sr.get("rejections") or {}).items():
+            rejection_totals[reason] = rejection_totals.get(reason, 0) + int(count)
+    for r in prepared:
+        u = r.get("resolvedWebsite") or ""
+        sr = source_results.get(u) if u else None
+        if not sr:
+            no_deal += 1
+            continue
+        deals = [d for d in (sr.get("deals") or []) if float(d.get("price") or 0) <= budget]
+        if not deals:
+            no_deal += 1
+            continue
+        best = min(deals, key=lambda d: (not bool(d.get("capacity_verified")), d["price"], -d["score"]))
+        opening_status = parse_simple_opening_hours(r.get("opening", "")) if open_only else True
+        record = {
+            "name": r.get("name", "Restaurant"), "distance": r.get("distance", 0),
+            "cuisine": r.get("cuisine", ""), "restaurantClass": r.get("restaurantClass", "unknown"),
+            "classReason": r.get("classReason", ""), "address": r.get("address", ""),
+            "website": u, "source_direct": bool(r.get("website")),
+            "deal_name": best.get("deal_name"), "price": best.get("price"),
+            "listed_price": best.get("listed_price"), "price_mode": best.get("price_mode", "package"),
+            "capacity": best.get("capacity"), "capacity_min": best.get("capacity_min"),
+            "capacity_max": best.get("capacity_max"), "capacity_label": best.get("capacity_label", ""),
+            "capacity_verified": bool(best.get("capacity_verified")), "evidence": best.get("evidence", ""),
+            "source_url": best.get("source_url", u), "pages_checked": sr.get("pages_checked", 0),
+            "opening_status": opening_status, "opening": r.get("opening", ""),
+        }
+        if not record["capacity_verified"]:
+            needs_capacity.append(record)
+        elif open_only and opening_status is None:
+            needs_hours.append(record)
+        elif open_only and opening_status is False:
+            continue
+        else:
+            matches.append(record)
+    for values in (matches, needs_hours, needs_capacity):
+        values.sort(key=lambda m: (m["price"], m["distance"]))
+    return {"matches": matches, "needs_hours": needs_hours, "needs_capacity": needs_capacity,
+            "no_deal": no_deal, "rejection_counts": rejection_totals}
+
+
+def restaurant_coverage_progress(prepared: list[dict[str, Any]], source_results: dict[str, dict[str, Any]]) -> dict[str, int]:
+    """Count only completed source checks; unresolved sources remain separately visible."""
+    checked = unavailable = unresolved = 0
+    for restaurant in prepared:
+        source = restaurant.get("resolvedWebsite") or ""
+        if not source:
+            unresolved += 1
+        elif source not in source_results:
+            continue
+        elif (source_results.get(source) or {}).get("status") == "checked":
+            checked += 1
+        else:
+            unavailable += 1
+    return {"restaurants_checked": checked, "restaurants_unavailable": unavailable,
+            "restaurants_unresolved": unresolved}
+
+
 def run_verification_job(job_id: str, payload: dict[str, Any]) -> None:
     started_at = time.time()
     restaurants = payload.get("restaurants") or []
@@ -907,76 +973,27 @@ def run_verification_job(job_id: str, payload: dict[str, Any]) -> None:
                 sum(1 for d in (v.get("deals") or []) if float(d.get("price") or 0) <= budget)
                 for v in source_results.values()
             )
+            progressive = build_candidate_sets(prepared, source_results, budget, open_only)
             set_job(
                 job_id,
                 sources_checked=checked,
                 blocked=blocked,
                 cached_sources=cached_sources,
                 candidate_deals=candidate_count,
-                message=f"Checked {checked} of {len(sources)} official web sources · {cached_sources} reused from cache",
+                **restaurant_coverage_progress(prepared, source_results),
+                matches=progressive["matches"],
+                needs_hours=progressive["needs_hours"],
+                needs_capacity=progressive["needs_capacity"],
+                rejection_counts=progressive["rejection_counts"],
+                message=f"Checked {checked} of {len(sources)} official web sources · {cached_sources} reused from cache · {len(progressive['matches'])} meal candidates so far",
             )
 
-    matches: list[dict[str, Any]] = []
-    needs_hours: list[dict[str, Any]] = []
-    needs_capacity: list[dict[str, Any]] = []
-    no_deal = 0
-    rejection_totals: dict[str, int] = {}
-    for sr in source_results.values():
-        for reason, count in (sr.get("rejections") or {}).items():
-            rejection_totals[reason] = rejection_totals.get(reason, 0) + int(count)
-
-    for r in prepared:
-        u = r.get("resolvedWebsite") or ""
-        sr = source_results.get(u) if u else None
-        deals = [
-            d for d in ((sr or {}).get("deals") or [])
-            if float(d.get("price") or 0) <= budget
-        ]
-        if not deals:
-            no_deal += 1
-            continue
-
-        # Prefer candidates that actually prove the requested party size, then lower total price.
-        best = min(deals, key=lambda d: (not bool(d.get("capacity_verified")), d["price"], -d["score"]))
-        opening_status = parse_simple_opening_hours(r.get("opening", "")) if open_only else True
-        record = {
-            "name": r.get("name", "Restaurant"),
-            "distance": r.get("distance", 0),
-            "cuisine": r.get("cuisine", ""),
-            "restaurantClass": r.get("restaurantClass", "unknown"),
-            "classReason": r.get("classReason", ""),
-            "address": r.get("address", ""),
-            "website": u,
-            "price": best.get("price"),
-            "listed_price": best.get("listed_price"),
-            "price_mode": best.get("price_mode", "package"),
-            "capacity": best.get("capacity"),
-            "capacity_min": best.get("capacity_min"),
-            "capacity_max": best.get("capacity_max"),
-            "capacity_label": best.get("capacity_label", ""),
-            "capacity_verified": bool(best.get("capacity_verified")),
-            "evidence": best.get("evidence", ""),
-            "source_url": best.get("source_url", u),
-            "pages_checked": (sr or {}).get("pages_checked", 0),
-            "opening_status": opening_status,
-            "opening": r.get("opening", ""),
-        }
-
-        # Price-only evidence is no longer enough to claim a match for the user's party size.
-        if not record["capacity_verified"]:
-            needs_capacity.append(record)
-            continue
-
-        if open_only and opening_status is None:
-            needs_hours.append(record)
-        elif open_only and opening_status is False:
-            continue
-        else:
-            matches.append(record)
-
-    matches.sort(key=lambda m: (m["price"], m["distance"]))
-    needs_hours.sort(key=lambda m: (m["price"], m["distance"]))
-    needs_capacity.sort(key=lambda m: (m["price"], m["distance"]))
+    final_candidates = build_candidate_sets(prepared, source_results, budget, open_only)
+    matches = final_candidates["matches"]
+    needs_hours = final_candidates["needs_hours"]
+    needs_capacity = final_candidates["needs_capacity"]
+    no_deal = final_candidates["no_deal"]
+    rejection_totals = final_candidates["rejection_counts"]
 
     set_job(
         job_id,
