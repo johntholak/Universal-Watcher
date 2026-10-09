@@ -55,6 +55,10 @@ test("chunked results survive duplicate delivery and have no global match cap", 
       claim_id: job.claim_id, coverage: { ...progressCoverage, checked: 20 },
     }, headers), env);
     assert.equal(invalidProgress.status, 400);
+    const invalidRadius = await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/progress`, "POST", {
+      claim_id: job.claim_id, coverage: { ...progressCoverage, radius_discovered: 2 },
+    }, headers), env);
+    assert.equal(invalidRadius.status, 400);
     const items = Array.from({ length: 12 }, (_, i) => ({
       id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
       title: `Meal ${i}`, outcome: "MATCH", verification: "VERIFIED", summary: "Official menu",
@@ -89,7 +93,9 @@ test("chunked results survive duplicate delivery and have no global match cap", 
     assert.equal((await worker.fetch(request(completePath, "POST", completion, headers), env)).status, 200);
     assert.equal((await worker.fetch(request(completePath, "POST", { ...completion, summary: "Different" }, headers), env)).status, 409);
     const search = await worker.fetch(request(`/api/v1/searches/${searchId}`, "GET", null, { Cookie: cookie }), env);
-    assert.equal((await search.json()).last_outcome, "MATCH");
+    const completedSearch = await search.json();
+    assert.equal(completedSearch.last_outcome, "MATCH");
+    assert.equal(completedSearch.coverage.radius_discovered, 12);
     assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id=?").get(job.id).status, "COMPLETED");
     const pageOne = await worker.fetch(request(`/api/v1/results?search_id=${searchId}&limit=5`, "GET", null, { Cookie: cookie }), env);
     assert.equal(pageOne.status, 200);
