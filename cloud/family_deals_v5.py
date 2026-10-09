@@ -138,12 +138,14 @@ def normalize_v5_snapshot(snapshot: dict[str, Any], criteria: dict[str, Any], jo
             omitted_candidates += 1
             continue
         fingerprint = hashlib.sha256(json.dumps([name, source, price_cents, record.get("capacity_label"), evidence], ensure_ascii=False).encode()).hexdigest()
+        deal_name = str(record.get("deal_name") or "").strip()
+        match_verified = location_verified and bool(deal_name)
         results.append({
             "id": str(uuid.uuid5(uuid.UUID(job_id), fingerprint)),
-            "title": f"Family meal offer at {name}", "outcome": "MATCH" if location_verified else "PARTIAL",
-            "verification": "VERIFIED" if location_verified else "PARTIALLY_VERIFIED", "summary": "Meal, total, capacity, and restaurant-source applicability verified." if location_verified else "Meal, total and capacity found; location applicability needs confirmation.",
+            "title": f"Family meal offer at {name}", "outcome": "MATCH" if match_verified else "PARTIAL",
+            "verification": "VERIFIED" if match_verified else "PARTIALLY_VERIFIED", "summary": "Meal, total, capacity, deal name, and restaurant-source applicability verified." if match_verified else "Meal, total, and capacity found; explicit deal name or location applicability still needs confirmation.",
             "fingerprint": fingerprint, "destination_url": source,
-            "details": {"deal_name": "Officially listed family meal" if location_verified else None, "restaurant": name, "price_cents": price_cents,
+            "details": {"deal_name": deal_name or None, "restaurant": name, "price_cents": price_cents,
                         "serves_max": record.get("capacity_max"), "serving_label": record.get("capacity_label"),
                         "cuisine": record.get("cuisine"), "classification": record.get("restaurantClass", "unknown"),
                         "distance_miles": record.get("distance"), "included_food": None,
