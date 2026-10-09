@@ -58,14 +58,12 @@ Dispatch is enabled only when `DISPATCH_ENABLED=true`, a Cloudflare secret
 and an integer `DISPATCH_DAILY_LIMIT` (1–100) are configured. Set that limit
 only after calculating a conservative allowance from the account's free Actions
 balance and the 120-minute workflow timeout. The D1 gate reserves one run
-before contacting GitHub, limits signals to one per 15 minutes and retains
-ambiguous failures as reservations. When the configured daily allowance is
-exhausted, due jobs and their Searches/Watches become `DELAYED` with reason
-`free_capacity`; Cron requeues them after the next UTC reset. A temporary
-dispatch failure stays queued for a later tick, including reclaimable expired
-leases. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria from
-D1 through the authenticated API. The dispatch limit is local to this Worker;
-it cannot see other repositories' use of the same account's Actions balance.
+before contacting GitHub and retains ambiguous failures as reservations.
+When the daily allowance is exhausted, the one-time Search is failed with an
+explicit capacity error rather than left queued. The current deployment has no
+Cron trigger. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria
+from D1 through the authenticated API. The dispatch limit is local to this
+Worker and cannot see other repositories' use of the same account's Actions balance.
 
 Run the offline migration test from the repository root:
 
