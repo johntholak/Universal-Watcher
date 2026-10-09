@@ -1,20 +1,24 @@
 # Family Deals Module Status
 
-**Recovery state (September 8, 2026): active product module.** V5.0.1 engine
-is preserved; full-radius coverage and all existing filters remain required.
-The shared web search/results UI is not built yet. Use
-`docs/FAMILY_DEALS_UX_BASELINE.md` and the shared visual baseline from the root.
-The live benchmark and evidence gaps remain in `PROJECT_STATUS.md`.
+**Current state (October 9, 2026):** V5.0.1 is preserved as the discovery and verification engine. Full-radius discovery, existing filters, and strict price-to-meal evidence rules remain required.
 
-Baseline imported: V5.0 Fast Filters + Semantic Verifier.
+The shared Universal Watcher web interface now includes the Family Deals search form. The private API/browser integration supports one-time searches, progressive candidate results, and live coverage snapshots. The implementation and its offline CI checks are green on main.
 
-Current repository iteration: V5.0.1 hours evidence. The parser now keeps
-explicitly closed, explicitly open, and unmentioned days distinct; this is a
-narrow correctness fix, not a claim that the live module meets the final
-product specification.
+**Production is not yet verified.** The dedicated deployment workflow is manual. Do not call the feature live until the D1 migrations, private-beta session, dispatch secrets, homepage/session smoke tests, and one controlled live-adapter acceptance run have all passed. The deployment template has no recurring Cron trigger.
 
-This directory was imported intact from `HUNT-Codex-Handoff-v5.0.zip`.
+## Source of truth
 
-Read `CODEX_HANDOFF.md` before modifying the module.
+- V5 discovery and verifier: `server.py` and `index.html`
+- Shared web interface: `../../web/index.html`, `../../web/app.js`, `../../web/styles.css`
+- API and progressive job execution: `../../cloud/worker.mjs`, `../../cloud/run_family_deals_batch.py`, `../../cloud/family_deals_v5.py`
+- Deployment gate and required secrets: `../../cloud/README.md`
+- API contract: `../../docs/API_V1_CONTRACT.md`
 
-Legacy naming note: internal `HUNT` naming is preserved intentionally for baseline safety. The overall product is Universal Watcher.
+## Locked product requirements
+
+- No arbitrary top-N cap on restaurant discovery.
+- Budget uses exact total price in cents. A deal at the budget qualifies; a deal one cent above does not.
+- Family size is 4 through 10. Serving capacity must cover the selected party.
+- Deal name, meal, total price, serving capacity, restaurant/location applicability, and dinner hours when requested must be supported by evidence.
+- Unknown evidence stays unknown. Partial coverage must never become a false `NO_MATCH`.
+- Search runs only when the user starts a Search. No recurring Cron schedule is configured.
