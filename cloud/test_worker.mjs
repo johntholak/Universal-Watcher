@@ -33,9 +33,21 @@ function environment() {
     },
     async batch(queries) {
       assert.equal(queries.length, 2);
-      const search = queries[0].args, job = queries[1].args;
-      searches.set(search[0], { id: search[0], user_id: search[1], module: search[2], criteria_json: search[3], status: search[5], last_outcome: null, coverage_json: null, created_at: search[6], updated_at: search[7], completed_at: null });
-      jobs.set(job[0], { search_id: job[2], idempotency_key: job[6], status: "QUEUED" });
+      if (queries[0].sql.startsWith("INSERT INTO searches")) {
+        const search = queries[0].args, job = queries[1].args;
+        searches.set(search[0], { id: search[0], user_id: search[1], module: search[2], criteria_json: search[3], status: search[5], last_outcome: null, coverage_json: null, created_at: search[6], updated_at: search[7], completed_at: null });
+        jobs.set(job[0], { search_id: job[2], idempotency_key: job[6], status: "QUEUED" });
+      } else {
+        for (const query of queries) {
+          if (query.sql.startsWith("UPDATE searches SET status='FAILED'")) {
+            const row = searches.get(query.args[2]);
+            if (row) { row.status = "FAILED"; row.last_outcome = "ERROR"; row.completed_at = query.args[1]; }
+          } else if (query.sql.startsWith("UPDATE jobs SET status='FAILED'")) {
+            const row = jobs.get(query.args[2]);
+            if (row) { row.status = "FAILED"; row.delay_reason = query.args[0]; }
+          }
+        }
+      }
       return [{ success: true }, { success: true }];
     },
   };
@@ -127,4 +139,16 @@ test("static app assets are served even before API secrets are configured", asyn
   const response = await worker.fetch(requestRoot, env);
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Universal Watcher/);
+});
+
+test("configured dispatch without a token fails the Search instead of leaving it queued", async () => {
+  const { env, searches, jobs } = environment();
+  env.DISPATCH_ENABLED = "true";
+  const { cookie, csrf } = await login(env);
+  const response = await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria }, { Cookie: cookie, "X-CSRF-Token": csrf }), env);
+  assert.equal(response.status, 503);
+  const data = await response.json();
+  assert.equal(data.dispatch, "not_configured");
+  assert.equal(searches.get(data.id).status, "FAILED");
+  assert.equal([...jobs.values()][0].status, "FAILED");
 });
