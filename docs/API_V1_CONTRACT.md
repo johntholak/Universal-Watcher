@@ -1,12 +1,11 @@
 # Universal Watcher `/api/v1` contract
 
-**Status:** Offline D1 migration and partial Worker API. Session creation,
-Family Deals Search creation/lookup, guarded dispatch, Watch creation/list/detail,
-Check Now and lifecycle, internal bounded claims and lease heartbeat, chunked
-result intake, Search/Watch finalization and paginated result reads exist in
-`cloud/worker.mjs`, but no route is deployed or wired to the browser. Dispatch
-is disabled by default; notifications remain planned. The current
-`/api/*` endpoints in `web/server.py` are local, in-memory previews.
+**Status:** The API and browser integration are implemented but remain offline
+until the manual production deployment workflow is run and its smoke tests pass.
+The Worker supports private sessions, one-time Family Deals Search, guarded
+on-demand dispatch, progressive result and coverage reads, and Watch lifecycle
+routes. The browser uses the same-origin API from `web/app.js`. The deployment
+template has no Cron trigger. Notifications remain planned.
 
 ## Public requests
 
@@ -20,7 +19,7 @@ errors. Timestamps are UTC ISO 8601 strings.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| POST | `/api/v1/searches` | Validate module/criteria, atomically create Search plus queued Job, signal immediate dispatch. Return `202` with Search ID and `QUEUED` state. Dispatch failure leaves retriable queued work. |
+| POST | `/api/v1/searches` | Validate module/criteria, atomically create Search plus queued Job, signal one on-demand worker run, and return the Search ID. Configured dispatch failure is recorded as a failed Search instead of leaving hidden queued work. |
 | GET | `/api/v1/searches/:id` | Return state, coverage, last outcome, and active job status. Reports `RUNNING` once claimed, before finalization. |
 | POST | `/api/v1/watches` | Save the exact criteria from a completed Search (`search_id`), including module and schema version. Set `ACTIVE` and schedule next check after 24 hours. |
 | GET | `/api/v1/watches` | List user Watches with last and next check, coverage, provider state and match state. |
@@ -69,15 +68,16 @@ and log no credentials or private criteria.
 | --- | --- | --- |
 | POST | `/api/v1/internal/jobs/claim` | Atomically claim a bounded due batch; return criteria, `claim_id`, attempt number, lease expiry. Reclaim expired leases. |
 | POST | `/api/v1/internal/jobs/:id/heartbeat` | Extend only the matching active claim. |
+| POST | `/api/v1/internal/jobs/:id/progress` | Publish validated checked, unavailable, and unresolved coverage counts for an active Search without finalizing it. |
 | POST | `/api/v1/internal/jobs/:id/results` | Accept one to five compact normalized results/evidence for a matching active claim per chunk; repeat chunks safely with stable IDs and payload digests. No overall match cap. |
 | POST | `/api/v1/internal/jobs/:id/complete` | Idempotently finalize Search or Watch with outcome/coverage. Incomplete coverage cannot become `NO_MATCH`; Watch history records meaningful changes only. |
 | POST | `/api/v1/internal/jobs/:id/failure` | Record `execution` versus `provider` failure. Execution gets bounded backoff (three claims); provider failure stays unavailable. Circuit state remains future work. |
 
-Cloudflare Cron is the authoritative scheduler. It queues due Watches and
-dispatches GitHub Actions with only a `work available` signal. The GitHub
-worker claims a bounded batch one job at a time. No criteria or secrets go in
-the workflow dispatch payload. Free capacity exhaustion delays work until
-reset; no paid fallback is permitted.
+There is no Cron trigger in the current on-demand deployment. A user Search
+signals one fixed GitHub Actions workflow with only a `ref: main` payload. The
+runner claims one job and exits. No criteria or secrets go in the workflow
+dispatch payload. Dispatch has a bounded daily allowance and cooldown; exhausted
+capacity is reported rather than silently left queued. No paid fallback is permitted.
 
 ## Auth and implementation gate
 
