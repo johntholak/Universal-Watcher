@@ -96,8 +96,27 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
     stopped, lost = asyncio.Event(), asyncio.Event()
     renewal = asyncio.create_task(heartbeat(api, job, stopped, lost))
     try:
+        published_ids: set[str] = set()
+
+        async def publish_progress(snapshot: dict[str, Any]) -> None:
+            if lost.is_set():
+                raise RuntimeError("Job lease was lost; progressive results will not be submitted")
+            partial = normalize_v5_snapshot(snapshot, job["criteria"], job["id"])
+            pending = [item for item in partial["results"] if item["id"] not in published_ids]
+            path = f"/api/v1/internal/jobs/{job['id']}/results"
+            for offset in range(0, len(pending), 5):
+                chunk = pending[offset:offset + 5]
+                await asyncio.to_thread(
+                    api.post, path,
+                    {"claim_id": job["claim_id"], "items": chunk},
+                )
+                published_ids.update(item["id"] for item in chunk)
+
         try:
-            snapshot = await asyncio.wait_for(run_v5_page(page, base_url, job["criteria"]), timeout=600)
+            snapshot = await asyncio.wait_for(
+                run_v5_page(page, base_url, job["criteria"], on_progress=publish_progress),
+                timeout=600,
+            )
             result = normalize_v5_snapshot(snapshot, job["criteria"], job["id"])
         except Exception as exc:
             if lost.is_set():
@@ -112,14 +131,17 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
         if lost.is_set():
             raise RuntimeError("Job lease was lost; result will not be submitted")
         path = f"/api/v1/internal/jobs/{job['id']}"
-        for offset in range(0, len(result["results"]), 5):
+        pending_final = [item for item in result["results"] if item["id"] not in published_ids]
+        for offset in range(0, len(pending_final), 5):
             if lost.is_set():
                 raise RuntimeError("Job lease was lost; result will not be submitted")
+            chunk = pending_final[offset:offset + 5]
             await asyncio.to_thread(
                 api.post,
                 path + "/results",
-                {"claim_id": job["claim_id"], "items": result["results"][offset:offset + 5]},
+                {"claim_id": job["claim_id"], "items": chunk},
             )
+            published_ids.update(item["id"] for item in chunk)
         if lost.is_set():
             raise RuntimeError("Job lease was lost; result will not be submitted")
         response = await asyncio.to_thread(
