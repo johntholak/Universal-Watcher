@@ -83,7 +83,7 @@ async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any], on_pro
                 verification.get("restaurants_unavailable"),
                 verification.get("restaurants_unresolved"),
                 verification.get("sources_checked"),
-                len(verification.get("matches") or []),
+                hashlib.sha256(json.dumps(verification.get("matches") or [], sort_keys=True, default=str).encode()).hexdigest(),
             )
             if signature != last_signature:
                 await on_progress(snapshot)
