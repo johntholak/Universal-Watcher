@@ -75,6 +75,26 @@ class FamilyDealsV5BridgeTests(unittest.TestCase):
                                        "restaurants_unavailable": 1, "restaurants_unresolved": 1, "matches": []}}
         self.assertEqual(bridge.normalize_v5_snapshot(incomplete, CRITERIA, JOB_ID)["outcome"], "PARTIAL")
 
+    def test_progressive_snapshot_publishes_candidates_without_claiming_complete_coverage(self):
+        snapshot = {"radius_discovered": 20, "selected_restaurants": 3,
+                    "discovery_completed": True, "error": None,
+                    "verification": {"status": "checking", "restaurants_checked": 1,
+                                     "restaurants_unavailable": 0, "restaurants_unresolved": 1,
+                                     "matches": [{"name": "Example Pizza", "price": 49.99,
+                                                  "capacity_verified": True, "capacity_max": 8,
+                                                  "capacity_label": "4-8", "opening_status": True,
+                                                  "restaurantClass": "independent", "source_direct": True,
+                                                  "source_url": "https://example.com/menu",
+                                                  "evidence": "Family meal for 4-8 | $49.99"}]}}
+        result = bridge.normalize_v5_snapshot(snapshot, CRITERIA, JOB_ID)
+        self.assertEqual(result["outcome"], "PARTIAL")
+        self.assertEqual(result["coverage"], {"state": "partial", "discovered": 3,
+                                               "checked": 1, "unavailable": 0, "unresolved": 1})
+        self.assertEqual(len(result["results"]), 1)
+        self.assertEqual(result["results"][0]["outcome"], "MATCH")
+        self.assertEqual(result["results"][0]["details"]["deal_name"], "Officially listed family meal")
+        self.assertIn("still being checked", result["summary"])
+
     def test_unmappable_candidate_never_becomes_no_match(self):
         snapshot = {"radius_discovered": 1, "selected_restaurants": 1,
                     "discovery_completed": True, "error": None,
