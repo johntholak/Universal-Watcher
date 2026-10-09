@@ -22,6 +22,7 @@ jobs:
       ACCESS_SECRET: ${{ secrets.UW_ACCESS_SECRET }}
       SESSION_KEY: ${{ secrets.UW_SESSION_KEY }}
       WORKER_SECRET: ${{ secrets.UW_WORKER_SECRET }}
+      UW_API_BASE: ${{ secrets.UW_API_BASE }}
       GITHUB_DISPATCH_TOKEN: ${{ secrets.UW_GITHUB_DISPATCH_TOKEN }}
 
     steps:
