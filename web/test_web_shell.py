@@ -10,6 +10,14 @@ class WebShellTests(unittest.TestCase):
         config = (WEB_ROOT.parent / "cloud" / "wrangler.example.toml").read_text(encoding="utf-8")
         self.assertRegex(config, r"(?m)^\[triggers\]\s*\ncrons\s*=\s*\[\s*\]")
 
+    def test_deployment_workflow_defaults_to_non_deploying_preflight(self):
+        workflow = (WEB_ROOT.parent / ".github" / "workflows" / "deploy-family-deals-api.yml").read_text(encoding="utf-8")
+        self.assertIn("default: preflight", workflow)
+        self.assertIn("type: choice", workflow)
+        self.assertIn("wrangler@4 deploy --dry-run", workflow)
+        for step in ("Apply D1 migrations", "Deploy same-origin app and API", "Set private beta and dispatch secrets", "Smoke test app and session endpoint"):
+            self.assertRegex(workflow, rf"(?s)- name: {step}\s+if: \$\{{\{{ inputs\.mode == 'deploy' \}}\}}")
+
     def test_shell_assets_exist(self):
         self.assertTrue((WEB_ROOT / "index.html").is_file())
         self.assertTrue((WEB_ROOT / "styles.css").is_file())

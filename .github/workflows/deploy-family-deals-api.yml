@@ -2,6 +2,15 @@ name: Deploy Universal Watcher Family Deals API
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate prerequisites only, or explicitly deploy after validation
+        required: true
+        type: choice
+        options:
+          - preflight
+          - deploy
+        default: preflight
 
 permissions:
   contents: read
@@ -57,6 +66,38 @@ jobs:
           config = config.replace('database_id = "REPLACE_WITH_D1_DATABASE_ID"', f'database_id = "{os.environ["UW_D1_DATABASE_ID"]}"')
           Path("cloud/wrangler.toml").write_text(config)
           PY
+      - name: Validate Cloudflare account, D1 binding, and Worker bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+          api = urlsplit(os.environ["UW_API_BASE"])
+          if api.scheme != "https" or api.netloc != "universal-watcher-api.johntholak.workers.dev" or api.path not in ("", "/") or api.query or api.fragment:
+              raise SystemExit("UW_API_BASE must be the production Worker origin")
+          PY
+          if ! npx --yes wrangler@4 whoami >/tmp/uw-wrangler-whoami.log 2>&1; then
+            echo "::error::Cloudflare authentication failed; verify the account ID and API token permissions."
+            exit 1
+          fi
+          if ! npx --yes wrangler@4 d1 info "$UW_D1_DATABASE_NAME" --config cloud/wrangler.toml >/tmp/uw-wrangler-d1.log 2>&1; then
+            echo "::error::The configured D1 database could not be verified. Check its name, ID, and Cloudflare token permissions."
+            exit 1
+          fi
+          if ! npx --yes wrangler@4 deploy --dry-run --config cloud/wrangler.toml >/tmp/uw-wrangler-dry-run.log 2>&1; then
+            echo "::error::Wrangler could not compile the Worker and static assets from the generated config."
+            exit 1
+          fi
+          {
+            echo "### Deployment preflight passed"
+            echo "Cloudflare authentication, D1 lookup, Worker config, and static asset compilation succeeded. No migration or deployment was run."
+            echo ""
+            echo "Configured GitHub Actions secret names (values not displayed):"
+            for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN UW_D1_DATABASE_NAME UW_D1_DATABASE_ID UW_ACCESS_SECRET UW_SESSION_KEY UW_WORKER_SECRET UW_API_BASE UW_GITHUB_DISPATCH_TOKEN; do
+              echo "- \`$name\`"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Run API and frontend checks
         run: |
           node --check cloud/worker.mjs
@@ -64,10 +105,13 @@ jobs:
           node --test cloud/test_dispatch.mjs cloud/test_results.mjs cloud/test_worker.mjs
           python -m unittest cloud/test_family_deals_v5.py cloud/test_run_family_deals_batch.py -v
       - name: Apply D1 migrations
+        if: ${{ inputs.mode == 'deploy' }}
         run: npx --yes wrangler@4 d1 migrations apply "${UW_D1_DATABASE_NAME}" --remote --config cloud/wrangler.toml
       - name: Deploy same-origin app and API
+        if: ${{ inputs.mode == 'deploy' }}
         run: npx --yes wrangler@4 deploy --config cloud/wrangler.toml
       - name: Set private beta and dispatch secrets
+        if: ${{ inputs.mode == 'deploy' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -76,6 +120,7 @@ jobs:
           printf '%s' "$WORKER_SECRET" | npx --yes wrangler@4 secret put WORKER_SECRET --name universal-watcher-api
           printf '%s' "$GITHUB_DISPATCH_TOKEN" | npx --yes wrangler@4 secret put GITHUB_DISPATCH_TOKEN --name universal-watcher-api
       - name: Smoke test app and session endpoint
+        if: ${{ inputs.mode == 'deploy' }}
         shell: bash
         run: |
           set -euo pipefail

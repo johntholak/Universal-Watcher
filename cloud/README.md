@@ -80,8 +80,12 @@ site and API must share an origin for the strict cookie and CSRF checks.
 
 ## On-demand production deployment
 
-Run the manual GitHub Actions workflow **Deploy Universal Watcher Family Deals API**
-only after these repository Actions secrets exist:
+The manual GitHub Actions workflow **Deploy Universal Watcher Family Deals API**
+defaults to `preflight`. That mode checks that the required repository Actions
+secrets are present, authenticates to Cloudflare, looks up the configured D1
+database, and compiles the Worker/assets with Wrangler dry-run. It prints secret
+names only, never values, and does not run migrations or deploy. The required
+secrets are:
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
@@ -93,8 +97,11 @@ only after these repository Actions secrets exist:
 - `UW_API_BASE` (the HTTPS API Worker origin used by the batch runner)
 - `UW_GITHUB_DISPATCH_TOKEN` (a GitHub token scoped to this repository with Actions: read/write permission)
 
-The workflow applies D1 migrations, deploys the app and API from the same Worker origin,
+Select `deploy` only after the preflight passes and deployment is approved. That
+mode applies D1 migrations, deploys the app and API from the same Worker origin,
 sets private session and dispatch secrets, then smoke-tests the homepage and session.
+Preflight cannot verify the dispatch token's Actions permission without sending
+a workflow dispatch, which would create a real runner execution.
 The Worker configuration explicitly removes Cron triggers. Each browser Search signals the fixed batch workflow,
 which claims one job and exits. The UI reports disabled dispatch as not connected and
 does not claim that the queued Search ran. Permanently invalid dispatch is recorded

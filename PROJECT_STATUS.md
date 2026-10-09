@@ -6,13 +6,13 @@
 
 ## October 9 Family Deals live-search checkpoint
 
-- PR #29 (`family-deals-live-search-ui`) is open against `main`. GitHub confirms branch head `8954f0fd13fb36e92e4d7e18461b472d19ee9f44`; push CI run 340 and pull request CI run 341 passed. The deployed Worker still needs the reviewed changes before its credential-free session behavior is corrected.
+- PR #29 (`family-deals-live-search-ui`) is open against `main`. Latest previously verified branch head `695453fe0730427b7bf93c25c86d4198c8226720`; push CI run 342 and pull request CI run 343 passed. A guarded deployment-workflow preflight is now being added; its new CI result is pending. The deployed Worker still needs reviewed changes before its credential-free session behavior is corrected.
 - The API ties each dispatch and claim to one job ID, publishes provisional coverage/results, and uses cursor pagination without a global result cap. Session reads require the signed cookie; cookie-authenticated mutations require same-origin and CSRF checks. Worker deployment configuration explicitly removes Cron triggers.
 - Temporary GitHub `429` and `5xx` dispatch responses now remain retryable rather than marking the Search failed. Result cards show API-provided cuisine, classification, distance, included items, and observation time, with unknown values labeled as unknown.
-- Local verification passed: 28 Node tests across criteria, dispatch, failures, results, Watches, and Worker; 37 Family Deals and web Python tests; JavaScript syntax checks; and `git diff --check`. No production deployment or provider search was run.
+- Local verification passed: 28 Node tests across criteria, dispatch, failures, results, Watches, and Worker; 38 Family Deals, runner, and web Python tests; JavaScript syntax checks; and `git diff --check`. The manual deployment workflow now defaults to a non-mutating preflight that checks secret presence, Cloudflare authentication, D1 lookup, and Worker asset compilation; deployment operations require explicit `mode=deploy`. No production deployment or provider search was run.
 - The GitHub connector confirms repository admin access and CI state but does not expose Actions secret metadata. The browser session is signed out, so secret names/presence were not verified. No secret values were read.
 
-**NEXT TASK:** Validate the required GitHub Actions secret names through an authorized repository settings view or a non-deploy preflight, then confirm the updated PR checks. The connected GitHub API does not expose secret metadata and the browser session is signed out. Deploy only after prerequisites and reviewed code are validated; then perform the production smoke test and one controlled search.
+**NEXT TASK:** Push the guarded preflight workflow and documentation, confirm PR CI passes, then run `mode=preflight` after merge to validate account-side secret presence and Cloudflare resources. Do not deploy until those checks pass and the reviewed code is ready. The preflight does not test GitHub dispatch-token permission because doing so starts a real runner; validate that with a controlled end-to-end search after deployment approval.
 
 ## September 26 browser-fixture gate
 
