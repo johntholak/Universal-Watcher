@@ -130,6 +130,16 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
                     {"claim_id": job["claim_id"], "items": chunk},
                 )
                 published_ids.update(item["id"] for item in chunk)
+            if job.get("search_id"):
+                try:
+                    await asyncio.to_thread(
+                        api.post,
+                        f"/api/v1/internal/jobs/{job['id']}/progress",
+                        {"claim_id": job["claim_id"], "coverage": partial["coverage"], "summary": partial["summary"]},
+                    )
+                except Exception as exc:
+                    # Coverage progress is helpful, but a transient reporting failure must not abort the scan.
+                    print(f"Family Deals progress update skipped: {type(exc).__name__}")
 
         try:
             snapshot = await asyncio.wait_for(

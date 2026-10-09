@@ -77,7 +77,14 @@ async def run_v5_page(page: Any, base_url: str, criteria: dict[str, Any], on_pro
         }""")
         verification = snapshot.get("verification") or {}
         if on_progress and snapshot.get("discovery_completed") and verification.get("status") in ("resolving", "checking"):
-            signature = (verification.get("status"), verification.get("sources_checked"), len(verification.get("matches") or []))
+            signature = (
+                verification.get("status"),
+                verification.get("restaurants_checked"),
+                verification.get("restaurants_unavailable"),
+                verification.get("restaurants_unresolved"),
+                verification.get("sources_checked"),
+                hashlib.sha256(json.dumps(verification.get("matches") or [], sort_keys=True, default=str).encode()).hexdigest(),
+            )
             if signature != last_signature:
                 await on_progress(snapshot)
                 last_signature = signature

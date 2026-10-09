@@ -60,7 +60,10 @@ export default {
     }
     if (!path.startsWith("/api/v1/")) return json({ error: "Not found" }, 404);
     if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
-    if (request.method === "GET" && path === "/api/v1/system/status") return json({ state: "preview", execution: "not_connected" });
+    if (request.method === "GET" && path === "/api/v1/system/status") {
+      const dispatchReady = env.DISPATCH_ENABLED === "true" && typeof env.GITHUB_DISPATCH_TOKEN === "string" && env.GITHUB_DISPATCH_TOKEN.length >= 20;
+      return json({ state: "configured", dispatch: dispatchReady ? "ready" : "not_connected", scheduled_checks: false });
+    }
 
     if (request.method === "POST" && path === "/api/v1/session") {
       if (!sameOrigin(request)) return json({ error: "Invalid origin" }, 403);
@@ -131,6 +134,34 @@ export default {
           const updated = await env.DB.prepare("UPDATE jobs SET status='RUNNING', lease_expires_at=?, updated_at=? WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=? RETURNING id").bind(expires, stamp, heartbeat[1], input.claim_id, stamp).first();
           return updated ? json({ lease_expires_at: expires }) : json({ error: "Claim is no longer active" }, 409);
         } catch { return json({ error: "Lease renewal unavailable" }, 503); }
+      }
+            const progress = /^\/api\/v1\/internal\/jobs\/([0-9a-f-]{36})\/progress$/.exec(path);
+      if (request.method === "POST" && progress) {
+        let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid progress report" }, 400); }
+        if (!/^[0-9a-f-]{36}$/.test(input.claim_id || "")) return json({ error: "Invalid claim ID" }, 400);
+        const coverage = input.coverage;
+        if (!coverage || typeof coverage !== "object" || Array.isArray(coverage) ||
+            !new Set(["partial", "unavailable"]).has(coverage.state) ||
+            !["discovered", "checked", "unavailable", "unresolved"].every((key) => Number.isSafeInteger(coverage[key]) && coverage[key] >= 0) ||
+            coverage.checked + coverage.unavailable + coverage.unresolved > coverage.discovered ||
+            (input.summary != null && (typeof input.summary !== "string" || input.summary.length > 800))) {
+          return json({ error: "Invalid progressive coverage" }, 400);
+        }
+        const stamp = now();
+        try {
+          const job = await env.DB.prepare("SELECT id,user_id,search_id,watch_id,status,claim_id,lease_expires_at FROM jobs WHERE id=?")
+            .bind(progress[1]).first();
+          if (!job || job.claim_id !== input.claim_id || !["CLAIMED", "RUNNING"].includes(job.status) || job.lease_expires_at < stamp) {
+            return json({ error: "Claim is no longer active" }, 409);
+          }
+          if (!job.search_id) return json({ accepted: true, updated: false });
+          const updated = await env.DB.prepare(`UPDATE searches SET coverage_json=?,updated_at=?
+            WHERE id=? AND user_id=? AND status IN ('QUEUED','RUNNING')
+              AND EXISTS (SELECT 1 FROM jobs WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=?)
+            RETURNING id`)
+            .bind(JSON.stringify(coverage), stamp, job.search_id, job.user_id, job.id, input.claim_id, stamp).first();
+          return updated ? json({ accepted: true, updated: true, coverage }) : json({ error: "Search is no longer active" }, 409);
+        } catch { return json({ error: "Progress storage unavailable" }, 503); }
       }
       const chunk = /^\/api\/v1\/internal\/jobs\/([0-9a-f-]{36})\/results$/.exec(path);
       if (request.method === "POST" && chunk) {
