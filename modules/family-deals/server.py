@@ -846,6 +846,23 @@ def build_candidate_sets(prepared: list[dict[str, Any]], source_results: dict[st
             "no_deal": no_deal, "rejection_counts": rejection_totals}
 
 
+def restaurant_coverage_progress(prepared: list[dict[str, Any]], source_results: dict[str, dict[str, Any]]) -> dict[str, int]:
+    """Report only finished source checks; remaining resolved sources stay pending."""
+    checked = unavailable = unresolved = 0
+    for restaurant in prepared:
+        source = restaurant.get("resolvedWebsite") or ""
+        if not source:
+            unresolved += 1
+        elif source not in source_results:
+            continue
+        elif (source_results.get(source) or {}).get("status") == "checked":
+            checked += 1
+        else:
+            unavailable += 1
+    return {"restaurants_checked": checked, "restaurants_unavailable": unavailable,
+            "restaurants_unresolved": unresolved}
+
+
 def run_verification_job(job_id: str, payload: dict[str, Any]) -> None:
     started_at = time.time()
     restaurants = payload.get("restaurants") or []
@@ -963,6 +980,7 @@ def run_verification_job(job_id: str, payload: dict[str, Any]) -> None:
                 blocked=blocked,
                 cached_sources=cached_sources,
                 candidate_deals=candidate_count,
+                **restaurant_coverage_progress(prepared, source_results),
                 matches=progressive["matches"],
                 needs_hours=progressive["needs_hours"],
                 needs_capacity=progressive["needs_capacity"],
