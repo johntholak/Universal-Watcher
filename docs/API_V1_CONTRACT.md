@@ -47,6 +47,9 @@ validated in the later Movies adapter milestone.
 
 Every completed execution has `outcome` from `MATCH`, `NO_MATCH`, `PARTIAL`,
 `UNAVAILABLE`, `ERROR`, a summary, coverage counts and provider state.
+Coverage separates `radius_discovered` (restaurants found inside the requested
+radius before filters) from `discovered` (the verification set after filters).
+The checked, unavailable and unresolved counts describe that verification set.
 `NO_MATCH` requires sufficient successful coverage. A blocked source, failed
 seat inventory, or partial scan never becomes a complete negative result.
 
@@ -68,7 +71,7 @@ and log no credentials or private criteria.
 | --- | --- | --- |
 | POST | `/api/v1/internal/jobs/claim` | Atomically claim a bounded due batch; return criteria, `claim_id`, attempt number, lease expiry. Reclaim expired leases. |
 | POST | `/api/v1/internal/jobs/:id/heartbeat` | Extend only the matching active claim. |
-| POST | `/api/v1/internal/jobs/:id/progress` | Publish validated checked, unavailable, and unresolved coverage counts for an active Search without finalizing it. |
+| POST | `/api/v1/internal/jobs/:id/progress` | Publish validated full-radius discovery and checked, unavailable, and unresolved verification counts for an active Search without finalizing it. |
 | POST | `/api/v1/internal/jobs/:id/results` | Accept one to five compact normalized results/evidence for a matching active claim per chunk; repeat chunks safely with stable IDs and payload digests. No overall match cap. |
 | POST | `/api/v1/internal/jobs/:id/complete` | Idempotently finalize Search or Watch with outcome/coverage. Incomplete coverage cannot become `NO_MATCH`; Watch history records meaningful changes only. |
 | POST | `/api/v1/internal/jobs/:id/failure` | Record `execution` versus `provider` failure. Execution gets bounded backoff (three claims); provider failure stays unavailable. Circuit state remains future work. |

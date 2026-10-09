@@ -43,12 +43,14 @@ export function validateCompletion(input, verifiedMatches) {
   const coverage = input.coverage;
   if (!coverage || typeof coverage !== "object" || Array.isArray(coverage) || !new Set(["complete", "partial", "unavailable"]).has(coverage.state)) throw invalid("Completion needs truthful coverage");
   for (const key of ["discovered", "checked", "unavailable", "unresolved"]) if (!Number.isSafeInteger(coverage[key]) || coverage[key] < 0) throw invalid("Coverage counts must be nonnegative integers");
+  const radiusDiscovered = coverage.radius_discovered ?? coverage.discovered;
+  if (!Number.isSafeInteger(radiusDiscovered) || radiusDiscovered < coverage.discovered) throw invalid("Radius discovery count is inconsistent with the verification set");
   if (coverage.checked + coverage.unavailable + coverage.unresolved > coverage.discovered) throw invalid("Coverage counts exceed discovery");
   if (coverage.state === "complete" && (coverage.checked !== coverage.discovered || coverage.unavailable || coverage.unresolved)) throw invalid("Complete coverage counts disagree");
   if (input.outcome === "NO_MATCH" && (verifiedMatches || coverage.state !== "complete")) throw invalid("No-match requires a complete check and no verified results");
   if (input.outcome === "MATCH" && !verifiedMatches) throw invalid("Match requires verified results");
   if (input.outcome === "PARTIAL" && coverage.state === "complete") throw invalid("Partial outcome needs partial coverage");
-  return { claim_id: input.claim_id, outcome: input.outcome, summary: input.summary, coverage: { state: coverage.state, discovered: coverage.discovered, checked: coverage.checked, unavailable: coverage.unavailable, unresolved: coverage.unresolved } };
+  return { claim_id: input.claim_id, outcome: input.outcome, summary: input.summary, coverage: { state: coverage.state, radius_discovered: radiusDiscovered, discovered: coverage.discovered, checked: coverage.checked, unavailable: coverage.unavailable, unresolved: coverage.unresolved } };
 }
 
 export async function digest(value) {

@@ -113,7 +113,7 @@
     const panel = byId("deal-preview-result");
     const coverage = search.coverage;
     const coverageLine = coverage
-      ? `Coverage: ${coverage.checked ?? 0} of ${coverage.discovered ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`
+      ? `Radius: ${coverage.radius_discovered ?? "unknown"} restaurants discovered · Verification: ${coverage.checked ?? 0} of ${coverage.discovered ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`
       : "Coverage summary pending until verification completes";
     const statusText = ({ QUEUED: "Search queued", RUNNING: "Checking the full radius", COMPLETED: search.last_outcome || "Search completed", FAILED: "Search failed", DELAYED: "Search delayed" })[search.status] || search.status;
     renderLiveDealResults(results, ["QUEUED", "RUNNING"].includes(search.status));
