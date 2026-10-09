@@ -298,10 +298,13 @@ export default {
     }
     const match = /^\/api\/v1\/searches\/([0-9a-f-]{36})$/.exec(path);
     if (request.method === "GET" && match) {
-      let row; try { row = await env.DB.prepare("SELECT id,module,status,last_outcome,coverage_json,created_at,updated_at,completed_at FROM searches WHERE id=? AND user_id=?").bind(match[1], identity.user_id).first(); }
+      let row; try { row = await env.DB.prepare(`SELECT s.id,s.module,s.status,s.last_outcome,s.coverage_json,s.created_at,s.updated_at,s.completed_at,
+        (SELECT j.status FROM jobs j WHERE j.search_id=s.id AND j.user_id=s.user_id ORDER BY j.created_at DESC LIMIT 1) AS job_status
+        FROM searches s WHERE s.id=? AND s.user_id=?`).bind(match[1], identity.user_id).first(); }
       catch { return json({ error: "Storage temporarily unavailable" }, 503); }
       if (!row) return json({ error: "Search not found" }, 404);
-      return json({ ...row, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
+      const status = row.status === "QUEUED" && ["CLAIMED", "RUNNING"].includes(row.job_status) ? "RUNNING" : row.status;
+      return json({ ...row, status, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
     }
     if (request.method === "POST" && path === "/api/v1/watches") {
       let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
@@ -431,7 +434,7 @@ export default {
       if (before) { cursorClause = " AND (created_at < ? OR (created_at = ? AND id < ?))"; args.push(before, before, beforeId); }
       try {
         const rows = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results
-          WHERE user_id=? AND ${column}=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND j.status='COMPLETED' AND j.final_digest IS NOT NULL)
+          WHERE user_id=? AND ${column}=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND (j.status IN ('CLAIMED','RUNNING') OR (j.status='COMPLETED' AND j.final_digest IS NOT NULL)))
           ${cursorClause} ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...args, limit + 1).all();
         const page = (rows.results || []).slice(0, limit);
         const last = page.at(-1);
@@ -442,7 +445,7 @@ export default {
     if (request.method === "GET" && resultMatch) {
       try {
         const row = await env.DB.prepare(`SELECT id,job_id,module,outcome,verification,title,summary,details_json,coverage_json,fingerprint,destination_url,observed_at,created_at FROM results
-          WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND j.status='COMPLETED' AND j.final_digest IS NOT NULL)`).bind(resultMatch[1], identity.user_id).first();
+          WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM jobs j WHERE j.id=results.job_id AND (j.status IN ('CLAIMED','RUNNING') OR (j.status='COMPLETED' AND j.final_digest IS NOT NULL)))`).bind(resultMatch[1], identity.user_id).first();
         if (!row) return json({ error: "Result not found" }, 404);
         const evidence = await env.DB.prepare("SELECT source,source_url,summary,captured_at FROM result_evidence WHERE result_id=? AND user_id=? ORDER BY id").bind(row.id, identity.user_id).all();
         const { details_json, coverage_json, ...publicRow } = row;
