@@ -273,6 +273,11 @@ export default {
       let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
       if (input.module !== "family-deals") return json({ error: "Module search is not available yet" }, 400);
       let criteria; try { criteria = validateFamilyDealsCriteria(input.criteria); } catch (error) { return json({ error: error.message }, 400); }
+      try {
+        const active = await env.DB.prepare("SELECT id FROM searches WHERE user_id=? AND module='family-deals' AND status IN ('QUEUED','RUNNING') LIMIT 1")
+          .bind(identity.user_id).first();
+        if (active) return json({ error: "Your current Family Deals search is still running. Wait for it to finish before starting another." }, 409);
+      } catch { return json({ error: "Could not confirm whether another search is active" }, 503); }
       const id = crypto.randomUUID(), jobId = crypto.randomUUID(), stamp = now();
       const stored = { ...criteria }; delete stored.max_total_cents;
       try {
