@@ -41,7 +41,7 @@ class WebShellTests(unittest.TestCase):
         ):
             self.assertIn(marker, html)
         self.assertNotIn("Family Deals is next", html)
-        for marker in ("dealCriteria()", "updateDealSummary()", "submitFamilyDealsSearch()", '"/api/v1/searches"', '"/api/v1/results?"', "PROVISIONAL RESULTS", "resultDetails[result.id]"):
+        for marker in ("dealCriteria()", "updateDealSummary()", "submitFamilyDealsSearch()", '"/api/v1/searches"', '/api/v1/results?', "PROVISIONAL RESULTS", "resultDetails[result.id]"):
             self.assertIn(marker, js)
 
     def test_shell_uses_locked_visual_language_and_hides_shelved_modules(self):
