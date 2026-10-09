@@ -143,6 +143,8 @@ export default {
         if (!coverage || typeof coverage !== "object" || Array.isArray(coverage) ||
             !new Set(["partial", "unavailable"]).has(coverage.state) ||
             !["discovered", "checked", "unavailable", "unresolved"].every((key) => Number.isSafeInteger(coverage[key]) && coverage[key] >= 0) ||
+            !Number.isSafeInteger(coverage.radius_discovered ?? coverage.discovered) ||
+            (coverage.radius_discovered ?? coverage.discovered) < coverage.discovered ||
             coverage.checked + coverage.unavailable + coverage.unresolved > coverage.discovered ||
             (input.summary != null && (typeof input.summary !== "string" || input.summary.length > 800))) {
           return json({ error: "Invalid progressive coverage" }, 400);
