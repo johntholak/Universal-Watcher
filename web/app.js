@@ -91,15 +91,20 @@
   }
   async function fetchAllSearchResults(searchId) {
     const results = [], seen = new Set();
-    let cursor = null, pages = 0;
+    let cursor = null;
+    const seenCursors = new Set();
     do {
       const query = new URLSearchParams({ search_id: searchId, limit: "50" });
-      if (cursor) { query.set("before", cursor.before); query.set("before_id", cursor.before_id); }
+      if (cursor) {
+        const key = `${cursor.before}\u0000${cursor.before_id}`;
+        if (seenCursors.has(key)) throw new Error("Results pagination returned a repeated cursor.");
+        seenCursors.add(key);
+        query.set("before", cursor.before); query.set("before_id", cursor.before_id);
+      }
       const data = await apiRequest(`/api/v1/results?${query}`);
       for (const result of data.results || []) if (!seen.has(result.id)) { seen.add(result.id); results.push(result); }
       cursor = data.next_cursor || null;
-      pages++;
-    } while (cursor && pages < 100);
+    } while (cursor);
     await Promise.all(results.map(async (result) => {
       if (state.resultDetails[result.id]) { Object.assign(result, state.resultDetails[result.id]); return; }
       try {
@@ -115,16 +120,16 @@
     const coverage = search.coverage || {};
     const coverageLine = `Coverage: ${coverage.checked ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`;
     const statusText = ({ QUEUED: "Search queued", RUNNING: "Checking the full radius", COMPLETED: search.last_outcome || "Search completed", FAILED: "Search failed", DELAYED: "Search delayed" })[search.status] || search.status;
-    renderLiveDealResults(results, ["QUEUED", "RUNNING"].includes(search.status));
+    renderLiveDealResults(results, search.status !== "COMPLETED");
     const summary = document.createElement("p");
     summary.textContent = `${statusText}. ${coverageLine}.`;
     panel.prepend(summary);
-    if (search.status === "COMPLETED" || search.status === "FAILED" || search.status === "DELAYED") {
+    if (search.status === "COMPLETED" || search.status === "FAILED") {
       window.clearTimeout(state.pollTimer); state.pollTimer = null;
     }
   }
   async function pollFamilySearch(searchId) {
-    if (state.currentSearchId !== searchId || state.pollCount >= 120) return;
+    if (state.currentSearchId !== searchId) return;
     state.pollCount++;
     try {
       const [search, results] = await Promise.all([
@@ -132,10 +137,13 @@
         fetchAllSearchResults(searchId)
       ]);
       renderSearchProgress(search, results);
-      if (["QUEUED", "RUNNING"].includes(search.status)) state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 2500);
+      if (["QUEUED", "RUNNING", "DELAYED"].includes(search.status)) {
+        const delay = Math.min(30000, 2500 * (2 ** Math.min(state.pollCount - 1, 4)));
+        state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), delay);
+      }
     } catch (error) {
       showToast(error.message || "Could not refresh search progress.");
-      state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 5000);
+      state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 30000);
     }
   }
   async function submitFamilyDealsSearch() {
@@ -159,7 +167,7 @@
       state.currentSearchId = created.id;
       const panel = byId("deal-preview-result"); panel.hidden = false;
       panel.innerHTML = `<div class="result-state-icon">◷</div><div><p class="eyebrow">ONE-TIME SEARCH</p><h2>Search ${escapeHtml(created.status || "queued")}</h2><p>Search ID: ${escapeHtml(created.id)}. Worker dispatch: ${escapeHtml(created.dispatch || "unknown")}.</p></div>`;
-      if (created.dispatch === "signaled" || created.dispatch === "idle") {
+      if (["signaled", "idle", "deferred", "free_capacity", "dispatch_network"].includes(created.dispatch)) {
         pollFamilySearch(created.id);
       } else {
         const detail = document.createElement("p");

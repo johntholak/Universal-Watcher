@@ -20,7 +20,7 @@ function environment() {
             },
             async all() {
               assert.match(sql, /UPDATE jobs SET status='CLAIMED'/);
-              const selected = [...jobs.entries()].filter(([, job]) => job.status === "QUEUED").slice(0, args[7]);
+              const selected = [...jobs.entries()].filter(([id, job]) => id === args[4] && job.status === "QUEUED").slice(0, args[9]);
               return { results: selected.map(([id, job]) => { job.status = "CLAIMED"; job.claim_id = args[0]; job.lease_expires_at = args[2]; return { id, user_id: "private-beta", search_id: job.search_id, watch_id: null, module: "family-deals", claim_id: args[0], attempt_number: 1, lease_expires_at: args[2] }; }) };
             },
             sql, args,
@@ -49,7 +49,7 @@ async function login(env) {
 const criteria = { schema_version: 1, location: "91304", radius_miles: 2, party_size: 7, max_total_price: 85, cuisines: ["pizza_italian"], restaurant_type: "any", open_tonight: false };
 
 test("scheduled tick is inert before guarded dispatch is configured", async () => {
-  const { env } = environment();
+  const { env, jobs } = environment();
   await worker.scheduled({ cron: "*/15 * * * *" }, env);
 });
 
@@ -90,25 +90,31 @@ test("invalid budget and module create no jobs", async () => {
 });
 
 test("internal worker claim is authenticated, bounded and can renew its lease", async () => {
-  const { env } = environment();
+  const { env, jobs } = environment();
   const { cookie, csrf } = await login(env);
   const search = await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria }, { Cookie: cookie, "X-CSRF-Token": csrf }), env);
   assert.equal(search.status, 202);
+  const otherSearch = await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria }, { Cookie: cookie, "X-CSRF-Token": csrf }), env);
+  assert.equal(otherSearch.status, 202);
+  const [jobId, otherJobId] = [...jobs.keys()];
   const path = "/api/v1/internal/jobs/claim";
   assert.equal((await worker.fetch(request(path, "POST", { limit: 10 }), env)).status, 401);
   const headers = { Authorization: `Bearer ${env.WORKER_SECRET}` };
-  assert.equal((await worker.fetch(request(path, "POST", { limit: 11, module: "family-deals" }, headers), env)).status, 400);
-  const claimed = await worker.fetch(request(path, "POST", { limit: 10, module: "family-deals" }, headers), env);
+  assert.equal((await worker.fetch(request(path, "POST", { limit: 11, module: "family-deals", job_id: jobId }, headers), env)).status, 400);
+  const claimed = await worker.fetch(request(path, "POST", { limit: 1, module: "family-deals", job_id: jobId }, headers), env);
   assert.equal(claimed.status, 200);
-  const { jobs } = await claimed.json();
-  assert.equal(jobs.length, 1);
-  assert.deepEqual(jobs[0].criteria, criteria);
-  const second = await worker.fetch(request(path, "POST", { limit: 10, module: "family-deals" }, headers), env);
+  const { jobs: claimedJobs } = await claimed.json();
+  assert.equal(claimedJobs.length, 1);
+  assert.equal(claimedJobs[0].id, jobId);
+  assert.deepEqual(claimedJobs[0].criteria, criteria);
+  const otherClaim = await worker.fetch(request(path, "POST", { limit: 1, module: "family-deals", job_id: otherJobId }, headers), env);
+  assert.equal((await otherClaim.json()).jobs[0].id, otherJobId);
+  const second = await worker.fetch(request(path, "POST", { limit: 1, module: "family-deals", job_id: jobId }, headers), env);
   assert.equal(second.status, 200);
   assert.deepEqual((await second.json()).jobs, []);
-  const stale = await worker.fetch(request(`/api/v1/internal/jobs/${jobs[0].id}/heartbeat`, "POST", { claim_id: crypto.randomUUID() }, headers), env);
+  const stale = await worker.fetch(request(`/api/v1/internal/jobs/${claimedJobs[0].id}/heartbeat`, "POST", { claim_id: crypto.randomUUID() }, headers), env);
   assert.equal(stale.status, 409);
-  const heartbeat = await worker.fetch(request(`/api/v1/internal/jobs/${jobs[0].id}/heartbeat`, "POST", { claim_id: jobs[0].claim_id }, headers), env);
+  const heartbeat = await worker.fetch(request(`/api/v1/internal/jobs/${claimedJobs[0].id}/heartbeat`, "POST", { claim_id: claimedJobs[0].claim_id }, headers), env);
   assert.equal(heartbeat.status, 200);
 });
 

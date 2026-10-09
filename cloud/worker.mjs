@@ -1,5 +1,5 @@
 import { validateFamilyDealsCriteria } from "./criteria.mjs";
-import { validateResultChunk, verifyFamilyMatch, validateCompletion, digest } from "./results.mjs";
+import { validateResultChunk, validateProgress, verifyFamilyMatch, validateCompletion, digest } from "./results.mjs";
 import { dispatchPending, expireExhaustedJobs, restoreFreeCapacity } from "./dispatch.mjs";
 import { nextWatchCheck, queueDueWatches } from "./watches.mjs";
 
@@ -92,19 +92,19 @@ export default {
       }
       if (request.method === "POST" && path === "/api/v1/internal/jobs/claim") {
         let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
-        const limit = input.limit ?? 10;
-        if (!Number.isInteger(limit) || limit < 1 || limit > 10) return json({ error: "Batch limit must be 1 through 10" }, 400);
+        const limit = input.limit ?? 1;
+        if (!Number.isInteger(limit) || limit !== 1 || !/^[0-9a-f-]{36}$/.test(input.job_id || "")) return json({ error: "Claim needs one valid job ID" }, 400);
         const module = input.module;
         if (module !== "family-deals") return json({ error: "Unsupported worker module" }, 400);
         const stamp = now(), expires = new Date(Date.now() + 5 * 60 * 1000).toISOString(), claimId = crypto.randomUUID();
         try {
           const claimed = await env.DB.prepare(`UPDATE jobs SET status='CLAIMED', claim_id=?, claimed_at=?, lease_expires_at=?, attempt_number=attempt_number+1, updated_at=?
             WHERE id IN (SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
-            WHERE j.module=? AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
+            WHERE j.id=? AND j.module=? AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
               OR (w.status='DELAYED' AND j.status IN ('RETRYABLE','CLAIMED','RUNNING')))
               AND j.attempt_number<3
-              AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?) OR (j.status='DELAYED' AND j.delay_reason='free_capacity') OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
-            ORDER BY j.due_at,j.id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, module, stamp, stamp, limit).all();
+              AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?) OR (j.status='DELAYED' AND j.delay_reason='free_capacity' AND j.due_at<=?) OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
+            ORDER BY j.due_at,j.id LIMIT ?) RETURNING id,user_id,search_id,watch_id,module,claim_id,attempt_number,lease_expires_at`).bind(claimId, stamp, expires, stamp, input.job_id, module, stamp, stamp, stamp, limit).all();
           const jobs = [];
           for (const row of claimed.results || []) {
             if (row.attempt_number > 1) await env.DB.batch([
@@ -131,6 +131,18 @@ export default {
           const updated = await env.DB.prepare("UPDATE jobs SET status='RUNNING', lease_expires_at=?, updated_at=? WHERE id=? AND claim_id=? AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=? RETURNING id").bind(expires, stamp, heartbeat[1], input.claim_id, stamp).first();
           return updated ? json({ lease_expires_at: expires }) : json({ error: "Claim is no longer active" }, 409);
         } catch { return json({ error: "Lease renewal unavailable" }, 503); }
+      }
+      const progress = /^\/api\/v1\/internal\/jobs\/([0-9a-f-]{36})\/progress$/.exec(path);
+      if (request.method === "POST" && progress) {
+        let input; try { input = validateProgress(await bodyObject(request)); } catch (error) { return json({ error: error.message }, 400); }
+        const stamp = now();
+        try {
+          const updated = await env.DB.prepare(`UPDATE searches SET coverage_json=?,updated_at=?
+            WHERE id=(SELECT search_id FROM jobs WHERE id=? AND search_id IS NOT NULL AND user_id=? AND claim_id=?
+              AND status IN ('CLAIMED','RUNNING') AND lease_expires_at>=?) AND user_id=?
+            RETURNING id`).bind(JSON.stringify(input.coverage), stamp, progress[1], "private-beta", input.claim_id, stamp, "private-beta").first();
+          return updated ? json({ accepted: true }) : json({ error: "Claim is no longer active" }, 409);
+        } catch { return json({ error: "Progress update unavailable" }, 503); }
       }
       const chunk = /^\/api\/v1\/internal\/jobs\/([0-9a-f-]{36})\/results$/.exec(path);
       if (request.method === "POST" && chunk) {
@@ -282,12 +294,12 @@ export default {
         ]);
       } catch { return json({ error: "Storage temporarily unavailable; search was not confirmed" }, 503); }
       let dispatch;
-      try { dispatch = await dispatchPending(env); } catch (error) {
+      try { dispatch = await dispatchPending(env, new Date(), jobId); } catch (error) {
         console.error("Family Deals dispatch failed", error instanceof Error ? error.message : "unknown error");
         dispatch = "dispatch_error";
       }
-      if (dispatch === "dispatch_error") {
-        const reason = dispatch === "not_configured" ? "worker_dispatch_not_configured" : "worker_dispatch_error";
+      if (["dispatch_error", "dispatch_forbidden", "not_configured"].includes(dispatch)) {
+        const reason = `worker_${dispatch}`;
         try {
           await env.DB.batch([
             env.DB.prepare("UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?,completed_at=? WHERE id=? AND user_id=? AND status='QUEUED'").bind(stamp, stamp, id, identity.user_id),
@@ -303,12 +315,28 @@ export default {
     const match = /^\/api\/v1\/searches\/([0-9a-f-]{36})$/.exec(path);
     if (request.method === "GET" && match) {
       let row; try { row = await env.DB.prepare(`SELECT s.id,s.module,s.status,s.last_outcome,s.coverage_json,s.created_at,s.updated_at,s.completed_at,
+        (SELECT j.id FROM jobs j WHERE j.search_id=s.id AND j.user_id=s.user_id ORDER BY j.created_at DESC LIMIT 1) AS job_id,
         (SELECT j.status FROM jobs j WHERE j.search_id=s.id AND j.user_id=s.user_id ORDER BY j.created_at DESC LIMIT 1) AS job_status
         FROM searches s WHERE s.id=? AND s.user_id=?`).bind(match[1], identity.user_id).first(); }
       catch { return json({ error: "Storage temporarily unavailable" }, 503); }
       if (!row) return json({ error: "Search not found" }, 404);
-      const status = row.status === "QUEUED" && ["CLAIMED", "RUNNING"].includes(row.job_status) ? "RUNNING" : row.status;
-      return json({ ...row, status, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
+      let dispatch = null;
+      if (["QUEUED", "DELAYED"].includes(row.status) && row.job_id) {
+        try { dispatch = await dispatchPending(env, new Date(), row.job_id); }
+        catch { dispatch = "deferred"; }
+        if (["dispatch_error", "dispatch_forbidden", "not_configured"].includes(dispatch)) {
+          const stamp = now();
+          try {
+            await env.DB.batch([
+              env.DB.prepare("UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?,completed_at=? WHERE id=? AND user_id=? AND status IN ('QUEUED','DELAYED')").bind(stamp, stamp, row.id, identity.user_id),
+              env.DB.prepare("UPDATE jobs SET status='FAILED',delay_reason=?,updated_at=? WHERE id=? AND user_id=? AND status IN ('QUEUED','DELAYED','RETRYABLE')").bind(`worker_${dispatch}`, stamp, row.job_id, identity.user_id),
+            ]);
+            row.status = "FAILED"; row.last_outcome = "ERROR";
+          } catch { return json({ error: "Dispatch failure could not be recorded" }, 503); }
+        }
+      }
+      const status = ["QUEUED", "DELAYED"].includes(row.status) && ["CLAIMED", "RUNNING"].includes(row.job_status) ? "RUNNING" : row.status;
+      return json({ ...row, status, dispatch, coverage: row.coverage_json ? JSON.parse(row.coverage_json) : null, coverage_json: undefined });
     }
     if (request.method === "POST" && path === "/api/v1/watches") {
       let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
@@ -373,7 +401,7 @@ export default {
             .bind(jobId, stamp, `watch:${watchId}:manual:${jobId}`, stamp, stamp, watchId, identity.user_id, watchId).run();
           const inserted = await env.DB.prepare("SELECT id FROM jobs WHERE id=? AND user_id=?").bind(jobId, identity.user_id).first();
           if (!inserted) return json({ error: "A check is already queued or this Watch is not active" }, 409);
-          let dispatch; try { dispatch = await dispatchPending(env); } catch { dispatch = "deferred"; }
+          let dispatch; try { dispatch = await dispatchPending(env, new Date(), jobId); } catch { dispatch = "deferred"; }
           return json({ job_id: jobId, status: "QUEUED", dispatch }, 202);
         } catch { return json({ error: "Watch check unavailable" }, 503); }
       }

@@ -44,27 +44,28 @@ export async function restoreFreeCapacity(env, at = new Date()) {
   ]);
 }
 
-async function delayForFreeCapacity(env, at) {
+async function delayForFreeCapacity(env, at, jobId) {
   const stamp = at.toISOString();
   const reset = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() + 1)).toISOString();
   await env.DB.batch([
     env.DB.prepare(`UPDATE jobs SET status='DELAYED',due_at=?,delay_reason='free_capacity',
-        claim_id=NULL,lease_expires_at=NULL,updated_at=? WHERE module='family-deals'
+        claim_id=NULL,lease_expires_at=NULL,updated_at=? WHERE id=? AND module='family-deals'
       AND ((status IN ('QUEUED','RETRYABLE') AND due_at<=?)
         OR (status IN ('CLAIMED','RUNNING') AND lease_expires_at<?))
       AND (watch_id IS NULL OR EXISTS (SELECT 1 FROM watches w WHERE w.id=watch_id
         AND w.status IN ('ACTIVE','FOUND')))`)
-      .bind(reset, stamp, stamp, stamp),
+      .bind(reset, stamp, jobId, stamp, stamp),
     env.DB.prepare(`UPDATE searches SET status='DELAYED',updated_at=? WHERE status='QUEUED'
-      AND EXISTS (SELECT 1 FROM jobs j WHERE j.search_id=searches.id AND j.status='DELAYED'
-        AND j.delay_reason='free_capacity')`).bind(stamp),
+      AND EXISTS (SELECT 1 FROM jobs j WHERE j.search_id=searches.id AND j.id=? AND j.status='DELAYED'
+        AND j.delay_reason='free_capacity')`).bind(stamp, jobId),
     env.DB.prepare(`UPDATE watches SET status='DELAYED',updated_at=? WHERE status IN ('ACTIVE','FOUND')
-      AND EXISTS (SELECT 1 FROM jobs j WHERE j.watch_id=watches.id AND j.status='DELAYED'
-        AND j.delay_reason='free_capacity')`).bind(stamp),
+      AND EXISTS (SELECT 1 FROM jobs j WHERE j.watch_id=watches.id AND j.id=? AND j.status='DELAYED'
+        AND j.delay_reason='free_capacity')`).bind(stamp, jobId),
   ]);
 }
 
-export async function dispatchPending(env, at = new Date()) {
+export async function dispatchPending(env, at = new Date(), jobId) {
+  if (!/^[0-9a-f-]{36}$/.test(jobId || "")) return "invalid_job";
   if (env.DISPATCH_ENABLED !== "true") return "not_connected";
   const configuredLimit = Number(env.DISPATCH_DAILY_LIMIT);
   const limit = Number.isInteger(configuredLimit) && configuredLimit >= 10 && configuredLimit <= 100 ? configuredLimit : 10;
@@ -72,10 +73,11 @@ export async function dispatchPending(env, at = new Date()) {
   const stamp = at.toISOString();
   const day = stamp.slice(0, 10);
   const pending = await env.DB.prepare(`SELECT j.id FROM jobs j LEFT JOIN watches w ON w.id=j.watch_id
-    WHERE j.module='family-deals' AND j.attempt_number<3 AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?)
+    WHERE j.id=? AND j.module='family-deals' AND j.attempt_number<3 AND ((j.status IN ('QUEUED','RETRYABLE') AND j.due_at<=?)
+      OR (j.status='DELAYED' AND j.delay_reason='free_capacity' AND j.due_at<=?)
       OR (j.status IN ('CLAIMED','RUNNING') AND j.lease_expires_at<?))
       AND (j.watch_id IS NULL OR w.status IN ('ACTIVE','FOUND')
-        OR (w.status='DELAYED' AND j.status IN ('RETRYABLE','CLAIMED','RUNNING'))) LIMIT 1`).bind(stamp, stamp).first();
+        OR (w.status='DELAYED' AND j.status IN ('RETRYABLE','CLAIMED','RUNNING'))) LIMIT 1`).bind(jobId, stamp, stamp, stamp).first();
   if (!pending) return "idle";
 
   // Count the reservation before contacting GitHub. An ambiguous network failure
@@ -88,7 +90,7 @@ export async function dispatchPending(env, at = new Date()) {
   if (!reserved) {
     const gate = await env.DB.prepare("SELECT utc_day,runs_today FROM dispatch_gate WHERE id=1").bind().first();
     if (gate?.utc_day === day && gate.runs_today >= limit) {
-      await delayForFreeCapacity(env, at);
+      await delayForFreeCapacity(env, at, jobId);
       return "free_capacity";
     }
     return "deferred";
@@ -100,7 +102,7 @@ export async function dispatchPending(env, at = new Date()) {
       headers: { Authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`,
                  Accept: "application/vnd.github+json", "Content-Type": "application/json",
                  "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "Universal-Watcher" },
-      body: JSON.stringify({ ref: "main" }),
+      body: JSON.stringify({ ref: "main", inputs: { job_id: jobId } }),
     });
     if (response.status === 200 || response.status === 204) return "signaled";
     const detail = await response.text().catch(() => "");

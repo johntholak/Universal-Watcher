@@ -27,6 +27,15 @@ export function validateResultChunk(input) {
   return { claim_id: input.claim_id, items };
 }
 
+export function validateProgress(input) {
+  if (!input || typeof input !== "object" || !idPattern.test(input.claim_id || "")) throw invalid("Invalid claim");
+  const coverage = input.coverage;
+  if (!coverage || typeof coverage !== "object" || Array.isArray(coverage) || !new Set(["partial", "unavailable"]).has(coverage.state)) throw invalid("Progress needs incomplete coverage");
+  for (const key of ["discovered", "checked", "unavailable", "unresolved"]) if (!Number.isSafeInteger(coverage[key]) || coverage[key] < 0) throw invalid("Coverage counts must be nonnegative integers");
+  if (coverage.checked + coverage.unavailable + coverage.unresolved > coverage.discovered) throw invalid("Coverage counts exceed discovery");
+  return { claim_id: input.claim_id, coverage: { state: coverage.state, discovered: coverage.discovered, checked: coverage.checked, unavailable: coverage.unavailable, unresolved: coverage.unresolved } };
+}
+
 export function verifyFamilyMatch(item, criteria) {
   if (item.outcome !== "MATCH") return;
   const details = item.details;

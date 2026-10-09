@@ -111,12 +111,17 @@ class FamilyBatchRunnerTests(unittest.TestCase):
         response = asyncio.run(runner.execute_job(
             api, ProgressiveFakePage([active, final]), "http://127.0.0.1:9999/", job))
         self.assertEqual(response["candidate_count"], 2)
-        self.assertEqual(len(api.calls), 3)
-        self.assertTrue(api.calls[0][0].endswith("/results"))
-        self.assertEqual([x["title"] for x in api.calls[0][1]["items"]], ["Family meal offer at First Pizza"])
+        self.assertEqual(len(api.calls), 4)
+        self.assertTrue(api.calls[0][0].endswith("/progress"))
+        self.assertEqual(api.calls[0][1]["coverage"], {
+            "state": "partial", "discovered": 2, "checked": 1,
+            "unavailable": 0, "unresolved": 0,
+        })
         self.assertTrue(api.calls[1][0].endswith("/results"))
-        self.assertEqual([x["title"] for x in api.calls[1][1]["items"]], ["Family meal offer at Second Pizza"])
-        self.assertTrue(api.calls[2][0].endswith("/complete"))
+        self.assertEqual([x["title"] for x in api.calls[1][1]["items"]], ["Family meal offer at First Pizza"])
+        self.assertTrue(api.calls[2][0].endswith("/results"))
+        self.assertEqual([x["title"] for x in api.calls[2][1]["items"]], ["Family meal offer at Second Pizza"])
+        self.assertTrue(api.calls[3][0].endswith("/complete"))
 
     def test_execution_failure_requests_bounded_retry_without_false_result(self):
         api = FakeAPI()

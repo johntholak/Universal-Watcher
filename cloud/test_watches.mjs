@@ -81,7 +81,8 @@ test("Cron queues due Watch once; completion records only meaningful history", a
   await worker.scheduled({ cron: "*/15 * * * *" }, env);
   assert.equal(sqlite.prepare("SELECT count(*) AS n FROM jobs WHERE watch_id=?").get(watchId).n, 1);
   const internal = { Authorization: `Bearer ${env.WORKER_SECRET}` };
-  const claim = await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { module: "family-deals", limit: 1 }, internal), env);
+  const jobId = sqlite.prepare("SELECT id FROM jobs WHERE watch_id=? AND status='QUEUED'").get(watchId).id;
+  const claim = await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { module: "family-deals", limit: 1, job_id: jobId }, internal), env);
   const job = (await claim.json()).jobs[0];
   assert.equal(job.watch_id, watchId);
   assert.deepEqual(job.criteria, criteria);
@@ -97,7 +98,8 @@ test("Cron queues due Watch once; completion records only meaningful history", a
   assert.equal(detail.coverage.checked, 2);
   sqlite.prepare("UPDATE watches SET next_check_at=? WHERE id=?").run("2020-01-02T00:00:00.000Z", watchId);
   await worker.scheduled({ cron: "*/15 * * * *" }, env);
-  const next = (await (await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { module: "family-deals", limit: 1 }, internal), env)).json()).jobs[0];
+  const nextJobId = sqlite.prepare("SELECT id FROM jobs WHERE watch_id=? AND status='QUEUED'").get(watchId).id;
+  const next = (await (await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { module: "family-deals", limit: 1, job_id: nextJobId }, internal), env)).json()).jobs[0];
   assert.ok(next);
   assert.equal((await worker.fetch(request(`/api/v1/internal/jobs/${next.id}/complete`, "POST", { ...completion, claim_id: next.claim_id }, internal), env)).status, 200);
   detail = await (await worker.fetch(request(`/api/v1/watches/${watchId}`, "GET", null, headers), env)).json();
@@ -105,7 +107,8 @@ test("Cron queues due Watch once; completion records only meaningful history", a
 
   const requested = await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env);
   assert.equal(requested.status, 202);
-  const third = (await (await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { module: "family-deals", limit: 1 }, internal), env)).json()).jobs[0];
+  const thirdJobId = sqlite.prepare("SELECT id FROM jobs WHERE watch_id=? AND status='QUEUED'").get(watchId).id;
+  const third = (await (await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { module: "family-deals", limit: 1, job_id: thirdJobId }, internal), env)).json()).jobs[0];
   const item = { id: crypto.randomUUID(), title: "Possible family meal", outcome: "PARTIAL",
     verification: "PARTIALLY_VERIFIED", fingerprint: "stable-meal", summary: "Location applicability unknown",
     details: { restaurant: "Example", deal_name: null, price_cents: 5000, location_verified: false },
@@ -134,11 +137,12 @@ test("pause blocks claims; resume and stop preserve audit trail", async (t) => {
   assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env)).status, 409);
   const internal = { Authorization: `Bearer ${env.WORKER_SECRET}` };
   const claimPath = "/api/v1/internal/jobs/claim";
-  assert.deepEqual((await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1 }, internal), env)).json()).jobs, []);
+  const jobId = sqlite.prepare("SELECT id FROM jobs WHERE watch_id=? AND status='QUEUED'").get(watchId).id;
+  assert.deepEqual((await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1, job_id: jobId }, internal), env)).json()).jobs, []);
   const resumed = await worker.fetch(request(`/api/v1/watches/${watchId}`, "PATCH", { action: "resume" }, headers), env);
   assert.equal(resumed.status, 200);
   assert.ok((await resumed.json()).next_check_at);
-  assert.equal((await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1 }, internal), env)).json()).jobs[0].watch_id, watchId);
+  assert.equal((await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1, job_id: jobId }, internal), env)).json()).jobs[0].watch_id, watchId);
   assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}`, "DELETE", null, headers), env)).status, 200);
   assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env)).status, 409);
   assert.equal(sqlite.prepare("SELECT status FROM watches WHERE id=?").get(watchId).status, "STOPPED");
@@ -150,9 +154,9 @@ test("free-run exhaustion delays Watch and recovers without dispatching a paid r
   const { watchId } = await createSearchAndWatch(env, headers);
   sqlite.prepare("UPDATE jobs SET status='COMPLETED' WHERE search_id IS NOT NULL").run();
   const today = new Date().toISOString().slice(0, 10);
-  sqlite.prepare("UPDATE dispatch_gate SET utc_day=?,runs_today=1 WHERE id=1").run(today);
+  sqlite.prepare("UPDATE dispatch_gate SET utc_day=?,runs_today=10 WHERE id=1").run(today);
   env.DISPATCH_ENABLED = "true";
-  env.DISPATCH_DAILY_LIMIT = "1";
+  env.DISPATCH_DAILY_LIMIT = "10";
   env.GITHUB_DISPATCH_TOKEN = "t".repeat(40);
   const response = await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env);
   assert.equal(response.status, 202);
@@ -181,7 +185,8 @@ test("criteria edits copy a new completed Search and version subsequent history"
   assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}`, "PATCH", edit, headers), env)).status, 409);
   const internal = { Authorization: `Bearer ${env.WORKER_SECRET}` };
   const claimPath = "/api/v1/internal/jobs/claim";
-  const first = (await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1 }, internal), env)).json()).jobs[0];
+  const firstJobId = sqlite.prepare("SELECT id FROM jobs WHERE watch_id=? AND status='QUEUED'").get(watchId).id;
+  const first = (await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1, job_id: firstJobId }, internal), env)).json()).jobs[0];
   const coverage = { state: "complete", discovered: 1, checked: 1, unavailable: 0, unresolved: 0 };
   assert.equal((await worker.fetch(request(`/api/v1/internal/jobs/${first.id}/complete`, "POST",
     { claim_id: first.claim_id, outcome: "NO_MATCH", summary: "None found", coverage }, internal), env)).status, 200);
@@ -193,7 +198,8 @@ test("criteria edits copy a new completed Search and version subsequent history"
   assert.deepEqual(detail.criteria_history.map((version) => version.criteria), [updatedCriteria, criteria]);
   assert.equal(detail.history[0].criteria_version, 1);
   assert.equal((await worker.fetch(request(`/api/v1/watches/${watchId}/check`, "POST", {}, headers), env)).status, 202);
-  const claimed = (await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1 }, internal), env)).json()).jobs[0];
+  const nextJobId = sqlite.prepare("SELECT id FROM jobs WHERE watch_id=? AND status='QUEUED'").get(watchId).id;
+  const claimed = (await (await worker.fetch(request(claimPath, "POST", { module: "family-deals", limit: 1, job_id: nextJobId }, internal), env)).json()).jobs[0];
   assert.deepEqual(claimed.criteria, updatedCriteria);
   const completion = { claim_id: claimed.claim_id, outcome: "NO_MATCH", summary: "None found",
     coverage };

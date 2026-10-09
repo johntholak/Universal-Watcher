@@ -39,11 +39,18 @@ test("chunked results survive duplicate delivery and have no global match cap", 
     const created = await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria }, { Cookie: cookie, "X-CSRF-Token": csrf_token }), env);
     assert.equal(created.status, 202);
     const searchId = (await created.json()).id;
+    const jobId = sqlite.prepare("SELECT id FROM jobs WHERE search_id=?").get(searchId).id;
     const headers = { Authorization: `Bearer ${env.WORKER_SECRET}` };
-    const claim = await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { limit: 1, module: "family-deals" }, headers), env);
+    const claim = await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { limit: 1, module: "family-deals", job_id: jobId }, headers), env);
     assert.equal(claim.status, 200);
     const job = (await claim.json()).jobs[0];
     assert.deepEqual(job.criteria, criteria);
+    const progress = { claim_id: job.claim_id, coverage: { state: "partial", discovered: 12, checked: 3, unavailable: 1, unresolved: 0 } };
+    const progressResponse = await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/progress`, "POST", progress, headers), env);
+    assert.equal(progressResponse.status, 200);
+    const progressiveSearch = await worker.fetch(request(`/api/v1/searches/${searchId}`, "GET", null, { Cookie: cookie }), env);
+    assert.deepEqual((await progressiveSearch.json()).coverage, progress.coverage);
+    assert.equal((await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/progress`, "POST", { ...progress, coverage: { ...progress.coverage, checked: 13 } }, headers), env)).status, 400);
     const items = Array.from({ length: 12 }, (_, i) => ({
       id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
       title: `Meal ${i}`, outcome: "MATCH", verification: "VERIFIED", summary: "Official menu",
@@ -100,9 +107,11 @@ test("partial provider coverage cannot finalize as no-match", async () => {
     const { csrf_token } = await login.json();
     const cookie = login.headers.get("Set-Cookie").split(";")[0];
     const criteria = { schema_version: 1, location: "91304", radius_miles: 2, party_size: 7, max_total_price: 85, cuisines: [], restaurant_type: "any", open_tonight: false };
-    await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria }, { Cookie: cookie, "X-CSRF-Token": csrf_token }), env);
+    const created = await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria }, { Cookie: cookie, "X-CSRF-Token": csrf_token }), env);
+    const searchId = (await created.json()).id;
     const headers = { Authorization: `Bearer ${env.WORKER_SECRET}` };
-    const job = (await (await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { limit: 1, module: "family-deals" }, headers), env)).json()).jobs[0];
+    const jobId = sqlite.prepare("SELECT id FROM jobs WHERE search_id=?").get(searchId).id;
+    const job = (await (await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { limit: 1, module: "family-deals", job_id: jobId }, headers), env)).json()).jobs[0];
     const completion = { claim_id: job.claim_id, outcome: "NO_MATCH", summary: "None found", coverage: { state: "partial", discovered: 12, checked: 9, unavailable: 3, unresolved: 0 } };
     assert.equal((await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/complete`, "POST", completion, headers), env)).status, 400);
     assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id=?").get(job.id).status, "CLAIMED");
