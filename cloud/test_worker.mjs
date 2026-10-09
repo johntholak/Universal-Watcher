@@ -14,6 +14,9 @@ function environment() {
             async run() { if (sql.startsWith("INSERT OR IGNORE")) return {}; throw new Error("Unexpected run"); },
             async first() {
               if (sql.startsWith("UPDATE jobs")) { const job = jobs.get(args[2]); if (!job || job.claim_id !== args[3]) return null; job.lease_expires_at = args[0]; return { id: args[2] }; }
+              if (sql.includes("SELECT id FROM searches WHERE user_id=? AND module='family-deals'")) {
+                return [...searches.values()].find((item) => item.user_id === args[0] && ["QUEUED", "RUNNING"].includes(item.status)) || null;
+              }
               assert.match(sql, /user_id=\?/);
               const search = searches.get(args[0]);
               return args[1] === "private-beta" ? (sql.includes("criteria_json") ? (search ? { criteria_json: search.criteria_json, schema_version: 1 } : null) : search || null) : null;
@@ -31,7 +34,7 @@ function environment() {
     async batch(queries) {
       assert.equal(queries.length, 2);
       const search = queries[0].args, job = queries[1].args;
-      searches.set(search[0], { id: search[0], module: search[2], criteria_json: search[3], status: search[5], last_outcome: null, coverage_json: null, created_at: search[6], updated_at: search[7], completed_at: null });
+      searches.set(search[0], { id: search[0], user_id: search[1], module: search[2], criteria_json: search[3], status: search[5], last_outcome: null, coverage_json: null, created_at: search[6], updated_at: search[7], completed_at: null });
       jobs.set(job[0], { search_id: job[2], idempotency_key: job[6], status: "QUEUED" });
       return [{ success: true }, { success: true }];
     },
@@ -75,6 +78,9 @@ test("search requires session and CSRF, queues exact criteria without claiming e
   assert.equal(data.dispatch, "not_connected");
   assert.equal(searches.size, 1);
   assert.equal(jobs.size, 1);
+  const duplicate = await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria }, headers), env);
+  assert.equal(duplicate.status, 409);
+  assert.equal(searches.size, 1);
   const detail = await worker.fetch(request(`/api/v1/searches/${data.id}`, "GET", null, { Cookie: cookie }), env);
   assert.equal((await detail.json()).status, "QUEUED");
   assert.equal(detail.status, 200);
