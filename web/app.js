@@ -84,8 +84,16 @@
       const serves = d.serves_max ? `Serves up to ${escapeHtml(d.serves_max)}` : "Serving capacity not verified";
       const restaurant = escapeHtml(d.restaurant || r.title || "Meal deal");
       const dealName = escapeHtml(d.deal_name || r.title || "Meal deal");
+      const cuisine = typeof d.cuisine === "string" && d.cuisine.trim() ? escapeHtml(d.cuisine) : "Cuisine unknown";
+      const classification = ({ independent: "Independent", local: "Local group", chain: "Chain", unknown: "Restaurant type unknown" })[d.classification] || "Restaurant type unknown";
+      const distance = Number.isFinite(d.distance_miles) && d.distance_miles >= 0 ? `${d.distance_miles.toFixed(1)} mi` : "Distance unknown";
+      const includedItems = Array.isArray(d.included_food) ? d.included_food.filter((item) => typeof item === "string" && item.trim()) : [];
+      const included = includedItems.length ? escapeHtml(includedItems.join(", "))
+        : typeof d.included_food === "string" && d.included_food.trim() ? escapeHtml(d.included_food) : "Included items unknown";
+      const checkedAt = typeof r.observed_at === "string" && Number.isFinite(Date.parse(r.observed_at))
+        ? new Date(r.observed_at).toLocaleString() : "Last checked unknown";
       const destination = typeof r.destination_url === "string" && /^https:\/\//i.test(r.destination_url) ? r.destination_url : "";
-      return `<article class="watch-item"><span class="result-badge result-${escapeHtml(r.outcome)}">${escapeHtml(r.outcome)}</span><div><strong>${dealName}</strong><small>${restaurant} · ${price} · ${serves}</small><p>${escapeHtml(r.summary || "")}</p>${evidence ? `<ul>${evidence}</ul>` : ""}${destination ? `<a href="${escapeHtml(destination)}" target="_blank" rel="noopener noreferrer">View deal source</a>` : ""}</div></article>`;
+      return `<article class="watch-item"><span class="result-badge result-${escapeHtml(r.outcome)}">${escapeHtml(r.outcome)}</span><div><strong>${dealName}</strong><small>${restaurant} · ${cuisine} · ${escapeHtml(classification)} · ${distance}</small><small>${price} · ${serves} · ${included}</small><p>${escapeHtml(r.summary || "")}</p><small>${escapeHtml(checkedAt)}</small>${evidence ? `<ul>${evidence}</ul>` : ""}${destination ? `<a href="${escapeHtml(destination)}" target="_blank" rel="noopener noreferrer">View deal source</a>` : ""}</div></article>`;
     }).join("");
     panel.innerHTML = `<div class="result-state-icon">${provisional ? "◷" : "✓"}</div><div><p class="eyebrow">${provisional ? "PROVISIONAL RESULTS" : "SEARCH RESULTS"}</p><h2>${results.length ? `${results.length} candidate${results.length === 1 ? "" : "s"} found` : "No candidates published yet"}</h2><p>${provisional ? "These are early candidates, not a final result. Keep this page open while full-radius coverage is checked." : "Search finished. Coverage and verification status determine whether the result is a confirmed match or an incomplete search."}</p></div><div class="full-list">${cards || "<p>No candidate results have arrived yet.</p>"}</div>`;
   }

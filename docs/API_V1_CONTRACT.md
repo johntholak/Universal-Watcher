@@ -39,6 +39,39 @@ form: `location` (address/ZIP or coordinate string), positive `radius_miles`,
 Do not put a top-N cap on restaurant discovery. Movies criteria can be
 validated in the later Movies adapter milestone.
 
+### Session and Search payloads
+
+`POST /api/v1/session` accepts `{ "access_secret": "…" }` from the same origin.
+On success it returns `{ "authenticated": true, "csrf_token": "…" }` and sets
+the `__Host-uw_session` cookie with `Secure`, `HttpOnly`, and `SameSite=Strict`.
+`GET /api/v1/session` requires that valid cookie and returns the same JSON fields
+without issuing a new cookie. Mutations require the cookie, an exact same-origin
+`Origin`, and `X-CSRF-Token`.
+
+`POST /api/v1/searches` accepts `{ "module": "family-deals", "criteria":
+{...} }`. A queued response is HTTP 202 and has `id`, `module`, `status`,
+`dispatch`, and `created_at`. `dispatch` is one of `signaled`, `idle`,
+`not_connected`, `deferred`, `free_capacity`, or `dispatch_network`. A permanent
+configuration/authorization rejection returns HTTP 503 with `status: "FAILED"`
+and an `error` code. An accepted Search is not proof that its worker has claimed
+or completed the job.
+
+`GET /api/v1/searches/:id` returns the owned Search row, its `coverage` object
+or `null`, current `status`, and `dispatch` state. Polling a queued Search can
+retry its job-specific dispatch; temporary network/rate-limit/server errors
+remain visible and retry only while the user keeps polling.
+
+### Result pagination and detail
+
+`GET /api/v1/results` requires exactly one of `search_id` or `watch_id`, accepts
+`limit` from 1 through 50, and accepts the paired `before` timestamp and
+`before_id` cursor fields. The response is `{ "results": [...], "next_cursor":
+null | { "before": "UTC timestamp", "before_id": "result-id" } }`. Continue
+until `next_cursor` is `null`; `limit` is a page size, not a total-result cap.
+Each listed row includes `id`, `job_id`, state, title/summary, `details`,
+`coverage`, destination, `observed_at`, and `created_at`. Evidence is returned
+by `GET /api/v1/results/:id` in the `evidence` array.
+
 ## Search response and result state
 
 ```json

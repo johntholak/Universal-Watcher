@@ -1,8 +1,18 @@
 # PROJECT_STATUS.md — Universal Watcher
 
-**Status date:** September 26, 2026
-**Overall stage:** Foundation / consolidation  
-**Current milestone:** Family Deals UI, offline Search/Watch API, guarded dispatch and GitHub batch runner are built; cloud execution is not deployed
+**Status date:** October 9, 2026
+**Overall stage:** Family Deals implementation review and deployment readiness
+**Current milestone:** On-demand browser-to-Worker-to-GitHub Actions flow is implemented and under PR review; production deployment and live provider acceptance remain unverified
+
+## October 9 Family Deals live-search checkpoint
+
+- PR #29 (`family-deals-live-search-ui`) is open against `main`. GitHub confirms branch head `82961941a2d24dfff5cfc39423abb8225456cc23`; pull request CI run 339 passed. The deployed Worker still needs the reviewed changes before its credential-free session behavior is corrected.
+- The API ties each dispatch and claim to one job ID, publishes provisional coverage/results, and uses cursor pagination without a global result cap. Session reads require the signed cookie; cookie-authenticated mutations require same-origin and CSRF checks. Worker deployment configuration explicitly removes Cron triggers.
+- Temporary GitHub `429` and `5xx` dispatch responses now remain retryable rather than marking the Search failed. Result cards show API-provided cuisine, classification, distance, included items, and observation time, with unknown values labeled as unknown.
+- Local verification passed: 28 Node tests across criteria, dispatch, failures, results, Watches, and Worker; 37 Family Deals and web Python tests; JavaScript syntax checks; and `git diff --check`. No production deployment or provider search was run.
+- The GitHub connector confirms repository admin access and CI state but does not expose Actions secret metadata. The browser session is signed out, so secret names/presence were not verified. No secret values were read.
+
+**NEXT TASK:** Validate the required GitHub Actions secret names through an authorized repository settings view or a non-deploy preflight, then confirm the updated PR checks. The connected GitHub API does not expose secret metadata and the browser session is signed out. Deploy only after prerequisites and reviewed code are validated; then perform the production smoke test and one controlled search.
 
 ## September 26 browser-fixture gate
 

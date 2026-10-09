@@ -67,6 +67,30 @@ test("current GitHub API 200 dispatch response is accepted", async (t) => {
   assert.equal(calls, 1);
 });
 
+test("GitHub rate limits and server errors remain retryable", async (t) => {
+  const oldFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = oldFetch; });
+  for (const status of [429, 500, 502, 503]) {
+    const { sqlite, env } = environment();
+    t.after(() => sqlite.close());
+    globalThis.fetch = async () => ({ status, text: async () => "temporary" });
+    assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z"), jobId), "dispatch_network");
+    assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id=?").get(jobId).status, "QUEUED");
+    assert.equal(sqlite.prepare("SELECT status FROM searches WHERE id='s'").get().status, "QUEUED");
+  }
+});
+
+test("permanently rejected dispatch remains distinguishable", async (t) => {
+  const oldFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = oldFetch; });
+  for (const [status, expected] of [[401, "dispatch_error"], [403, "dispatch_forbidden"], [422, "dispatch_error"]]) {
+    const { sqlite, env } = environment();
+    t.after(() => sqlite.close());
+    globalThis.fetch = async () => ({ status, text: async () => "rejected" });
+    assert.equal(await dispatchPending(env, new Date("2026-09-26T01:00:00.000Z"), jobId), expected);
+  }
+});
+
 test("disabled dispatch never contacts GitHub; failed dispatch stays queued with conservative reservation", async (t) => {
   const { sqlite, env } = environment();
   t.after(() => sqlite.close());

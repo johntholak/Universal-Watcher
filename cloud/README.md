@@ -98,5 +98,6 @@ sets private session and dispatch secrets, then smoke-tests the homepage and ses
 The Worker configuration explicitly removes Cron triggers. Each browser Search signals the fixed batch workflow,
 which claims one job and exits. The UI reports disabled dispatch as not connected and
 does not claim that the queued Search ran. Permanently invalid dispatch is recorded
-as a failed Search. Temporary network and capacity states remain visible and retry
-only while the user polls that Search.
+as a failed Search. Temporary network failures, GitHub rate limits, and server errors remain queued and retry
+only while the user polls that Search. Result cards show cuisine, classification, distance, known included
+items, and observation time when available; missing source data stays labeled unknown.

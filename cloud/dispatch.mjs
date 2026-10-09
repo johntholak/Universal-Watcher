@@ -107,7 +107,11 @@ export async function dispatchPending(env, at = new Date(), jobId) {
     if (response.status === 200 || response.status === 204) return "signaled";
     const detail = await response.text().catch(() => "");
     console.error("GitHub workflow dispatch rejected", response.status, detail.slice(0, 300));
-    return response.status === 403 ? "dispatch_forbidden" : "dispatch_error";
+    if (response.status === 403) return "dispatch_forbidden";
+    // Rate limits and server errors are temporary. Keep the user-started job
+    // queued so active polling can retry instead of reporting a false failure.
+    if (response.status === 429 || response.status >= 500) return "dispatch_network";
+    return "dispatch_error";
   } catch (error) {
     console.error("GitHub workflow dispatch failed", error instanceof Error ? error.message : "unknown error");
     return "dispatch_network";

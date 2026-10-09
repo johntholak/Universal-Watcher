@@ -47,6 +47,8 @@ class WebShellTests(unittest.TestCase):
         self.assertNotIn("Family Deals is next", html)
         for marker in ("dealCriteria()", "updateDealSummary()", "submitFamilyDealsSearch()", '"/api/v1/searches"', '/api/v1/results?', "PROVISIONAL RESULTS", "resultDetails[result.id]", "Coverage summary pending until verification completes", "Radius: ${coverage.radius_discovered ?? \"unknown\"} restaurants discovered", "Verification: ${coverage.checked ?? 0} of ${coverage.discovered ?? 0} checked", "cursors.has(key)", "DELAYED" ):
             self.assertIn(marker, js)
+        for marker in ("d.cuisine", "d.classification", "d.distance_miles", "d.included_food", "Distance unknown", "Included items unknown", "r.observed_at", "Last checked unknown"):
+            self.assertIn(marker, js)
         self.assertNotIn("state.pollCount >=", js)
 
     def test_shell_uses_locked_visual_language_and_hides_shelved_modules(self):
