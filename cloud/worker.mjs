@@ -273,6 +273,11 @@ export default {
       let input; try { input = await bodyObject(request); } catch { return json({ error: "Invalid request" }, 400); }
       if (input.module !== "family-deals") return json({ error: "Module search is not available yet" }, 400);
       let criteria; try { criteria = validateFamilyDealsCriteria(input.criteria); } catch (error) { return json({ error: error.message }, 400); }
+      try {
+        const active = await env.DB.prepare("SELECT id FROM searches WHERE user_id=? AND module='family-deals' AND status IN ('QUEUED','RUNNING') LIMIT 1")
+          .bind(identity.user_id).first();
+        if (active) return json({ error: "Your current Family Deals search is still running. Wait for it to finish before starting another." }, 409);
+      } catch { return json({ error: "Could not confirm whether another search is active" }, 503); }
       const id = crypto.randomUUID(), jobId = crypto.randomUUID(), stamp = now();
       const stored = { ...criteria }; delete stored.max_total_cents;
       try {
@@ -286,12 +291,20 @@ export default {
         console.error("Family Deals dispatch failed", error instanceof Error ? error.message : "unknown error");
         dispatch = "dispatch_error";
       }
-      if (dispatch === "dispatch_error") {
-        const reason = dispatch === "not_configured" ? "worker_dispatch_not_configured" : "worker_dispatch_error";
+      if (!["signaled", "idle", "not_connected"].includes(dispatch)) {
+        const reasons = {
+          not_configured: "worker_dispatch_not_configured",
+          dispatch_forbidden: "worker_dispatch_forbidden",
+          dispatch_network: "worker_dispatch_network_error",
+          dispatch_error: "worker_dispatch_error",
+          deferred: "worker_dispatch_deferred",
+          free_capacity: "worker_daily_capacity_exhausted",
+        };
+        const reason = reasons[dispatch] || "worker_dispatch_unavailable";
         try {
           await env.DB.batch([
-            env.DB.prepare("UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?,completed_at=? WHERE id=? AND user_id=? AND status='QUEUED'").bind(stamp, stamp, id, identity.user_id),
-            env.DB.prepare("UPDATE jobs SET status='FAILED',delay_reason=?,updated_at=? WHERE id=? AND user_id=? AND status='QUEUED'").bind(reason, stamp, jobId, identity.user_id),
+            env.DB.prepare("UPDATE searches SET status='FAILED',last_outcome='ERROR',updated_at=?,completed_at=? WHERE id=? AND user_id=? AND status IN ('QUEUED','DELAYED')").bind(stamp, stamp, id, identity.user_id),
+            env.DB.prepare("UPDATE jobs SET status='FAILED',delay_reason=?,updated_at=? WHERE id=? AND user_id=? AND status IN ('QUEUED','DELAYED')").bind(reason, stamp, jobId, identity.user_id),
           ]);
         } catch (error) {
           console.error("Family Deals dispatch failure could not be persisted", error instanceof Error ? error.message : "unknown error");

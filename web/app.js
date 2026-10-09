@@ -91,15 +91,14 @@
   }
   async function fetchAllSearchResults(searchId) {
     const results = [], seen = new Set();
-    let cursor = null, pages = 0;
+    let cursor = null;
     do {
       const query = new URLSearchParams({ search_id: searchId, limit: "50" });
       if (cursor) { query.set("before", cursor.before); query.set("before_id", cursor.before_id); }
       const data = await apiRequest(`/api/v1/results?${query}`);
       for (const result of data.results || []) if (!seen.has(result.id)) { seen.add(result.id); results.push(result); }
       cursor = data.next_cursor || null;
-      pages++;
-    } while (cursor && pages < 100);
+    } while (cursor);
     await Promise.all(results.map(async (result) => {
       if (state.resultDetails[result.id]) { Object.assign(result, state.resultDetails[result.id]); return; }
       try {
@@ -121,6 +120,8 @@
     panel.prepend(summary);
     if (search.status === "COMPLETED" || search.status === "FAILED" || search.status === "DELAYED") {
       window.clearTimeout(state.pollTimer); state.pollTimer = null;
+      state.currentSearchId = "";
+      byId("deal-search-form").querySelector('button[type="submit"]').disabled = false;
     }
   }
   async function pollFamilySearch(searchId) {
@@ -140,6 +141,8 @@
   }
   async function submitFamilyDealsSearch() {
     const form = byId("deal-search-form");
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (state.currentSearchId) { showToast("Your current Family Deals search is still running."); return; }
     if (!form.reportValidity()) return;
     if (!state.csrfToken) {
       byId("deal-auth-panel").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -153,6 +156,7 @@
       return;
     }
     try {
+      submitButton.disabled = true;
       window.clearTimeout(state.pollTimer);
       state.currentSearchId = ""; state.pollCount = 0;
       const created = await apiRequest("/api/v1/searches", { method: "POST", body: JSON.stringify({ module: "family-deals", criteria }) });
@@ -162,12 +166,15 @@
       if (created.dispatch === "signaled" || created.dispatch === "idle") {
         pollFamilySearch(created.id);
       } else {
+        state.currentSearchId = "";
+        submitButton.disabled = false;
         const detail = document.createElement("p");
         detail.textContent = "The search is saved, but the execution worker has not confirmed a run. No results will be invented. This needs backend dispatch configuration before it can run live.";
         panel.append(detail);
       }
       panel.scrollIntoView({ behavior: "smooth", block: "center" });
     } catch (error) {
+      submitButton.disabled = false;
       showToast(error.message || "Family Deals search could not be started.");
       setAuthMessage(error.message || "Connection needs attention.");
     }
