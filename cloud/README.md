@@ -10,11 +10,7 @@ slice, separately authenticated bounded job claims and lease heartbeat, chunked
 result intake, finalization, and paginated result reads. Result chunks are at
 most five records each to keep an invocation bounded; there is no overall
 result limit. Stable IDs and payload digests make duplicate delivery safe.
-This is offline code, not a deployed or complete API. `dispatch.mjs` can signal
-the fixed GitHub workflow after a Search and on a Cron tick, but defaults to
-`dispatch: not_connected`. `wrangler.example.toml` shows the intended 15-minute
-Cron and still has a D1 placeholder. No restaurant source is contacted by the
-API. `docs/API_V1_CONTRACT.md` defines the remaining route shapes.
+This is offline code until the dedicated API deployment workflow is run. The browser UI and API share one origin through the Worker static-assets binding. A user Search signals one fixed GitHub workflow run, which claims one job and exits. There is no recurring Cron trigger. Dispatch is bounded by a one-minute cooldown and daily run limit. `wrangler.example.toml` remains a deployment template with a D1 placeholder. No restaurant source is contacted by the API itself. `docs/API_V1_CONTRACT.md` defines the route shapes.
 No credential or database ID is stored here.
 
 The schema retains exact versioned criteria in compact JSON, separates one-time
@@ -29,9 +25,7 @@ API supports list/detail/history, Check Now, pause/resume/keep watching and
 soft-stop. An edit must reference a new completed Search owned by the user;
 it is rejected while that Watch has a pending/running job. The Watch copies
 the new exact criteria, increments its version and retains previous versions
-for interpreting older runs. Cron queues at most ten due Watches per tick without truncating the
-restaurant radius; a partial unique index and due-time key prevent duplicate
-active jobs. Results and coverage are scoped to the owner. Repeated identical
+for interpreting older runs. A partial unique index and due-time key prevent duplicate active Watch jobs. Watch scheduling is dormant while the Worker has no Cron trigger, in keeping with the on-demand-only deployment. Results and coverage are scoped to the owner. Repeated identical
 outcomes do not add redundant history; a changed outcome, candidate set or
 coverage does. Notifications are not connected yet.
 

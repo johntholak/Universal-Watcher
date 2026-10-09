@@ -32,10 +32,11 @@ jobs:
           python -m unittest discover -s tests -p "test_*.py" -v
           cd ../..
           python -m unittest cloud/test_family_deals_v5.py cloud/test_run_family_deals_batch.py -v
-          node --test cloud/test_dispatch.mjs cloud/test_results.mjs
+          node --test cloud/test_dispatch.mjs cloud/test_results.mjs cloud/test_worker.mjs
       - name: Validate Family Deals Worker JavaScript
         run: |
           node --check cloud/worker.mjs
+          node --check web/app.js
           node --check cloud/criteria.mjs
           node --check cloud/results.mjs
           node --check cloud/dispatch.mjs

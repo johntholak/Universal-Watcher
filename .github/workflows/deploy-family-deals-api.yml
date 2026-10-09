@@ -1,0 +1,90 @@
+name: Deploy Universal Watcher Family Deals API
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: universal-watcher-family-deals-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      UW_D1_DATABASE_NAME: ${{ secrets.UW_D1_DATABASE_NAME }}
+      UW_D1_DATABASE_ID: ${{ secrets.UW_D1_DATABASE_ID }}
+      ACCESS_SECRET: ${{ secrets.UW_ACCESS_SECRET }}
+      SESSION_KEY: ${{ secrets.UW_SESSION_KEY }}
+      WORKER_SECRET: ${{ secrets.UW_WORKER_SECRET }}
+      GITHUB_DISPATCH_TOKEN: ${{ secrets.UW_GITHUB_DISPATCH_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Validate deployment inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN UW_D1_DATABASE_NAME UW_D1_DATABASE_ID ACCESS_SECRET SESSION_KEY WORKER_SECRET GITHUB_DISPATCH_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing GitHub Actions secret for $name"
+              exit 1
+            fi
+          done
+          if [ "${#ACCESS_SECRET}" -lt 32 ] || [ "${#SESSION_KEY}" -lt 32 ] || [ "${#WORKER_SECRET}" -lt 32 ]; then
+            echo "::error::UW_ACCESS_SECRET, UW_SESSION_KEY, and UW_WORKER_SECRET must each be at least 32 characters."
+            exit 1
+          fi
+      - name: Generate Wrangler config
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          config = Path("cloud/wrangler.example.toml").read_text()
+          config = config.replace('database_name = "universal-watcher"', f'database_name = "{os.environ["UW_D1_DATABASE_NAME"]}"')
+          config = config.replace('database_id = "REPLACE_WITH_D1_DATABASE_ID"', f'database_id = "{os.environ["UW_D1_DATABASE_ID"]}"')
+          Path("cloud/wrangler.toml").write_text(config)
+          PY
+      - name: Run API and frontend checks
+        run: |
+          node --check cloud/worker.mjs
+          node --check web/app.js
+          node --test cloud/test_dispatch.mjs cloud/test_results.mjs cloud/test_worker.mjs
+          python -m unittest cloud/test_family_deals_v5.py cloud/test_run_family_deals_batch.py -v
+      - name: Apply D1 migrations
+        run: npx --yes wrangler@4 d1 migrations apply "${UW_D1_DATABASE_NAME}" --remote --config cloud/wrangler.toml
+      - name: Deploy same-origin app and API
+        run: npx --yes wrangler@4 deploy --config cloud/wrangler.toml
+      - name: Set private beta and dispatch secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$ACCESS_SECRET" | npx --yes wrangler@4 secret put ACCESS_SECRET --name universal-watcher-api
+          printf '%s' "$SESSION_KEY" | npx --yes wrangler@4 secret put SESSION_KEY --name universal-watcher-api
+          printf '%s' "$WORKER_SECRET" | npx --yes wrangler@4 secret put WORKER_SECRET --name universal-watcher-api
+          printf '%s' "$GITHUB_DISPATCH_TOKEN" | npx --yes wrangler@4 secret put GITHUB_DISPATCH_TOKEN --name universal-watcher-api
+      - name: Smoke test app and session endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="https://universal-watcher-api.johntholak.workers.dev"
+          curl -fsS --retry 3 --retry-delay 1 "$BASE_URL/" | grep -q "Universal Watcher"
+          SESSION_JSON="$(curl -fsS --retry 3 --retry-delay 1 -H "Origin: $BASE_URL" -H "Content-Type: application/json" -X POST "$BASE_URL/api/v1/session" --data "$(python -c 'import json,os; print(json.dumps({"access_secret":os.environ["ACCESS_SECRET"]}))')")"
+          python - "$SESSION_JSON" <<'PY'
+          import json,sys
+          data=json.loads(sys.argv[1])
+          assert data.get("authenticated") is True, data
+          assert data.get("csrf_token"), data
+          print("Universal Watcher static app and private session: OK")
+          PY

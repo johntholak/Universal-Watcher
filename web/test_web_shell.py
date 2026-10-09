@@ -27,7 +27,7 @@ class WebShellTests(unittest.TestCase):
         ):
             self.assertIn(marker, html)
 
-    def test_family_deals_flow_has_full_search_controls_and_truthful_preview(self):
+    def test_family_deals_flow_connects_to_on_demand_live_search(self):
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         js = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
         for marker in (
@@ -35,12 +35,13 @@ class WebShellTests(unittest.TestCase):
             'id="deal-radius"', 'id="deal-party-size"', 'id="deal-budget"',
             'name="deal-cuisine"', 'id="deal-restaurant-type"',
             'value="independent_local"', 'value="independent"', 'value="chains"',
-            'id="deal-open-tonight"', 'Find Family Deals', 'data-save-deal-watch',
-            'id="deal-preview-result"', 'No restaurant sources are contacted',
+            'id="deal-open-tonight"', 'Find Family Deals',
+            'id="deal-auth-form"', 'id="deal-access-secret"', 'id="deal-preview-result"',
+            'Search runs once when you ask', 'One-time search only',
         ):
             self.assertIn(marker, html)
         self.assertNotIn("Family Deals is next", html)
-        for marker in ("dealCriteria()", "updateDealSummary()", "showDealPreview()", 'createDraft("family-deals")', "No restaurants were checked"):
+        for marker in ("dealCriteria()", "updateDealSummary()", "submitFamilyDealsSearch()", '"/api/v1/searches"', '/api/v1/results?', "PROVISIONAL RESULTS", "resultDetails[result.id]"):
             self.assertIn(marker, js)
 
     def test_shell_uses_locked_visual_language_and_hides_shelved_modules(self):

@@ -52,10 +52,14 @@ export default {
     try { await expireExhaustedJobs(env); await restoreFreeCapacity(env); await queueDueWatches(env); } catch { /* Next tick retries queued work. */ }
   },
   async fetch(request, env) {
-    if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
     const url = new URL(request.url);
     const path = url.pathname;
+    if (!path.startsWith("/api/")) {
+      if (env?.ASSETS) return env.ASSETS.fetch(request);
+      return json({ error: "Not found" }, 404);
+    }
     if (!path.startsWith("/api/v1/")) return json({ error: "Not found" }, 404);
+    if (!requireConfig(env)) return json({ error: "Service is not configured" }, 503);
     if (request.method === "GET" && path === "/api/v1/system/status") return json({ state: "preview", execution: "not_connected" });
 
     if (request.method === "POST" && path === "/api/v1/session") {

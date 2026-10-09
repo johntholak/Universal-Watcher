@@ -8,5 +8,11 @@ binding = "DB"
 database_name = "universal-watcher"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
-[triggers]
-crons = ["*/15 * * * *"]
+[assets]
+directory = "../web"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[vars]
+DISPATCH_ENABLED = "true"
+DISPATCH_DAILY_LIMIT = "10"

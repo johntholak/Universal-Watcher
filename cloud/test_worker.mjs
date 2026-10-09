@@ -111,3 +111,14 @@ test("internal worker claim is authenticated, bounded and can renew its lease", 
   const heartbeat = await worker.fetch(request(`/api/v1/internal/jobs/${jobs[0].id}/heartbeat`, "POST", { claim_id: jobs[0].claim_id }, headers), env);
   assert.equal(heartbeat.status, 200);
 });
+
+test("static app assets are served even before API secrets are configured", async () => {
+  const requestRoot = new Request(base + "/", { method: "GET" });
+  const env = { ASSETS: { async fetch(request) {
+    assert.equal(new URL(request.url).pathname, "/");
+    return new Response("<title>Universal Watcher</title>", { headers: { "Content-Type": "text/html" } });
+  } } };
+  const response = await worker.fetch(requestRoot, env);
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /Universal Watcher/);
+});
