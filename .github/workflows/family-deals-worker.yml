@@ -2,6 +2,11 @@ name: Family Deals batch worker
 
 on:
   workflow_dispatch:
+    inputs:
+      job_id:
+        description: One queued Family Deals job ID
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -43,4 +48,5 @@ jobs:
         env:
           UW_API_BASE: ${{ secrets.UW_API_BASE }}
           UW_WORKER_SECRET: ${{ secrets.UW_WORKER_SECRET }}
+          UW_JOB_ID: ${{ inputs.job_id }}
         run: python cloud/run_family_deals_batch.py

@@ -6,6 +6,18 @@ WEB_ROOT = Path(__file__).parent
 
 
 class WebShellTests(unittest.TestCase):
+    def test_worker_deployment_explicitly_removes_recurring_cron_triggers(self):
+        config = (WEB_ROOT.parent / "cloud" / "wrangler.example.toml").read_text(encoding="utf-8")
+        self.assertRegex(config, r"(?m)^\[triggers\]\s*\ncrons\s*=\s*\[\s*\]")
+
+    def test_deployment_workflow_defaults_to_non_deploying_preflight(self):
+        workflow = (WEB_ROOT.parent / ".github" / "workflows" / "deploy-family-deals-api.yml").read_text(encoding="utf-8")
+        self.assertIn("default: preflight", workflow)
+        self.assertIn("type: choice", workflow)
+        self.assertIn("wrangler@4 deploy --dry-run", workflow)
+        for step in ("Apply D1 migrations", "Deploy same-origin app and API", "Set private beta and dispatch secrets", "Smoke test app and session endpoint"):
+            self.assertRegex(workflow, rf"(?s)- name: {step}\s+if: \$\{{\{{ inputs\.mode == 'deploy' \}}\}}")
+
     def test_shell_assets_exist(self):
         self.assertTrue((WEB_ROOT / "index.html").is_file())
         self.assertTrue((WEB_ROOT / "styles.css").is_file())
@@ -41,8 +53,11 @@ class WebShellTests(unittest.TestCase):
         ):
             self.assertIn(marker, html)
         self.assertNotIn("Family Deals is next", html)
-        for marker in ("dealCriteria()", "updateDealSummary()", "submitFamilyDealsSearch()", '"/api/v1/searches"', '/api/v1/results?', "PROVISIONAL RESULTS", "resultDetails[result.id]", "Coverage summary pending until verification completes", "Radius: ${coverage.radius_discovered ?? \"unknown\"} restaurants discovered", "Verification: ${coverage.checked ?? 0} of ${coverage.discovered ?? 0} checked", "state.pollCount >= 240", "data-poll-limit-note", "data-resume-family-search", "Check status again"):
+        for marker in ("dealCriteria()", "updateDealSummary()", "submitFamilyDealsSearch()", '"/api/v1/searches"', '/api/v1/results?', "PROVISIONAL RESULTS", "resultDetails[result.id]", "Coverage summary pending until verification completes", "Radius: ${coverage.radius_discovered ?? \"unknown\"} restaurants discovered", "Verification: ${coverage.checked ?? 0} of ${coverage.discovered ?? 0} checked", "cursors.has(key)", "DELAYED" ):
             self.assertIn(marker, js)
+        for marker in ("d.cuisine", "d.classification", "d.distance_miles", "d.included_food", "Distance unknown", "Included items unknown", "r.observed_at", "Last checked unknown"):
+            self.assertIn(marker, js)
+        self.assertNotIn("state.pollCount >=", js)
 
     def test_shell_uses_locked_visual_language_and_hides_shelved_modules(self):
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")

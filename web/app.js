@@ -84,13 +84,21 @@
       const serves = d.serves_max ? `Serves up to ${escapeHtml(d.serves_max)}` : "Serving capacity not verified";
       const restaurant = escapeHtml(d.restaurant || r.title || "Meal deal");
       const dealName = escapeHtml(d.deal_name || r.title || "Meal deal");
+      const cuisine = typeof d.cuisine === "string" && d.cuisine.trim() ? escapeHtml(d.cuisine) : "Cuisine unknown";
+      const classification = ({ independent: "Independent", local: "Local group", chain: "Chain", unknown: "Restaurant type unknown" })[d.classification] || "Restaurant type unknown";
+      const distance = Number.isFinite(d.distance_miles) && d.distance_miles >= 0 ? `${d.distance_miles.toFixed(1)} mi` : "Distance unknown";
+      const includedItems = Array.isArray(d.included_food) ? d.included_food.filter((item) => typeof item === "string" && item.trim()) : [];
+      const included = includedItems.length ? escapeHtml(includedItems.join(", "))
+        : typeof d.included_food === "string" && d.included_food.trim() ? escapeHtml(d.included_food) : "Included items unknown";
+      const checkedAt = typeof r.observed_at === "string" && Number.isFinite(Date.parse(r.observed_at))
+        ? new Date(r.observed_at).toLocaleString() : "Last checked unknown";
       const destination = typeof r.destination_url === "string" && /^https:\/\//i.test(r.destination_url) ? r.destination_url : "";
-      return `<article class="watch-item"><span class="result-badge result-${escapeHtml(r.outcome)}">${escapeHtml(r.outcome)}</span><div><strong>${dealName}</strong><small>${restaurant} · ${price} · ${serves}</small><p>${escapeHtml(r.summary || "")}</p>${evidence ? `<ul>${evidence}</ul>` : ""}${destination ? `<a href="${escapeHtml(destination)}" target="_blank" rel="noopener noreferrer">View deal source</a>` : ""}</div></article>`;
+      return `<article class="watch-item"><span class="result-badge result-${escapeHtml(r.outcome)}">${escapeHtml(r.outcome)}</span><div><strong>${dealName}</strong><small>${restaurant} · ${cuisine} · ${escapeHtml(classification)} · ${distance}</small><small>${price} · ${serves} · ${included}</small><p>${escapeHtml(r.summary || "")}</p><small>${escapeHtml(checkedAt)}</small>${evidence ? `<ul>${evidence}</ul>` : ""}${destination ? `<a href="${escapeHtml(destination)}" target="_blank" rel="noopener noreferrer">View deal source</a>` : ""}</div></article>`;
     }).join("");
     panel.innerHTML = `<div class="result-state-icon">${provisional ? "◷" : "✓"}</div><div><p class="eyebrow">${provisional ? "PROVISIONAL RESULTS" : "SEARCH RESULTS"}</p><h2>${results.length ? `${results.length} candidate${results.length === 1 ? "" : "s"} found` : "No candidates published yet"}</h2><p>${provisional ? "These are early candidates, not a final result. Keep this page open while full-radius coverage is checked." : "Search finished. Coverage and verification status determine whether the result is a confirmed match or an incomplete search."}</p></div><div class="full-list">${cards || "<p>No candidate results have arrived yet.</p>"}</div>`;
   }
   async function fetchAllSearchResults(searchId) {
-    const results = [], seen = new Set();
+    const results = [], seen = new Set(), cursors = new Set();
     let cursor = null;
     do {
       const query = new URLSearchParams({ search_id: searchId, limit: "50" });
@@ -98,6 +106,11 @@
       const data = await apiRequest(`/api/v1/results?${query}`);
       for (const result of data.results || []) if (!seen.has(result.id)) { seen.add(result.id); results.push(result); }
       cursor = data.next_cursor || null;
+      if (cursor) {
+        const key = `${cursor.before}|${cursor.before_id}`;
+        if (cursors.has(key)) throw new Error("Results pagination returned a repeated cursor.");
+        cursors.add(key);
+      }
     } while (cursor);
     await Promise.all(results.map(async (result) => {
       if (state.resultDetails[result.id]) { Object.assign(result, state.resultDetails[result.id]); return; }
@@ -116,11 +129,11 @@
       ? `Radius: ${coverage.radius_discovered ?? "unknown"} restaurants discovered · Verification: ${coverage.checked ?? 0} of ${coverage.discovered ?? 0} checked · ${coverage.unavailable ?? 0} unavailable · ${coverage.unresolved ?? 0} unresolved`
       : "Coverage summary pending until verification completes";
     const statusText = ({ QUEUED: "Search queued", RUNNING: "Checking the full radius", COMPLETED: search.last_outcome || "Search completed", FAILED: "Search failed", DELAYED: "Search delayed" })[search.status] || search.status;
-    renderLiveDealResults(results, ["QUEUED", "RUNNING"].includes(search.status));
+    renderLiveDealResults(results, ["QUEUED", "RUNNING", "DELAYED"].includes(search.status));
     const summary = document.createElement("p");
     summary.textContent = `${statusText}. ${coverageLine}.`;
     panel.prepend(summary);
-    if (search.status === "COMPLETED" || search.status === "FAILED" || search.status === "DELAYED") {
+    if (search.status === "COMPLETED" || search.status === "FAILED") {
       window.clearTimeout(state.pollTimer); state.pollTimer = null;
       state.currentSearchId = "";
       byId("deal-search-form").querySelector('button[type="submit"]').disabled = false;
@@ -128,23 +141,6 @@
   }
   async function pollFamilySearch(searchId) {
     if (state.currentSearchId !== searchId) return;
-    if (state.pollCount >= 240) {
-      const panel = byId("deal-preview-result");
-      if (panel && !panel.querySelector("[data-poll-limit-note]")) {
-        const note = document.createElement("p");
-        note.dataset.pollLimitNote = "true";
-        note.textContent = "This search is taking longer than expected. Automatic refresh has paused, but the search has not been marked as failed.";
-        const retry = document.createElement("button");
-        retry.type = "button";
-        retry.className = "button button-outline";
-        retry.dataset.resumeFamilySearch = "true";
-        retry.textContent = "Check status again";
-        note.append(" ", retry);
-        panel.append(note);
-      }
-      state.pollTimer = null;
-      return;
-    }
     state.pollCount++;
     try {
       const [search, results] = await Promise.all([
@@ -152,10 +148,13 @@
         fetchAllSearchResults(searchId)
       ]);
       renderSearchProgress(search, results);
-      if (["QUEUED", "RUNNING"].includes(search.status)) state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 2500);
+      if (["QUEUED", "RUNNING", "DELAYED"].includes(search.status)) {
+        const delay = Math.min(30000, 2500 * (2 ** Math.min(state.pollCount - 1, 4)));
+        state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), delay);
+      }
     } catch (error) {
       showToast(error.message || "Could not refresh search progress.");
-      state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 5000);
+      state.pollTimer = window.setTimeout(() => pollFamilySearch(searchId), 30000);
     }
   }
   async function submitFamilyDealsSearch() {
@@ -182,7 +181,7 @@
       state.currentSearchId = created.id;
       const panel = byId("deal-preview-result"); panel.hidden = false;
       panel.innerHTML = `<div class="result-state-icon">◷</div><div><p class="eyebrow">ONE-TIME SEARCH</p><h2>Search ${escapeHtml(created.status || "queued")}</h2><p>Search ID: ${escapeHtml(created.id)}. Worker dispatch: ${escapeHtml(created.dispatch || "unknown")}.</p></div>`;
-      if (created.dispatch === "signaled" || created.dispatch === "idle") {
+      if (["signaled", "idle", "deferred", "free_capacity", "dispatch_network", "not_connected"].includes(created.dispatch)) {
         pollFamilySearch(created.id);
       } else {
         state.currentSearchId = "";
@@ -265,10 +264,6 @@
       navigator.geolocation.getCurrentPosition(({ coords }) => { byId("deal-location").value = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`; updateDealSummary(); }, () => showToast("Location access was unavailable. Enter an address or ZIP instead."), { timeout: 10000, maximumAge: 300000 });
     }
     const action = event.target.closest("[data-watch-action]"); if (action) changeWatchStatus(action.dataset.watchId, action.dataset.watchAction);
-    if (event.target.closest("[data-resume-family-search]") && state.currentSearchId) {
-      state.pollCount = 0;
-      pollFamilySearch(state.currentSearchId);
-    }
   });
   byId("movie-search-form").addEventListener("input", updateSummary); byId("movie-search-form").addEventListener("change", updateSummary); byId("movie-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateSummary(); showOfflineResult(); });
   byId("deal-search-form").addEventListener("input", updateDealSummary); byId("deal-search-form").addEventListener("change", updateDealSummary); byId("deal-search-form").addEventListener("submit", (event) => { event.preventDefault(); updateDealSummary(); submitFamilyDealsSearch(); });

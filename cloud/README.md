@@ -10,7 +10,7 @@ slice, separately authenticated bounded job claims and lease heartbeat, chunked
 result intake, live coverage progress, finalization, and paginated result reads. Result chunks are at
 most five records each to keep an invocation bounded; there is no overall
 result limit. Stable IDs and payload digests make duplicate delivery safe.
-This is offline code until the dedicated API deployment workflow is run. The browser UI and API share one origin through the Worker static-assets binding. A user Search signals one fixed GitHub workflow run, which claims one job and exits. There is no recurring Cron trigger. Dispatch is bounded by a one-minute cooldown and daily run limit. `wrangler.example.toml` remains a deployment template with a D1 placeholder. No restaurant source is contacted by the API itself. `docs/API_V1_CONTRACT.md` defines the route shapes.
+This repository branch is reviewed and CI-tested; production deployment remains separately gated. The browser UI and API share one origin through the Worker static-assets binding. A user Search signals one fixed GitHub workflow run, which claims one job and exits. `wrangler.example.toml` explicitly sets `crons = []`, so deployment removes recurring Worker triggers. Dispatch is bounded by a one-minute cooldown and daily run limit. The template has a D1 placeholder. No restaurant source is contacted by the API itself. `docs/API_V1_CONTRACT.md` defines the route shapes.
 No credential or database ID is stored here.
 
 The schema retains exact versioned criteria in compact JSON, separates one-time
@@ -59,10 +59,11 @@ and an integer `DISPATCH_DAILY_LIMIT` (1–100) are configured. Set that limit
 only after calculating a conservative allowance from the account's free Actions
 balance and the 120-minute workflow timeout. The D1 gate reserves one run
 before contacting GitHub and retains ambiguous failures as reservations.
-When the daily allowance is exhausted, the one-time Search is failed with an
-explicit capacity error rather than left queued. The current deployment has no
-Cron trigger. Dispatch carries only `{ "ref": "main" }`; the runner claims criteria
-from D1 through the authenticated API. The dispatch limit is local to this
+When the daily allowance is exhausted, the one-time Search is delayed with an
+explicit capacity state. While the browser continues polling, it retries dispatch
+after the due time. The current deployment has no Cron trigger. Dispatch carries
+`{ "ref": "main", "inputs": { "job_id": "…" } }`; the runner claims only that job's
+criteria from D1 through the authenticated API. The dispatch limit is local to this
 Worker and cannot see other repositories' use of the same account's Actions balance.
 
 Run the offline migration test from the repository root:
@@ -79,8 +80,12 @@ site and API must share an origin for the strict cookie and CSRF checks.
 
 ## On-demand production deployment
 
-Run the manual GitHub Actions workflow **Deploy Universal Watcher Family Deals API**
-only after these repository Actions secrets exist:
+The manual GitHub Actions workflow **Deploy Universal Watcher Family Deals API**
+defaults to `preflight`. That mode checks that the required repository Actions
+secrets are present, authenticates to Cloudflare, looks up the configured D1
+database, and compiles the Worker/assets with Wrangler dry-run. It prints secret
+names only, never values, and does not run migrations or deploy. The required
+secrets are:
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
@@ -92,8 +97,14 @@ only after these repository Actions secrets exist:
 - `UW_API_BASE` (the HTTPS API Worker origin used by the batch runner)
 - `UW_GITHUB_DISPATCH_TOKEN` (a GitHub token scoped to this repository with Actions: read/write permission)
 
-The workflow applies D1 migrations, deploys the app and API from the same Worker origin,
+Select `deploy` only after the preflight passes and deployment is approved. That
+mode applies D1 migrations, deploys the app and API from the same Worker origin,
 sets private session and dispatch secrets, then smoke-tests the homepage and session.
-The Worker has no Cron trigger. Each browser Search signals the fixed batch workflow,
-which claims one job and exits. Failed dispatch is recorded as a failed Search instead
-of leaving a hidden queued job behind.
+Preflight cannot verify the dispatch token's Actions permission without sending
+a workflow dispatch, which would create a real runner execution.
+The Worker configuration explicitly removes Cron triggers. Each browser Search signals the fixed batch workflow,
+which claims one job and exits. The UI reports disabled dispatch as not connected and
+does not claim that the queued Search ran. Permanently invalid dispatch is recorded
+as a failed Search. Temporary network failures, GitHub rate limits, and server errors remain queued and retry
+only while the user polls that Search. Result cards show cuisine, classification, distance, known included
+items, and observation time when available; missing source data stays labeled unknown.

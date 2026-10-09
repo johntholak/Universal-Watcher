@@ -40,11 +40,12 @@ test("chunked results survive duplicate delivery and have no global match cap", 
     assert.equal(created.status, 202);
     const searchId = (await created.json()).id;
     const headers = { Authorization: `Bearer ${env.WORKER_SECRET}` };
-    const claim = await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { limit: 1, module: "family-deals" }, headers), env);
+    const targetJobId = sqlite.prepare("SELECT id FROM jobs WHERE search_id=?").get(searchId).id;
+    const claim = await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { limit: 1, module: "family-deals", job_id: targetJobId }, headers), env);
     assert.equal(claim.status, 200);
     const job = (await claim.json()).jobs[0];
     assert.deepEqual(job.criteria, criteria);
-    const progressCoverage = { state: "partial", discovered: 12, checked: 3, unavailable: 1, unresolved: 2 };
+    const progressCoverage = { state: "partial", radius_discovered: 12, discovered: 12, checked: 3, unavailable: 1, unresolved: 2 };
     const progressResponse = await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/progress`, "POST", {
       claim_id: job.claim_id, coverage: progressCoverage, summary: "3 checked so far",
     }, headers), env);
@@ -119,7 +120,8 @@ test("partial provider coverage cannot finalize as no-match", async () => {
     const criteria = { schema_version: 1, location: "91304", radius_miles: 2, party_size: 7, max_total_price: 85, cuisines: [], restaurant_type: "any", open_tonight: false };
     await worker.fetch(request("/api/v1/searches", "POST", { module: "family-deals", criteria }, { Cookie: cookie, "X-CSRF-Token": csrf_token }), env);
     const headers = { Authorization: `Bearer ${env.WORKER_SECRET}` };
-    const job = (await (await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { limit: 1, module: "family-deals" }, headers), env)).json()).jobs[0];
+    const targetJobId = sqlite.prepare("SELECT id FROM jobs WHERE search_id=?").get(sqlite.prepare("SELECT id FROM searches WHERE user_id='private-beta'").get().id).id;
+    const job = (await (await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { limit: 1, module: "family-deals", job_id: targetJobId }, headers), env)).json()).jobs[0];
     const completion = { claim_id: job.claim_id, outcome: "NO_MATCH", summary: "None found", coverage: { state: "partial", discovered: 12, checked: 9, unavailable: 3, unresolved: 0 } };
     assert.equal((await worker.fetch(request(`/api/v1/internal/jobs/${job.id}/complete`, "POST", completion, headers), env)).status, 400);
     assert.equal(sqlite.prepare("SELECT status FROM jobs WHERE id=?").get(job.id).status, "CLAIMED");

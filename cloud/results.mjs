@@ -27,6 +27,18 @@ export function validateResultChunk(input) {
   return { claim_id: input.claim_id, items };
 }
 
+export function validateProgress(input) {
+  if (!input || typeof input !== "object" || !idPattern.test(input.claim_id || "")) throw invalid("Invalid claim");
+  const coverage = input.coverage;
+  if (!coverage || typeof coverage !== "object" || Array.isArray(coverage) || !new Set(["partial", "unavailable"]).has(coverage.state)) throw invalid("Progress needs incomplete coverage");
+  for (const key of ["discovered", "checked", "unavailable", "unresolved"]) if (!Number.isSafeInteger(coverage[key]) || coverage[key] < 0) throw invalid("Coverage counts must be nonnegative integers");
+  const radiusDiscovered = coverage.radius_discovered ?? coverage.discovered;
+  if (!Number.isSafeInteger(radiusDiscovered) || radiusDiscovered < coverage.discovered) throw invalid("Radius discovery count is inconsistent");
+  if (coverage.checked + coverage.unavailable + coverage.unresolved > coverage.discovered) throw invalid("Coverage counts exceed discovery");
+  if (input.summary != null && (!shortText(input.summary, 800))) throw invalid("Invalid progress summary");
+  return { claim_id: input.claim_id, summary: input.summary || null, coverage: { state: coverage.state, radius_discovered: radiusDiscovered, discovered: coverage.discovered, checked: coverage.checked, unavailable: coverage.unavailable, unresolved: coverage.unresolved } };
+}
+
 export function verifyFamilyMatch(item, criteria) {
   if (item.outcome !== "MATCH") return;
   const details = item.details;

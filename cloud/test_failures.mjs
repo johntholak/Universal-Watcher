@@ -27,7 +27,7 @@ function environment() {
       catch (error) { sqlite.exec("ROLLBACK"); throw error; }
     },
   };
-  return { sqlite, env: { DB, ACCESS_SECRET: "a".repeat(40), SESSION_KEY: "b".repeat(40), WORKER_SECRET: "c".repeat(40) } };
+  return { sqlite, env: { DB, sqlite, ACCESS_SECRET: "a".repeat(40), SESSION_KEY: "b".repeat(40), WORKER_SECRET: "c".repeat(40) } };
 }
 async function createSearch(env) {
   const login = await worker.fetch(request("/api/v1/session", "POST", { access_secret: env.ACCESS_SECRET }), env);
@@ -38,7 +38,9 @@ async function createSearch(env) {
 }
 const internal = (env) => ({ Authorization: `Bearer ${env.WORKER_SECRET}` });
 async function claim(env) {
-  const response = await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { module: "family-deals", limit: 1 }, internal(env)), env);
+  const jobId = env.sqlite.prepare("SELECT id FROM jobs WHERE status IN ('QUEUED','RETRYABLE','DELAYED','CLAIMED','RUNNING') ORDER BY due_at,id LIMIT 1").get()?.id;
+  if (!jobId) return undefined;
+  const response = await worker.fetch(request("/api/v1/internal/jobs/claim", "POST", { module: "family-deals", limit: 1, job_id: jobId }, internal(env)), env);
   assert.equal(response.status, 200);
   return (await response.json()).jobs[0];
 }

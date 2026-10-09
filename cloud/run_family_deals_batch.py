@@ -121,6 +121,15 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
             if lost.is_set():
                 raise RuntimeError("Job lease was lost; progressive results will not be submitted")
             partial = normalize_v5_snapshot(snapshot, job["criteria"], job["id"])
+            try:
+                await asyncio.to_thread(
+                    api.post,
+                    f"/api/v1/internal/jobs/{job['id']}/progress",
+                    {"claim_id": job["claim_id"], "coverage": partial["coverage"], "summary": partial["summary"]},
+                )
+            except Exception as exc:
+                # Early coverage is useful, but a transient reporting failure must not abort the scan.
+                print(f"Family Deals progress update skipped: {type(exc).__name__}")
             pending = [item for item in partial["results"] if item["id"] not in published_ids]
             path = f"/api/v1/internal/jobs/{job['id']}/results"
             for offset in range(0, len(pending), 5):
@@ -130,17 +139,6 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
                     {"claim_id": job["claim_id"], "items": chunk},
                 )
                 published_ids.update(item["id"] for item in chunk)
-            if job.get("search_id"):
-                try:
-                    await asyncio.to_thread(
-                        api.post,
-                        f"/api/v1/internal/jobs/{job['id']}/progress",
-                        {"claim_id": job["claim_id"], "coverage": partial["coverage"], "summary": partial["summary"]},
-                    )
-                except Exception as exc:
-                    # Coverage progress is helpful, but a transient reporting failure must not abort the scan.
-                    print(f"Family Deals progress update skipped: {type(exc).__name__}")
-
         try:
             snapshot = await asyncio.wait_for(
                 run_v5_page(page, base_url, job["criteria"], on_progress=publish_progress),
@@ -190,7 +188,7 @@ async def execute_job(api: WorkerAPI, page: Any, base_url: str,
         await renewal
 
 
-async def run_batch(api: WorkerAPI) -> int:
+async def run_batch(api: WorkerAPI, job_id: str) -> int:
     from playwright.async_api import async_playwright
 
     state = await asyncio.to_thread(api.get, "/api/v1/internal/jobs/state")
@@ -198,7 +196,7 @@ async def run_batch(api: WorkerAPI) -> int:
     pending = await asyncio.to_thread(
         api.post,
         "/api/v1/internal/jobs/claim",
-        {"module": "family-deals", "limit": 1},
+        {"module": "family-deals", "limit": 1, "job_id": job_id},
     )
     if not pending.get("jobs"):
         return 0
@@ -224,7 +222,10 @@ async def run_batch(api: WorkerAPI) -> int:
 
 def main() -> int:
     api = WorkerAPI(os.environ.get("UW_API_BASE", ""), os.environ.get("UW_WORKER_SECRET", ""))
-    count = asyncio.run(run_batch(api))
+    job_id = os.environ.get("UW_JOB_ID", "")
+    if len(job_id) != 36 or job_id.count("-") != 4:
+        raise RuntimeError("Worker run needs one dispatched job ID")
+    count = asyncio.run(run_batch(api, job_id))
     print(f"Family Deals jobs handled: {count}")
     return 0
 
