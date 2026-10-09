@@ -68,6 +68,17 @@ test("scheduled tick is inert before guarded dispatch is configured", async () =
   await worker.scheduled({ cron: "*/15 * * * *" }, env);
 });
 
+test("system status reports configured on-demand mode without claiming a recurring schedule", async () => {
+  const { env } = environment();
+  const response = await worker.fetch(request("/api/v1/system/status"), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { state: "configured", dispatch: "not_connected", scheduled_checks: false });
+  env.DISPATCH_ENABLED = "true";
+  env.GITHUB_DISPATCH_TOKEN = "g".repeat(40);
+  const ready = await worker.fetch(request("/api/v1/system/status"), env);
+  assert.deepEqual(await ready.json(), { state: "configured", dispatch: "ready", scheduled_checks: false });
+});
+
 test("session denies wrong secret and origin; cookie is secure", async () => {
   const { env } = environment();
   assert.equal((await worker.fetch(request("/api/v1/session", "POST", { access_secret: "wrong" }), env)).status, 401);
